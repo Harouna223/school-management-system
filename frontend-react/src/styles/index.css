@@ -1,0 +1,310 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100vh;
+}
+
+body {
+  font-family: 'Inter Variable', 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #f8fafc;
+  background-image:
+    radial-gradient(1100px 480px at 85% -10%, rgba(37, 99, 235, 0.05) 0%, transparent 60%),
+    radial-gradient(900px 420px at -10% 0%, rgba(79, 70, 229, 0.035) 0%, transparent 55%);
+  background-attachment: fixed;
+  color: #1e293b;
+  transition: background-color 240ms ease, color 240ms ease;
+}
+
+.dark body {
+  background-color: #0b1220;
+  background-image:
+    radial-gradient(1100px 480px at 85% -10%, rgba(37, 99, 235, 0.07) 0%, transparent 60%),
+    radial-gradient(900px 420px at -10% 0%, rgba(79, 70, 229, 0.045) 0%, transparent 55%);
+  color: #e2e8f0;
+}
+
+/* Scrollbar moderne */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+@layer components {
+  .page-title {
+    @apply text-[26px] font-extrabold text-slate-900 dark:text-slate-100 tracking-tight;
+  }
+  .page-subtitle {
+    @apply text-sm text-slate-500 dark:text-slate-400;
+  }
+  /* Libellé de section dans les formulaires / fiches */
+  .section-label {
+    @apply text-[11px] font-bold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500;
+  }
+  /* Carte cliquable : élévation au survol */
+  .card-lift {
+    transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
+  }
+  .card-lift:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 14px 32px rgba(15, 23, 42, 0.1) !important;
+  }
+  .dark .card-lift:hover {
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.4) !important;
+  }
+
+  /* ============================================================
+     DESIGN SYSTEM SMS — utilitaires avancés
+     ============================================================ */
+
+  /* Conteneur de carte de filtres standardisée */
+  .filter-card {
+    @apply rounded-2xl border border-slate-200 bg-white p-3.5 shadow-[0_1px_3px_rgba(15,23,42,0.04),0_4px_16px_rgba(15,23,42,0.04)] dark:border-slate-800 dark:bg-slate-900;
+    transition: background-color 240ms ease, border-color 240ms ease;
+  }
+
+  /* Bannière héros du tableau de bord */
+  .hero-banner {
+    position: relative;
+    overflow: hidden;
+    border-radius: 20px;
+    background: linear-gradient(120deg, #1e3a8a 0%, #2563eb 55%, #4f46e5 100%);
+    color: #fff;
+  }
+  .hero-banner::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(600px 300px at 90% -20%, rgba(255, 255, 255, 0.14) 0%, transparent 60%),
+      radial-gradient(500px 280px at -10% 110%, rgba(255, 255, 255, 0.08) 0%, transparent 55%);
+    pointer-events: none;
+  }
+  .hero-banner::after {
+    content: '';
+    position: absolute;
+    right: -80px;
+    top: -80px;
+    width: 320px;
+    height: 320px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    pointer-events: none;
+  }
+
+  /* En-tête de carte graphique */
+  .chart-card {
+    @apply rounded-2xl border border-slate-200 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04),0_4px_16px_rgba(15,23,42,0.04)] dark:border-slate-800 dark:bg-slate-900;
+    transition: background-color 240ms ease, border-color 240ms ease, box-shadow 220ms ease;
+  }
+
+  /* Puce « soft » générique */
+  .soft-badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold;
+  }
+
+  /* Table horizontale scrollable sur petits écrans */
+  .table-responsive {
+    @apply w-full overflow-x-auto;
+  }
+}
+
+/* Animations légères */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Apparition différée (stagger) pour les cartes du dashboard */
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Transition douce entre les pages */
+@keyframes pageFade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.page-fade {
+  animation: pageFade 260ms ease both;
+}
+
+/* Halo lumineux au survol des cartes KPI */
+.stat-card {
+  position: relative;
+}
+.stat-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 300ms ease;
+  background: radial-gradient(480px 220px at 100% -20%, rgba(37, 99, 235, 0.06), transparent 60%);
+}
+.stat-card:hover::after {
+  opacity: 1;
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 320ms ease both;
+}
+
+.animate-fade-in {
+  animation: fadeIn 240ms ease both;
+}
+
+.animate-scale-in {
+  animation: scaleIn 220ms ease both;
+}
+
+/* Stagger : la classe parente définit un délai par index via style inline */
+.stagger-1 { animation: riseIn 420ms cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: 40ms; }
+.stagger-2 { animation: riseIn 420ms cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: 80ms; }
+.stagger-3 { animation: riseIn 420ms cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: 120ms; }
+.stagger-4 { animation: riseIn 420ms cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: 160ms; }
+.stagger-5 { animation: riseIn 420ms cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: 200ms; }
+.stagger-6 { animation: riseIn 420ms cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: 240ms; }
+.stagger-7 { animation: riseIn 420ms cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: 280ms; }
+.stagger-8 { animation: riseIn 420ms cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: 320ms; }
+
+/* Cartes statistiques : effet hover subtil */
+.stat-card {
+  transition: transform 220ms ease, box-shadow 220ms ease;
+}
+.stat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.1) !important;
+}
+.dark .stat-card:hover {
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Sidebar : item actif avec barre d'indication */
+.nav-item .MuiListItemButton-root.Mui-selected {
+  position: relative;
+}
+.nav-item .MuiListItemButton-root.Mui-selected::before {
+  content: '';
+  position: absolute;
+  left: -10px;
+  top: 28%;
+  bottom: 28%;
+  width: 3.5px;
+  border-radius: 0 4px 4px 0;
+  background: linear-gradient(180deg, #2563eb, #4f46e5);
+}
+.dark .nav-item .MuiListItemButton-root.Mui-selected::before {
+  background: linear-gradient(180deg, #3b82f6, #818cf8);
+}
+
+/* Sélection de texte */
+::selection {
+  background: rgba(37, 99, 235, 0.18);
+}
+
+/* Focus visible accessible */
+:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.5);
+  outline-offset: 1px;
+}
+
+/* Impression : n'affiche que la zone du bulletin */
+@media print {
+  body.printing * {
+    visibility: hidden !important;
+  }
+  body.printing .print-area,
+  body.printing .print-area * {
+    visibility: visible !important;
+  }
+  body.printing .print-area {
+    position: absolute !important;
+    inset: 0;
+    width: 100%;
+  }
+  .print-area-hidden {
+    display: none !important;
+  }
+
+  /* Documents élèves : une seule section à imprimer */
+  body.printing .doc-toolbar {
+    display: none !important;
+  }
+  body.printing.print-card .cert-area {
+    display: none !important;
+  }
+  body.printing.print-cert .card-area {
+    display: none !important;
+  }
+  body.printing.print-card .card-area {
+    margin-top: 24mm;
+  }
+}

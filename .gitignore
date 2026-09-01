@@ -1,0 +1,14 @@
+target/
+node_modules/
+dist/
+*.jar
+*.log
+.env
+.vscode/
+.idea/
+*.iml
+.DS_Store
+docker-compose.override.yml
+backend-springboot/target/
+frontend-react/node_modules/
+frontend-react/dist/

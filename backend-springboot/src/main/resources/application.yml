@@ -1,0 +1,77 @@
+spring:
+  application:
+    name: school-management-backend
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:school_management}?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    open-in-view: true
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 10MB
+
+server:
+  port: ${SERVER_PORT:8080}
+  error:
+    include-message: always
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:Y2hhbmdlLXRoaXMtc2VjcmV0LWtleS1pbi1wcm9kdWN0aW9uLXdpdGgtYTM3LWNyYXdhbGxlbg==}
+    expiration-ms: 3600000
+    refresh-expiration-ms: 604800000
+  cors:
+    allowed-origins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:3000}
+  upload-dir: ${UPLOAD_DIR:./uploads}
+  school:
+    name: ${SCHOOL_NAME:École Moderne de Technologie}
+    address: ${SCHOOL_ADDRESS:Douala, Cameroun}
+    phone: ${SCHOOL_PHONE:+237 600 000 000}
+    email: ${SCHOOL_EMAIL:contact@school.edu}
+  whatsapp:
+    enabled: ${WA_ENABLED:false}
+    provider: ${WA_PROVIDER:meta}
+    meta-token: ${WA_META_TOKEN:}
+    meta-phone-id: ${WA_META_PHONE_ID:}
+    twilio-sid: ${WA_TWILIO_SID:}
+    twilio-token: ${WA_TWILIO_TOKEN:}
+    twilio-from: ${WA_TWILIO_FROM:}
+    default-country-code: ${WA_COUNTRY_CODE:237}
+  sms:
+    enabled: ${SMS_ENABLED:false}
+    twilio-sid: ${SMS_TWILIO_SID:${WA_TWILIO_SID:}}
+    twilio-token: ${SMS_TWILIO_TOKEN:${WA_TWILIO_TOKEN:}}
+    twilio-from: ${SMS_TWILIO_FROM:}
+  admin:
+    username: admin
+    password: ${ADMIN_PASSWORD:Admin@123}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: method
+  api-docs:
+    path: /v3/api-docs
+
+logging:
+  level:
+    com.school: INFO
+    org.springframework.security: WARN
