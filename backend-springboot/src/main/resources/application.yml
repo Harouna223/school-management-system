@@ -77,20 +77,26 @@ logging:
     org.springframework.security: WARN
 
 management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info
   health:
-    db:
-      enabled: true
     mail:
       enabled: false
+    db:
+      enabled: true
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
   endpoint:
     health:
       show-details: always
       group:
+        liveness:
+          include: livenessState
         readiness:
-          include: db,diskSpace,ping
+          include: readinessState,db,diskSpace
       probes:
         enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,info
