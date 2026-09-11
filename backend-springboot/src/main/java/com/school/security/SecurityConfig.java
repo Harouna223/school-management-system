@@ -1,5 +1,7 @@
 package com.school.security;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -108,9 +110,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/alumni/**").hasAnyAuthority("PERM_LMD_WRITE")
                         .requestMatchers("/api/backup/**").hasAuthority("PERM_BACKUP_WRITE")
                         .requestMatchers(HttpMethod.GET, "/api/users/**", "/api/roles/**", "/api/audit/**")
-                        .hasAnyAuthority("PERM_USER_READ")
+                        .hasAnyAuthority("PERM_USER_READ", "ROLE_SUPER_ADMIN", "ROLE_ADMIN")
                         .requestMatchers("/api/users/**", "/api/roles/**", "/api/audit/**")
-                        .hasAnyAuthority("PERM_USER_WRITE")
+                        .hasAnyAuthority("PERM_USER_WRITE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN")
                         // Journal d'audit : lecture réservée aux rôles autorisés
                         .requestMatchers(HttpMethod.GET, "/api/dashboard/audit-logs/**")
                         .hasAnyAuthority("PERM_USER_READ")
@@ -121,6 +123,23 @@ public class SecurityConfig {
                         .requestMatchers("/api/settings/**").hasRole("SUPER_ADMIN")
                         // Toute autre requête exige une authentification
                         .anyRequest().authenticated())
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.setContentType("application/json;charset=UTF-8");
+                            response.getWriter().write(
+                                    "{\"success\":false,\"message\":\"Non authentifié : jeton manquant ou invalide\","
+                                            + "\"path\":\"" + request.getRequestURI() + "\",\"timestamp\":\""
+                                            + java.time.LocalDateTime.now() + "\"}");
+                        })
+                        .accessDeniedHandler((request, response, accessDeniedException) -> {
+                            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                            response.setContentType("application/json;charset=UTF-8");
+                            response.getWriter().write(
+                                    "{\"success\":false,\"message\":\"Accès refusé : permissions insuffisantes\","
+                                            + "\"path\":\"" + request.getRequestURI() + "\",\"timestamp\":\""
+                                            + java.time.LocalDateTime.now() + "\"}");
+                        }))
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtExceptionFilter, JwtAuthenticationFilter.class);

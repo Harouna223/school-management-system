@@ -81,9 +81,11 @@ management:
     web:
       exposure:
         include: health
+  health:
+    db:
+      enabled: false
   endpoint:
     health:
       show-details: never
-  health:
-    db:
-      enabled: true
+      probes:
+        enabled: true
