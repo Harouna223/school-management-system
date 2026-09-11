@@ -12,3 +12,13 @@ docker-compose.override.yml
 backend-springboot/target/
 frontend-react/node_modules/
 frontend-react/dist/
+
+# Artefacts créés par des commandes terminales accidentelles
+/[Help
+/cd
+/git
+/mvn
+/_mvn_ver.txt
+/_node_ver.txt
+/_build_backend.log
+/backend-springboot/erreur.txt

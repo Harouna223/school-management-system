@@ -32,7 +32,7 @@ school-management-system/
 ├── backend-springboot/
 │   └── src/main/java/com/school/
 │       ├── config/             # AppProperties, OpenApiConfig, WebConfig, DataInitializer
-│       ├── controller/         # 16 contrôleurs REST (/api/...)
+│       ├── controller/         # 28 contrôleurs REST (/api/...)
 │       ├── dto/                # DTOs request/response (validation Jakarta)
 │       ├── entity/             # 27 entités JPA
 │       ├── enums/              # Rôles, statuts, types...
