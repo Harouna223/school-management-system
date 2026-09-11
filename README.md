@@ -15,6 +15,9 @@ Système complet de gestion scolaire : élèves, enseignants, classes, emplois d
 
 ### Option 1 — Docker (recommandé)
 
+> **Prérequis :** Docker Desktop démarré. Le port MySQL est défini dans `docker/.env` (`DB_PORT`).
+> Sur cette machine : **3307** (un ancien MySQL local 5.6 occupe déjà le 3306).
+
 ```bash
 docker compose -f docker/docker-compose.yml up -d --build
 ```
@@ -23,17 +26,29 @@ docker compose -f docker/docker-compose.yml up -d --build
 |---|---|
 | Frontend | http://localhost |
 | API + Swagger | http://localhost:8080/swagger-ui.html |
-| MySQL | localhost:3306 (root / root) |
+| MySQL | localhost:`DB_PORT` (root / root) — voir `docker/.env` |
 
 Connexion : `admin` / `Admin@123` (modifiable via `ADMIN_PASSWORD`).
 
 ### Option 2 — Développement local
 
 1. **Base de données** : exécuter `database/schema.sql` dans MySQL (ou laisser `ddl-auto: update` créer le schéma).
+   Astuce : utiliser le MySQL Docker sur un autre port ne change rien à votre MySQL local :
+   ```bash
+   docker compose -f docker/docker-compose.yml up -d mysql
+   # MySQL joignable sur localhost:3307 (voir docker/.env)
+   ```
 
 2. **Backend** (`backend-springboot/`) :
    ```bash
    mvn spring-boot:run
+   ```
+   Si vous utilisez le MySQL Docker (port ≠ 3306) :
+   ```bash
+   # Windows (cmd) :
+   set DB_PORT=3307 && mvn spring-boot:run
+   # ou bash / Git Bash :
+   DB_PORT=3307 mvn spring-boot:run
    ```
    Démarre sur `http://localhost:8080`.
 
