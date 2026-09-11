@@ -22,3 +22,7 @@ frontend-react/dist/
 /_node_ver.txt
 /_build_backend.log
 /backend-springboot/erreur.txt
+/_*.txt
+/_*.log
+/_*.ps1
+/_*.js

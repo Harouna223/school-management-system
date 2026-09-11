@@ -12,7 +12,9 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -84,6 +86,20 @@ public class GlobalExceptionHandler {
                                                                  HttpServletRequest request) {
         log.error("Violation d'intégrité : {}", ex.getMessage());
         return build(HttpStatus.CONFLICT, "Donnée en conflit : la ressource existe déjà ou est référencée", request);
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNoResourceFound(NoResourceFoundException ex,
+                                                                   HttpServletRequest request) {
+        log.debug("Ressource statique introuvable : {}", request.getRequestURI());
+        return build(HttpStatus.NOT_FOUND, "Ressource introuvable", request);
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex,
+                                                                      HttpServletRequest request) {
+        log.warn("Méthode non supportée : {} {}", ex.getMethod(), request.getRequestURI());
+        return build(HttpStatus.METHOD_NOT_ALLOWED, "Méthode HTTP non supportée pour cette ressource", request);
     }
 
     @ExceptionHandler(Exception.class)

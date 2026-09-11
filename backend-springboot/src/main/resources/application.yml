@@ -75,3 +75,15 @@ logging:
   level:
     com.school: INFO
     org.springframework.security: WARN
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+  health:
+    db:
+      enabled: true
