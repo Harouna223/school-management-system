@@ -11,23 +11,18 @@ import {
   PictureAsPdf as PdfIcon,
   FactCheck as AttendanceIcon,
   Payments as PaymentsIcon,
-  Dashboard as DashboardIcon,
-  Notifications as NotificationsIcon,
-  Event as EventIcon,
+  ReceiptLong as ReceiptIcon,
 } from '@mui/icons-material'
 import PageHeader from '../../components/PageHeader'
 import StatusChip from '../../components/StatusChip'
 import Loader from '../../components/Loader'
 import EmptyState from '../../components/EmptyState'
-import { myApi, examApi, communicationApi } from '../../api/endpoints'
+import { myApi, examApi } from '../../api/endpoints'
 import { downloadResponse } from '../../services/exportService'
 import { useToast } from '../../hooks/useToast'
 import { extractError } from '../../api/axios'
 import { primaryRole } from '../../utils/auth'
 import { initials, formatDate, formatCurrency, DAYS_FR, DAY_KEYS } from '../../utils/format'
-import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
-} from 'recharts'
 
 const TERM_LABEL = { T1: '1er Trimestre', T2: '2e Trimestre', T3: '3e Trimestre' }
 const DECISION_COLORS = { ADMIS: 'success', AJOURNE: 'warning', REDOUBLE: 'error' }
@@ -45,7 +40,6 @@ export default function StudentPortalPage() {
   const [bulletins, setBulletins] = useState([])
   const [attendances, setAttendances] = useState([])
   const [invoices, setInvoices] = useState([])
-  const [notifications, setNotifications] = useState([])
   const [tab, setTab] = useState(0)
   const [loading, setLoading] = useState(true)
 
@@ -55,19 +49,12 @@ export default function StudentPortalPage() {
     myApi.grades().then((res) => setGrades(res.data.data || [])).catch(() => {})
     myApi.bulletins().then((res) => setBulletins(res.data.data || [])).catch(() => {})
     myApi.attendances().then((res) => setAttendances(res.data.data || [])).catch(() => {})
-    myApi.invoices().then((res) => setInvoices(res.data.data || [])).catch(() => {})
-    communicationApi.notifications({ page: 0, size: 5 }).then((res) => setNotifications(res.data.data?.content || res.data.data || [])).catch(() => {})
+    myApi.invoices()
+      .then((res) => setInvoices(res.data.data || []))
+      .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
 
-  const absentCount = useMemo(
-    () => attendances.filter((a) => a.status === 'ABSENT').length,
-    [attendances]
-  )
-  const dueInvoices = useMemo(
-    () => invoices.filter((i) => i.status !== 'PAID' && i.status !== 'PAYE'),
-    [invoices]
-  )
   const lastBulletin = bulletins[0]
   const scheduleByDay = useMemo(() => {
     const map = {}
@@ -79,27 +66,8 @@ export default function StudentPortalPage() {
     return map
   }, [schedule])
 
-  const todayIdx = useMemo(() => {
-    const now = new Date().getDay()
-    return now === 0 ? 0 : now - 1
-  }, [])
-  const todaySchedule = useMemo(() => scheduleByDay[todayIdx] || [], [scheduleByDay, todayIdx])
-  const recentGrades = useMemo(() => grades.slice(0, 5), [grades])
-  const rank = lastBulletin?.rank
-  const progressionData = useMemo(() => bulletins
-    .slice()
-    .sort((a, b) => (a.academicYear || '').localeCompare(b.academicYear || '') || a.term.localeCompare(b.term))
-    .map((b) => ({ name: `${TERM_LABEL[b.term] || b.term} ${b.academicYear || ''}`, moyenne: b.average ?? 0 })),
-  [bulletins])
-
   if (role !== 'ELEVE') {
     return <Navigate to="/dashboard" replace />
-  }
-
-  const handlePrint = () => {
-    document.body.classList.add('printing')
-    window.print()
-    setTimeout(() => document.body.classList.remove('printing'), 500)
   }
 
   const downloadBulletin = async (b) => {
@@ -110,13 +78,6 @@ export default function StudentPortalPage() {
     } catch (err) {
       toastError(extractError(err))
     }
-  }
-
-  const markRead = async (id) => {
-    try {
-      await communicationApi.markRead(id)
-      setNotifications((n) => n.map((x) => (x.id === id ? { ...x, read: true } : x)))
-    } catch { /* silencieux */ }
   }
 
   return (
@@ -149,22 +110,6 @@ export default function StudentPortalPage() {
                     {profile.className} · Matricule {profile.matricule}
                   </Typography>
                 </Box>
-                <Box display="flex" gap={2} flexWrap="wrap">
-                  <Box textAlign="center">
-                    <Typography variant="h5" fontWeight={800} color={lastBulletin?.average >= 10 ? 'success.main' : 'error.main'}>
-                      {lastBulletin?.average != null ? lastBulletin.average.toFixed(2) : '—'}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">Moyenne / 20</Typography>
-                  </Box>
-                  <Box textAlign="center">
-                    <Typography variant="h5" fontWeight={800}>{absentCount}</Typography>
-                    <Typography variant="caption" color="text.secondary">Absences</Typography>
-                  </Box>
-                  <Box textAlign="center">
-                    <Typography variant="h5" fontWeight={800}>{dueInvoices.length}</Typography>
-                    <Typography variant="caption" color="text.secondary">Factures en attente</Typography>
-                  </Box>
-                </Box>
               </CardContent>
             </Card>
           )}
@@ -172,7 +117,6 @@ export default function StudentPortalPage() {
           <Card>
             <CardContent>
               <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }} variant="scrollable">
-                <Tab icon={<DashboardIcon />} iconPosition="start" label="Tableau de bord" />
                 <Tab icon={<SchoolIcon />} iconPosition="start" label="Mes bulletins" />
                 <Tab icon={<GradesIcon />} iconPosition="start" label="Mes notes" />
                 <Tab icon={<ScheduleIcon />} iconPosition="start" label="Emploi du temps" />
@@ -180,129 +124,8 @@ export default function StudentPortalPage() {
                 <Tab icon={<PaymentsIcon />} iconPosition="start" label="Paiements" />
               </Tabs>
 
-              {/* Tableau de bord */}
-              {tab === 0 && (
-                <Grid container spacing={2.5}>
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Card variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
-                      <Typography variant="h4" fontWeight={800} color={lastBulletin?.average >= 10 ? 'success.main' : 'error.main'}>
-                        {lastBulletin?.average != null ? lastBulletin.average.toFixed(2) : '—'}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">Moyenne / 20</Typography>
-                    </Card>
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Card variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
-                      <Typography variant="h4" fontWeight={800}>{rank || '—'}</Typography>
-                      <Typography variant="caption" color="text.secondary">Rang dans la classe</Typography>
-                    </Card>
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Card variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
-                      <Typography variant="h4" fontWeight={800} color={absentCount > 0 ? 'error.main' : 'success.main'}>{absentCount}</Typography>
-                      <Typography variant="caption" color="text.secondary">Absences</Typography>
-                    </Card>
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Card variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
-                      <Typography variant="h4" fontWeight={800} color={dueInvoices.length > 0 ? 'warning.main' : 'success.main'}>{dueInvoices.length}</Typography>
-                      <Typography variant="caption" color="text.secondary">Factures en attente</Typography>
-                    </Card>
-                  </Grid>
-
-                  <Grid item xs={12} md={6}>
-                    <Card variant="outlined">
-                      <CardContent>
-                        <Typography variant="subtitle1" fontWeight={700} mb={1.5}>Cours d'aujourd'hui ({todaySchedule.length})</Typography>
-                        {todaySchedule.length === 0 ? (
-                          <EmptyState message="Aucun cours aujourd'hui." />
-                        ) : (
-                          todaySchedule.map((s) => (
-                            <Box key={s.id} display="flex" alignItems="center" gap={1.5} mb={1}>
-                              <EventIcon color="primary" sx={{ fontSize: 20 }} />
-                              <Box flex={1}>
-                                <Typography variant="body2" fontWeight={600}>{s.subjectName}</Typography>
-                                <Typography variant="caption" color="text.secondary">{s.teacherName} · {s.roomName}</Typography>
-                              </Box>
-                              <Chip size="small" label={`${s.startTime} – ${s.endTime}`} variant="outlined" />
-                            </Box>
-                          ))
-                        )}
-                      </CardContent>
-                    </Card>
-                  </Grid>
-
-                  <Grid item xs={12} md={6}>
-                    <Card variant="outlined">
-                      <CardContent>
-                        <Typography variant="subtitle1" fontWeight={700} mb={1.5}>Dernières notes</Typography>
-                        {recentGrades.length === 0 ? (
-                          <EmptyState message="Aucune note saisie pour le moment." />
-                        ) : (
-                          recentGrades.map((g) => (
-                            <Box key={g.id} display="flex" alignItems="center" gap={1.5} mb={1}>
-                              <Box flex={1}>
-                                <Typography variant="body2" fontWeight={600}>{g.subjectName}</Typography>
-                                <Typography variant="caption" color="text.secondary">{g.examName} · {TERM_LABEL[g.term] || g.term}</Typography>
-                              </Box>
-                              <Chip size="small" color={g.value >= 10 ? 'success' : 'error'} label={`${g.value}/${g.maxValue}`} />
-                            </Box>
-                          ))
-                        )}
-                      </CardContent>
-                    </Card>
-                  </Grid>
-
-                  <Grid item xs={12}>
-                    <Card variant="outlined">
-                      <CardContent>
-                        <Typography variant="subtitle1" fontWeight={700} mb={1.5}>Évolution de ma moyenne</Typography>
-                        {progressionData.length > 1 ? (
-                          <ResponsiveContainer width="100%" height={220}>
-                            <LineChart data={progressionData} margin={{ top: 8, right: 16, left: -8, bottom: 0 }}>
-                              <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.25)" />
-                              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                              <YAxis domain={[0, 20]} tick={{ fontSize: 11 }} />
-                              <Tooltip />
-                              <Legend />
-                              <Line type="monotone" dataKey="moyenne" name="Moyenne /20" stroke="#2563eb" strokeWidth={2.5} dot={{ r: 4 }} />
-                            </LineChart>
-                          </ResponsiveContainer>
-                        ) : (
-                          <EmptyState message="Les bulletins affichés ici dès qu'il y en a au moins deux." />
-                        )}
-                      </CardContent>
-                    </Card>
-                  </Grid>
-
-                  <Grid item xs={12}>
-                    <Card variant="outlined">
-                      <CardContent>
-                        <Typography variant="subtitle1" fontWeight={700} mb={1.5}>
-                          <NotificationsIcon sx={{ fontSize: 18, verticalAlign: 'middle', mr: 0.5 }} /> Notifications récentes
-                        </Typography>
-                        {notifications.length === 0 ? (
-                          <EmptyState message="Aucune notification pour le moment." />
-                        ) : (
-                          notifications.map((n) => (
-                            <Box key={n.id} display="flex" alignItems="center" gap={1.5} mb={1}
-                              sx={{ p: 1, borderRadius: 2, bgcolor: n.read ? 'transparent' : 'action.hover' }}>
-                              <Box flex={1}>
-                                <Typography variant="body2" fontWeight={n.read ? 400 : 700}>{n.title}</Typography>
-                                <Typography variant="caption" color="text.secondary">{n.message}</Typography>
-                              </Box>
-                              {!n.read && <Button size="small" onClick={() => markRead(n.id)}>Marquer lu</Button>}
-                            </Box>
-                          ))
-                        )}
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                </Grid>
-              )}
-
               {/* Bulletins */}
-              {tab === 1 && (
+              {tab === 0 && (
                 bulletins.length === 0 ? (
                   <EmptyState message="Aucun bulletin disponible pour le moment." />
                 ) : (
@@ -339,7 +162,7 @@ export default function StudentPortalPage() {
               )}
 
               {/* Notes */}
-              {tab === 2 && (
+              {tab === 1 && (
                 grades.length === 0 ? (
                   <EmptyState message="Aucune note n'a encore été saisie." />
                 ) : (
@@ -371,7 +194,7 @@ export default function StudentPortalPage() {
               )}
 
               {/* Emploi du temps */}
-              {tab === 3 && (
+              {tab === 2 && (
                 schedule.length === 0 ? (
                   <EmptyState message="Aucun cours planifié pour votre classe." />
                 ) : (
@@ -405,7 +228,7 @@ export default function StudentPortalPage() {
               )}
 
               {/* Présences */}
-              {tab === 4 && (
+              {tab === 3 && (
                 attendances.length === 0 ? (
                   <EmptyState message="Aucune présence enregistrée." />
                 ) : (
@@ -431,7 +254,7 @@ export default function StudentPortalPage() {
               )}
 
               {/* Paiements */}
-              {tab === 5 && (
+              {tab === 4 && (
                 invoices.length === 0 ? (
                   <EmptyState message="Aucune facture émise pour vous." />
                 ) : (

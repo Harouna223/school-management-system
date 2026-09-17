@@ -38,6 +38,7 @@ import {
   Splitscreen as SectionsIcon,
   MeetingRoom as RoomsIcon,
   Receipt as FeeTypesIcon,
+  Paid as TeacherPayrollIcon,
 } from '@mui/icons-material'
 import { useNavigate, useLocation, NavLink } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
@@ -59,13 +60,15 @@ const NAV_GROUPS = [
   {
     label: 'nav.group.main',
     items: [
-      { key: 'dashboard', label: 'nav.dashboard', icon: <DashboardIcon />, to: '/dashboard', roles: 'all' },
+      // Tableau de bord réservé à l'administration (direction + staff).
+      // Les espaces élève / parent / enseignant n'exposent pas de tableau de bord.
+      { key: 'dashboard', label: 'nav.dashboard', icon: <DashboardIcon />, to: '/dashboard', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'COMPTABLE', 'SECRETAIRE'] },
     ],
   },
   {
     label: 'nav.group.admin',
     items: [
-      { key: 'students', label: 'nav.students', icon: <StudentsIcon />, to: '/students', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE', 'COMPTABLE', 'PARENT'], requires: 'school' },
+      { key: 'students', label: 'nav.students', icon: <StudentsIcon />, to: '/students', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE', 'COMPTABLE'], requires: 'school' },
       { key: 'teachers', label: 'nav.teachers', icon: <TeachersIcon />, to: '/teachers', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE'], requires: 'school' },
       { key: 'classes', label: 'nav.classes', icon: <ClassesIcon />, to: '/classes', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE'], requires: 'school' },
       { key: 'levels', label: 'Niveaux', icon: <LevelsIcon />, to: '/levels', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE'], requires: 'school' },
@@ -95,8 +98,9 @@ const NAV_GROUPS = [
     label: 'nav.group.finance',
     items: [
       { key: 'payments', label: 'nav.payments', icon: <PaymentsIcon />, to: '/payments', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'COMPTABLE', 'SECRETAIRE'] },
-      { key: 'fee-types', label: 'Types de frais', icon: <FeeTypesIcon />, to: '/fee-types', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'COMPTABLE', 'SECRETAIRE'] },
       { key: 'expenses', label: 'nav.expenses', icon: <FinanceIcon />, to: '/expenses', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'COMPTABLE'] },
+      { key: 'teacher-payroll', label: 'nav.teacherPayroll', icon: <TeacherPayrollIcon />, to: '/teacher-payroll', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'COMPTABLE', 'SECRETAIRE'] },
+      { key: 'fee-types', label: 'Types de frais', icon: <FeeTypesIcon />, to: '/fee-types', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'COMPTABLE', 'SECRETAIRE'] },
     ],
   },
   {

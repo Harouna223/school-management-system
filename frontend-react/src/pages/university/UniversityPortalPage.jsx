@@ -5,14 +5,12 @@ import {
 } from '@mui/material'
 import {
   School, PictureAsPdf, TableView, MenuBook, Star, WorkspacePremium, History, Description,
-  Dashboard as DashboardIcon, Event as EventIcon, Notifications as NotificationsIcon,
-  FactCheck as GradesIcon, Download,
 } from '@mui/icons-material'
 import PageHeader from '../../components/PageHeader'
 import { useToast } from '../../hooks/useToast'
-import { myApi, lmdApi, universityExamApi, communicationApi } from '../../api/endpoints'
+import { myApi, lmdApi } from '../../api/endpoints'
 import { extractError } from '../../api/axios'
-import { downloadBlob, formatDate } from '../../utils/format'
+import { downloadBlob } from '../../utils/format'
 import EmptyState from '../../components/EmptyState'
 
 const SESSION_LABEL = { 1: 'Session 1 (normale)', 2: 'Session 2 (rattrapage)' }
@@ -22,10 +20,7 @@ export default function UniversityPortalPage() {
   const [profile, setProfile] = useState(null)
   const [enrollments, setEnrollments] = useState([])
   const [history, setHistory] = useState([])
-  const [exams, setExams] = useState([])
-  const [notifications, setNotifications] = useState([])
   const [ueEnrollments, setUeEnrollments] = useState([])
-  const [ecGradesList, setEcGradesList] = useState([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState(0)
   const [selectedEnr, setSelectedEnr] = useState(null)
@@ -39,8 +34,6 @@ export default function UniversityPortalPage() {
       myApi.profile().then((r) => setProfile(r.data.data)).catch(() => {}),
       myApi.university().then((r) => setEnrollments(r.data.data || [])).catch(() => {}),
       myApi.universityHistory().then((r) => setHistory(r.data.data || [])).catch(() => {}),
-      universityExamApi.list({}).then((r) => setExams(r.data.data || [])).catch(() => {}),
-      communicationApi.notifications({ page: 0, size: 5 }).then((r) => setNotifications(r.data.data?.content || r.data.data || [])).catch(() => {}),
     ]).finally(() => setLoading(false))
   }, [])
 
@@ -78,31 +71,12 @@ export default function UniversityPortalPage() {
     } catch { setUeEnrollments([]) }
   }
 
-  const loadEcGrades = async (fieldId) => {
-    if (!selectedEnr?.student?.id || !fieldId) return
-    try {
-      const { data } = await lmdApi.ecGrades(selectedEnr.student.id, fieldId)
-      setEcGradesList(data.data || [])
-    } catch { setEcGradesList([]) }
-  }
-
   const creditsObtained = releve?.creditsObtained ?? 0
   const creditsFailed = releve?.creditsFailed ?? 0
   const totalCreditsSemester = releve?.totalCredits ?? 0
-  const ueValidated = useMemo(() => (releve?.ues || []).filter((u) => u.note != null && u.note >= 10).length, [releve])
-  const ueFailed = useMemo(() => (releve?.ues || []).filter((u) => u.note != null && u.note < 10).length, [releve])
   const debts = useMemo(() => (releve?.uesToRetake || []), [releve])
   const totalCreditsAll = useMemo(() => enrollments.reduce((acc, e) => acc + (e.program?.totalCredits ?? 0), 0), [enrollments])
   const creditsCumulated = useMemo(() => enrollments.reduce((acc, e) => acc + (e.program?.totalCredits ?? 0), 0), [enrollments])
-
-  const upcomingExams = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10)
-    return (exams || [])
-      .filter((ex) => !selectedEnr?.field?.id || ex.courseUnit?.ue?.field?.id === selectedEnr.field.id)
-      .filter((ex) => ex.date >= today)
-      .sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime))
-      .slice(0, 5)
-  }, [exams, selectedEnr])
 
   const downloadDoc = async (type, enr, session = 1) => {
     try {
@@ -159,69 +133,14 @@ export default function UniversityPortalPage() {
         <Card sx={{ borderRadius: '16px' }}>
           <CardContent>
             <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }} variant="scrollable">
-              <Tab icon={<DashboardIcon />} iconPosition="start" label="Tableau de bord" />
               <Tab icon={<School />} iconPosition="start" label="Inscriptions" />
               <Tab icon={<WorkspacePremium />} iconPosition="start" label="Résultats" />
               <Tab icon={<Star />} iconPosition="start" label="Crédits" />
               <Tab icon={<Description />} iconPosition="start" label="Documents" />
             </Tabs>
 
-            {/* ======= Tableau de bord ======= */}
-            {tab === 0 && (
-              <Grid container spacing={2.5}>
-                <Grid item xs={12} sm={6} md={3}>
-                  <Card variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
-                    <Typography variant="h4" fontWeight={800} color={releve?.average >= 10 ? 'success.main' : 'error.main'}>{releve?.average ?? '—'}</Typography>
-                    <Typography variant="caption" color="text.secondary">Moyenne du semestre</Typography>
-                  </Card>
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <Card variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
-                    <Typography variant="h4" fontWeight={800} color="success.main">{creditsObtained}</Typography>
-                    <Typography variant="caption" color="text.secondary">Crédits obtenus / {totalCreditsSemester}</Typography>
-                  </Card>
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <Card variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
-                    <Typography variant="h4" fontWeight={800} color="primary.main">{ueValidated}</Typography>
-                    <Typography variant="caption" color="text.secondary">UE validées {ueFailed > 0 ? `· ${ueFailed} à repasser` : ''}</Typography>
-                  </Card>
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <Card variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
-                    <Typography variant="h4" fontWeight={800} color={debts.length > 0 ? 'error.main' : 'success.main'}>{debts.length}</Typography>
-                    <Typography variant="caption" color="text.secondary">Dettes académiques</Typography>
-                  </Card>
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <Card variant="outlined"><CardContent>
-                    <Typography variant="subtitle1" fontWeight={700} mb={1.5}>Prochains examens</Typography>
-                    {upcomingExams.length === 0 ? <EmptyState message="Aucun examen à venir." /> : upcomingExams.map((ex) => (
-                      <Box key={ex.id} display="flex" alignItems="center" gap={1.5} mb={1}>
-                        <EventIcon color="secondary" sx={{ fontSize: 20 }} />
-                        <Box flex={1}><Typography variant="body2" fontWeight={600}>{ex.courseUnit?.name}</Typography><Typography variant="caption" color="text.secondary">{ex.courseUnit?.code}</Typography></Box>
-                        <Chip size="small" label={`${formatDate(ex.date)} ${ex.startTime}`} variant="outlined" />
-                        <Chip size="small" label={`S${ex.session}`} color="primary" />
-                      </Box>
-                    ))}
-                  </CardContent></Card>
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <Card variant="outlined"><CardContent>
-                    <Typography variant="subtitle1" fontWeight={700} mb={1.5}><NotificationsIcon sx={{ fontSize: 18, verticalAlign: 'middle', mr: 0.5 }} /> Notifications</Typography>
-                    {notifications.length === 0 ? <EmptyState message="Aucune notification." /> : notifications.map((n) => (
-                      <Box key={n.id} display="flex" alignItems="center" gap={1.5} mb={1} sx={{ p: 1, borderRadius: 2, bgcolor: n.read ? 'transparent' : 'action.hover' }}>
-                        <Box flex={1}><Typography variant="body2" fontWeight={n.read ? 400 : 700}>{n.title}</Typography><Typography variant="caption" color="text.secondary">{n.message}</Typography></Box>
-                        {!n.read && <Chip size="small" color="primary" label="Nouveau" />}
-                      </Box>
-                    ))}
-                  </CardContent></Card>
-                </Grid>
-              </Grid>
-            )}
-
             {/* ======= Inscriptions LMD ======= */}
-            {tab === 1 && (
+            {tab === 0 && (
               <Grid container spacing={2.5}>
                 {enrollments.map((enr) => (
                   <Grid item xs={12} md={6} key={enr.id}>
@@ -269,7 +188,7 @@ export default function UniversityPortalPage() {
             )}
 
             {/* ======= Résultats détaillés ======= */}
-            {tab === 2 && (
+            {tab === 1 && (
               <>
                 <Box display="flex" gap={1} flexWrap="wrap" mb={2}>
                   {enrollments.map((enr) => (
@@ -333,7 +252,7 @@ export default function UniversityPortalPage() {
             )}
 
             {/* ======= Crédits ======= */}
-            {tab === 3 && (
+            {tab === 2 && (
               <Grid container spacing={3}>
                 <Grid item xs={12} md={6}>
                   <Card variant="outlined" sx={{ p: 2.5, borderRadius: '14px' }}>
@@ -396,7 +315,7 @@ export default function UniversityPortalPage() {
             )}
 
             {/* ======= Documents ======= */}
-            {tab === 4 && (
+            {tab === 3 && (
               <Grid container spacing={2.5}>
                 {enrollments.map((enr) => (
                   <Grid item xs={12} md={6} key={enr.id}>

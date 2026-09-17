@@ -1,27 +1,35 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import {
-  Grid, Card, CardContent, Typography, Box, Tabs, Tab, Chip, Button,
+  Grid, Card, CardContent, Typography, Box, Tabs, Tab, Chip,
   Table, TableHead, TableRow, TableCell, TableBody,
-  TextField, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, Avatar, IconButton,
+  TextField, MenuItem, Avatar, IconButton,
 } from '@mui/material'
 import {
   CalendarMonth as ScheduleIcon,
   Group as ClassesIcon,
   EditNote as GradesIcon,
   Save as SaveIcon,
+  ReceiptLong as ReceiptIcon,
 } from '@mui/icons-material'
 import PageHeader from '../../components/PageHeader'
 import StatusChip from '../../components/StatusChip'
 import Loader from '../../components/Loader'
 import EmptyState from '../../components/EmptyState'
 import { useToast } from '../../hooks/useToast'
-import { myApi, examApi, studentApi } from '../../api/endpoints'
+import { myApi, examApi, studentApi, teacherHoursApi } from '../../api/endpoints'
 import { extractError } from '../../api/axios'
 import { primaryRole } from '../../utils/auth'
-import { initials, formatGrade, DAYS_FR, DAY_KEYS } from '../../utils/format'
+import { initials, formatGrade, formatCurrency, downloadBlob, DAYS_FR, DAY_KEYS } from '../../utils/format'
 
 const TERM_LABEL = { T1: '1er Trimestre', T2: '2e Trimestre', T3: '3e Trimestre' }
+const METHOD_LABEL = {
+  CASH: 'Espèces',
+  MOBILE_MONEY: 'Mobile Money',
+  BANK_TRANSFER: 'Virement bancaire',
+  CHECK: 'Chèque',
+  CARD: 'Carte',
+}
 
 /**
  * Espace enseignant : emploi du temps, classes, saisie des notes (rôle ENSEIGNANT).
@@ -41,9 +49,11 @@ export default function TeacherPortalPage() {
   const [draftGrades, setDraftGrades] = useState({})
   const [tab, setTab] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [currentStudent, setCurrentStudent] = useState(null)
-  const [gradeValue, setGradeValue] = useState('')
+
+  // Ma paie (heures enseignées, salaire calculé, paiements)
+  const [payMonth, setPayMonth] = useState(new Date().toISOString().slice(0, 7))
+  const [myRows, setMyRows] = useState([])
+  const [myTxs, setMyTxs] = useState([])
 
   useEffect(() => {
     myApi.teacherProfile().then((res) => setProfile(res.data.data || null)).catch(() => {})
@@ -85,6 +95,24 @@ export default function TeacherPortalPage() {
       })
       .catch(() => {})
   }, [selectedExam])
+
+  const loadMyPay = async () => {
+    try {
+      const [rows, txs] = await Promise.all([
+        teacherHoursApi.myMonthly({ month: `${payMonth}-01` }),
+        teacherHoursApi.myTransactions(),
+      ])
+      setMyRows(rows.data.data || [])
+      setMyTxs(txs.data.data || [])
+    } catch (err) {
+      toastError(extractError(err))
+    }
+  }
+
+  useEffect(() => {
+    if (tab === 3) loadMyPay()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, payMonth])
 
   const saveInlineGrade = async (studentId, studentName) => {
     const raw = draftGrades[studentId]
@@ -138,29 +166,6 @@ export default function TeacherPortalPage() {
     return <Navigate to="/dashboard" replace />
   }
 
-  const openGradeDialog = (student) => {
-    setCurrentStudent(student)
-    setGradeValue('')
-    setDialogOpen(true)
-  }
-
-  const handleSaveGrade = async () => {
-    try {
-      await examApi.saveGrade({
-        studentId: currentStudent.studentId,
-        examId: Number(selectedExam),
-        value: Number(gradeValue),
-        appreciation: gradeValue >= 10 ? 'Acquis' : 'Non acquis',
-      })
-      success(`Note ${formatGrade(gradeValue)} enregistrée`)
-      setDialogOpen(false)
-      const { data } = await examApi.gradesByExam(selectedExam)
-      setGradeRows(data.data || [])
-    } catch (err) {
-      toastError(extractError(err))
-    }
-  }
-
   return (
     <>
       <PageHeader
@@ -184,14 +189,6 @@ export default function TeacherPortalPage() {
                     {profile.employeeNo} · {profile.contractType} · {profile.email || profile.phone}
                   </Typography>
                 </Box>
-                <Box textAlign="center">
-                  <Typography variant="h5" fontWeight={800}>{myClasses.length}</Typography>
-                  <Typography variant="caption" color="text.secondary">Classes</Typography>
-                </Box>
-                <Box textAlign="center">
-                  <Typography variant="h5" fontWeight={800}>{schedule.length}</Typography>
-                  <Typography variant="caption" color="text.secondary">Cours / semaine</Typography>
-                </Box>
                 <StatusChip status={profile.status} />
               </CardContent>
             </Card>
@@ -203,6 +200,7 @@ export default function TeacherPortalPage() {
                 <Tab icon={<ScheduleIcon />} iconPosition="start" label="Mon emploi du temps" />
                 <Tab icon={<ClassesIcon />} iconPosition="start" label="Mes classes" />
                 <Tab icon={<GradesIcon />} iconPosition="start" label="Saisie des notes" />
+                <Tab icon={<ReceiptIcon />} iconPosition="start" label="Ma paie" />
               </Tabs>
 
               {/* Emploi du temps */}
@@ -380,25 +378,107 @@ export default function TeacherPortalPage() {
                   )}
                 </>
               )}
+
+              {/* Ma paie : heures enseignées, salaire calculé, paiements */}
+              {tab === 3 && (
+                <>
+                  <Box display="flex" gap={2} mb={2} alignItems="center" flexWrap="wrap">
+                    <TextField
+                      type="month" size="small" label="Mois" value={payMonth}
+                      onChange={(e) => setPayMonth(e.target.value)}
+                      InputLabelProps={{ shrink: true }} sx={{ maxWidth: 220 }}
+                    />
+                  </Box>
+                  {myRows.length === 0 ? (
+                    <EmptyState message="Aucune heure enseignée enregistrée pour ce mois." />
+                  ) : (
+                    myRows.map((r) => (
+                      <Card variant="outlined" key={r.teacherId} sx={{ mb: 2 }}>
+                        <CardContent>
+                          <Typography variant="subtitle1" fontWeight={700} mb={1}>
+                            {r.teacherName} — {payMonth}
+                          </Typography>
+                          <Grid container spacing={2}>
+                            <Grid item xs={6} sm={3}>
+                              <Typography variant="caption" color="text.secondary">Heures enseignées</Typography>
+                              <Typography variant="h6" fontWeight={800}>{r.totalHours} h</Typography>
+                            </Grid>
+                            <Grid item xs={6} sm={3}>
+                              <Typography variant="caption" color="text.secondary">Tarif horaire</Typography>
+                              <Typography variant="h6" fontWeight={800}>{formatCurrency(r.hourlyRate)}</Typography>
+                            </Grid>
+                            <Grid item xs={6} sm={2}>
+                              <Typography variant="caption" color="text.secondary">Salaire dû</Typography>
+                              <Typography variant="h6" fontWeight={800}>{formatCurrency(r.totalAmount)}</Typography>
+                            </Grid>
+                            <Grid item xs={6} sm={2}>
+                              <Typography variant="caption" color="text.secondary">Déjà payé</Typography>
+                              <Typography variant="h6" fontWeight={800}>{formatCurrency(r.amountPaid)}</Typography>
+                            </Grid>
+                            <Grid item xs={12} sm={2}>
+                              <Typography variant="caption" color="text.secondary">Statut</Typography>
+                              <Box>
+                                <Chip size="small" color={r.status === 'PAID' ? 'success' : r.status === 'PARTIAL' ? 'warning' : 'default'}
+                                  label={r.status === 'PAID' ? 'Payé' : r.status === 'PARTIAL' ? 'Partiel' : 'Non payé'} />
+                              </Box>
+                              {r.remainingAmount > 0 && (
+                                <Typography variant="caption" display="block" color="text.secondary">
+                                  Reste : {formatCurrency(r.remainingAmount)}
+                                </Typography>
+                              )}
+                            </Grid>
+                          </Grid>
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
+                  <Typography variant="subtitle2" fontWeight={700} mt={2} mb={1}>Historique de mes paiements</Typography>
+                  {myTxs.length === 0 ? (
+                    <EmptyState message="Aucun paiement enregistré." />
+                  ) : (
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>N° reçu</TableCell>
+                          <TableCell>Mois</TableCell>
+                          <TableCell>Montant</TableCell>
+                          <TableCell>Mode</TableCell>
+                          <TableCell>Date</TableCell>
+                          <TableCell align="right">Reçu</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {myTxs.map((t) => (
+                          <TableRow key={t.id}>
+                            <TableCell>{t.receiptNo}</TableCell>
+                            <TableCell>{t.monthDate || ''}</TableCell>
+                            <TableCell>{formatCurrency(t.amount)}</TableCell>
+                            <TableCell>{METHOD_LABEL[t.method] || t.method}</TableCell>
+                            <TableCell>{(t.paymentDate || '').slice(0, 10)}</TableCell>
+                            <TableCell align="right">
+                              <IconButton size="small" color="primary" title="Télécharger le reçu PDF"
+                                onClick={async () => {
+                                  try {
+                                    const res = await teacherHoursApi.myReceipt(t.id)
+                                    downloadBlob(res.data, `recu-${t.receiptNo}.pdf`)
+                                  } catch (err) {
+                                    toastError(extractError(err))
+                                  }
+                                }}>
+                                <ReceiptIcon fontSize="small" />
+                              </IconButton>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </>
+              )}
             </CardContent>
           </Card>
         </>
       )}
-
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Note de l'élève</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus fullWidth type="number" size="small" label="Note / 20" value={gradeValue}
-            onChange={(e) => setGradeValue(e.target.value)} inputProps={{ min: 0, max: 20, step: 0.25 }}
-            sx={{ mt: 1 }}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDialogOpen(false)}>Annuler</Button>
-          <Button variant="contained" disabled={gradeValue === ''} onClick={handleSaveGrade}>Enregistrer</Button>
-        </DialogActions>
-      </Dialog>
     </>
   )
 }

@@ -6,14 +6,14 @@ import {
   DialogActions, Table, TableHead, TableRow, TableCell, TableBody, Divider,
 } from '@mui/material'
 import {
-  PictureAsPdf, Print, MenuBook, FactCheck, Assignment, Timeline as TimelineIcon,
-  Description, School, Receipt, Download,
+  PictureAsPdf, MenuBook, FactCheck, Assignment, Timeline as TimelineIcon,
+  Description, School, Receipt,
 } from '@mui/icons-material'
 import PageHeader from '../../components/PageHeader'
 import StatusChip from '../../components/StatusChip'
 import Loader from '../../components/Loader'
 import EmptyState from '../../components/EmptyState'
-import { parentApi, examApi } from '../../api/endpoints'
+import { parentApi } from '../../api/endpoints'
 import { downloadResponse } from '../../services/exportService'
 import { useToast } from '../../hooks/useToast'
 import { extractError } from '../../api/axios'
@@ -81,7 +81,7 @@ export default function ParentPortalPage() {
 
   const downloadBulletin = async (bulletin) => {
     try {
-      const res = await examApi.bulletinPdf(bulletin.id)
+      const res = await parentApi.childBulletinPdf(selected.id, bulletin.id)
       await downloadResponse(res, `bulletin-${selected.matricule}-${bulletin.term}.pdf`)
       success('Bulletin téléchargé')
     } catch (err) {
