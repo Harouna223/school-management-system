@@ -22,7 +22,7 @@ import Loader from '../../components/Loader'
 import StatusChip from '../../components/StatusChip'
 import EmptyState from '../../components/EmptyState'
 import { myApi, teacherHoursApi } from '../../api/endpoints'
-import { initials, formatCurrency, DAYS_FR, DAY_KEYS } from '../../utils/format'
+import { initials, formatDate, formatCurrency, DAYS_FR, DAY_KEYS } from '../../utils/format'
 
 const MONTH_LABEL = (value) => {
   if (!value) return '—'
@@ -381,7 +381,7 @@ export default function TeacherDashboard() {
                           {formatCurrency(t.amount)}
                         </Typography>
                         <Typography variant="caption" color="text.secondary" noWrap display="block">
-                          {t.receiptNo} · {METHOD_LABEL[t.method] || t.method} · {(t.paymentDate || '').slice(0, 10)}
+                          {t.receiptNo} · {METHOD_LABEL[t.method] || t.method} · {formatDate(t.paymentDate)}
                         </Typography>
                       </Box>
                       <Typography variant="caption" color="text.disabled">
