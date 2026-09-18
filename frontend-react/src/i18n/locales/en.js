@@ -22,6 +22,7 @@ export const en = {
   'nav.reports': 'Reports',
   'nav.payments': 'Payments & Receipts',
   'nav.expenses': 'Expenses',
+  'nav.teacherPayroll': 'Teacher payroll',
   'nav.library': 'Library',
   'nav.hr': 'Human Resources',
   'nav.lmd': 'University (LMD)',

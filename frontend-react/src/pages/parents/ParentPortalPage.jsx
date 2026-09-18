@@ -36,11 +36,13 @@ const CYCLE_LABELS = {
  */
 export default function ParentPortalPage() {
   const role = primaryRole()
+  const location = useLocation()
   const { success, error: toastError } = useToast()
 
   const [children, setChildren] = useState([])
   const [selected, setSelected] = useState(null)
-  const [tab, setTab] = useState(0)
+  // Onglet ciblé par le tableau de bord (navigation depuis /dashboard).
+  const [tab, setTab] = useState(location.state?.tab ?? 0)
   const [bulletins, setBulletins] = useState([])
   const [attendances, setAttendances] = useState([])
   const [grades, setGrades] = useState([])
@@ -50,13 +52,23 @@ export default function ParentPortalPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    if (location.state?.tab != null) setTab(location.state.tab)
+  }, [location.state])
+
+  useEffect(() => {
     parentApi.children()
       .then((res) => {
-        setChildren(res.data.data || [])
-        if (res.data.data?.length) setSelected(res.data.data[0])
+        const kids = res.data.data || []
+        setChildren(kids)
+        // Enfant ciblé par le tableau de bord, sinon premier enfant de la liste.
+        const wanted = location.state?.studentId
+        const targeted = wanted ? kids.find((k) => String(k.id) === String(wanted)) : null
+        if (targeted) setSelected(targeted)
+        else if (kids.length) setSelected(kids[0])
       })
       .catch(() => {})
       .finally(() => setLoading(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {

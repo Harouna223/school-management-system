@@ -8,7 +8,7 @@ import Loader from '../components/Loader'
 
 // Pages légères / critiques chargées immédiatement
 import LoginPage from '../pages/auth/LoginPage'
-import DashboardPage from '../pages/DashboardPage'
+import RoleDashboard from '../pages/RoleDashboard'
 import NotFoundPage from '../pages/NotFoundPage'
 
 // Pages lourdes chargées à la demande (lazy loading)
@@ -38,6 +38,7 @@ const PaymentsPage = lazy(() => import('../pages/payments/PaymentsPage'))
 const FeeTypesPage = lazy(() => import('../pages/payments/FeeTypesPage'))
 const ExpensesPage = lazy(() => import('../pages/expenses/ExpensesPage'))
 const LibraryPage = lazy(() => import('../pages/library/LibraryPage'))
+const TeacherPayrollPage = lazy(() => import('../pages/payroll/TeacherPayrollPage'))
 const HrPage = lazy(() => import('../pages/hr/HrPage'))
 const MessagesPage = lazy(() => import('../pages/messages/MessagesPage'))
 const AnnouncementsPage = lazy(() => import('../pages/announcements/AnnouncementsPage'))
@@ -70,7 +71,8 @@ export default function AppRoutes() {
           <Route element={<ProtectedRoute />}>
             <Route element={<DashboardLayout />}>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/dashboard" element={<DashboardPage />} />
+              {/* Tableau de bord : contenu déterminé par le rôle (administration, parent, élève, enseignant) */}
+              <Route path="/dashboard" element={<RoleDashboard />} />
               <Route path="/profile" element={<ProfilePage />} />
 
               {/* Scolarité */}
@@ -105,6 +107,7 @@ export default function AppRoutes() {
               <Route path="/payments" element={<RoleRoute roles={['DIRECTEUR', 'COMPTABLE', 'SECRETAIRE']}><PaymentsPage /></RoleRoute>} />
               <Route path="/fee-types" element={<RoleRoute roles={['DIRECTEUR', 'COMPTABLE', 'SECRETAIRE']}><FeeTypesPage /></RoleRoute>} />
               <Route path="/expenses" element={<RoleRoute roles={['DIRECTEUR', 'COMPTABLE']}><ExpensesPage /></RoleRoute>} />
+              <Route path="/teacher-payroll" element={<RoleRoute roles={['SUPER_ADMIN', 'DIRECTEUR', 'COMPTABLE', 'SECRETAIRE']}><TeacherPayrollPage /></RoleRoute>} />
 
               {/* Services */}
               <Route path="/library" element={<RoleRoute roles={['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE']}><LibraryPage /></RoleRoute>} />

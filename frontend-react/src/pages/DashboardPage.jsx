@@ -47,6 +47,7 @@ import {
 } from 'recharts'
 import { useTheme } from '@mui/material/styles'
 import StatCard from '../components/StatCard'
+import MiniMetric from '../components/MiniMetric'
 import { useFetch } from '../hooks/useFetch'
 import { dashboardApi } from '../api/endpoints'
 import { formatCurrency } from '../utils/format'
@@ -86,7 +87,7 @@ export default function DashboardPage() {
   const stats = cycle === 'Université' ? null : (cycleStats ?? null)
   const univ = cycle === 'Université' ? cycleStats : null
   const { data: univReportData } = useFetch(() => (cycle === 'Université' ? dashboardApi.universityReport() : Promise.resolve({ data: { data: null } })), [cycle, refreshKey])
-  const univReport = cycle === 'Université' ? univReportData?.data?.data : null
+  const univReport = cycle === 'Université' ? univReportData : null
 
   const dark = theme.palette.mode === 'dark'
   const axisColor = dark ? '#64748b' : '#94a3b8'
@@ -622,53 +623,6 @@ function QuickPill({ icon, label }) {
     >
       <Box sx={{ display: 'flex', alignItems: 'center', color: 'rgba(255,255,255,0.85)' }}>{icon}</Box>
       <Typography variant="caption" sx={{ fontWeight: 600, fontSize: 12 }}>{label}</Typography>
-    </Box>
-  )
-}
-
-function MiniMetric({ icon, color, label, value, loading }) {
-  return (
-    <Box
-      sx={(theme) => ({
-        p: 2,
-        borderRadius: '14px',
-        border: '1px solid',
-        borderColor: 'divider',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 1.5,
-        bgcolor: theme.palette.mode === 'dark' ? 'rgba(148,163,184,0.05)' : '#f8fafc',
-        transition: 'background 160ms ease, transform 160ms ease',
-        '&:hover': { bgcolor: 'action.hover', transform: 'translateY(-2px)' },
-      })}
-    >
-      <Box
-        sx={{
-          width: 40,
-          height: 40,
-          borderRadius: '14px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          bgcolor: `${color}.light`,
-          color: `${color}.dark`,
-          flexShrink: 0,
-        }}
-      >
-        {icon}
-      </Box>
-      <Box minWidth={0}>
-        <Typography variant="caption" color="text.secondary" display="block" sx={{ fontSize: 11.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-          {label}
-        </Typography>
-        {loading ? (
-          <Skeleton width={80} height={24} sx={{ mt: 0.3 }} />
-        ) : (
-          <Typography variant="h6" fontWeight={800} noWrap>
-            {value}
-          </Typography>
-        )}
-      </Box>
     </Box>
   )
 }

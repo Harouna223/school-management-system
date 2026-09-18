@@ -77,6 +77,7 @@ public class DataInitializer implements CommandLineRunner {
             "FINANCE_READ", "FINANCE_WRITE",
             "LIBRARY_READ", "LIBRARY_WRITE",
             "HR_READ", "HR_WRITE",
+            "HOURS_READ", "HOURS_WRITE", "HOURS_PAY",
             "COMMUNICATION_READ", "COMMUNICATION_WRITE",
             "ACADEMIC_YEAR_READ", "ACADEMIC_YEAR_WRITE",
             "LMD_READ", "LMD_WRITE",
@@ -93,19 +94,24 @@ public class DataInitializer implements CommandLineRunner {
                 "GRADE_READ", "PAYMENT_READ", "ATTENDANCE_READ", "EXAM_READ", "EXAM_WRITE",
                 "SCHEDULE_READ", "SCHEDULE_WRITE", "REPORT_READ", "FINANCE_READ",
                 "LIBRARY_READ", "HR_READ", "USER_READ", "COMMUNICATION_READ", "COMMUNICATION_WRITE",
-                "ACADEMIC_YEAR_READ", "LMD_READ"));
+                "ACADEMIC_YEAR_READ", "LMD_READ", "LMD_WRITE",
+                "HOURS_READ", "HOURS_WRITE", "HOURS_PAY"));
         ROLE_PERMISSIONS.put("COMPTABLE", Set.of(
                 "PAYMENT_READ", "PAYMENT_WRITE", "FINANCE_READ", "FINANCE_WRITE",
-                "REPORT_READ", "STUDENT_READ", "COMMUNICATION_READ"));
+                "REPORT_READ", "STUDENT_READ", "COMMUNICATION_READ",
+                "HOURS_READ", "HOURS_WRITE", "HOURS_PAY"));
         ROLE_PERMISSIONS.put("SECRETAIRE", Set.of(
                 "STUDENT_READ", "STUDENT_WRITE", "TEACHER_READ", "CLASS_READ",
                 "ATTENDANCE_READ", "ATTENDANCE_WRITE", "PAYMENT_READ", "EXAM_READ",
                 "SCHEDULE_READ", "LIBRARY_READ", "LIBRARY_WRITE", "REPORT_READ",
-                "COMMUNICATION_READ", "COMMUNICATION_WRITE", "ACADEMIC_YEAR_READ", "LMD_READ"));
+                "COMMUNICATION_READ", "COMMUNICATION_WRITE", "ACADEMIC_YEAR_READ",
+                "LMD_READ", "LMD_WRITE",
+                "HOURS_READ", "HOURS_WRITE"));
         ROLE_PERMISSIONS.put("ENSEIGNANT", Set.of(
                 "GRADE_READ", "GRADE_WRITE", "ATTENDANCE_READ", "ATTENDANCE_WRITE",
                 "EXAM_READ", "SCHEDULE_READ", "STUDENT_READ", "SUBJECT_READ",
-                "COMMUNICATION_READ", "COMMUNICATION_WRITE"));
+                "COMMUNICATION_READ", "COMMUNICATION_WRITE", "LMD_READ", "LMD_WRITE",
+                "HOURS_READ"));
         ROLE_PERMISSIONS.put("PARENT", Set.of(
                 "STUDENT_READ", "GRADE_READ", "ATTENDANCE_READ", "PAYMENT_READ",
                 "SCHEDULE_READ", "COMMUNICATION_READ"));

@@ -153,6 +153,9 @@ export const attendanceApi = {
 export const parentApi = {
   children: () => api.get('/parents/children'),
   childBulletins: (studentId) => api.get(`/parents/children/${studentId}/bulletins`),
+  childBulletinPdf: (studentId, bulletinId) => api.get(`/parents/children/${studentId}/bulletins/${bulletinId}/pdf`, { responseType: 'blob' }),
+  childBulletinPdf: (studentId, bulletinId) => api.get(`/parents/children/${studentId}/bulletins/${bulletinId}/pdf`, { responseType: 'blob' }),
+  childBulletinPdf: (studentId, bulletinId) => api.get(`/parents/children/${studentId}/bulletins/${bulletinId}/pdf`, { responseType: 'blob' }),
   childAttendances: (studentId) => api.get(`/parents/children/${studentId}/attendances`),
   childGrades: (studentId) => api.get(`/parents/children/${studentId}/grades`),
   childTimeline: (studentId) => api.get(`/parents/children/${studentId}/timeline`),
@@ -402,6 +405,38 @@ export const hrApi = {
   payrolls: (params) => api.get('/hr/payrolls', { params }),
   generatePayroll: (data) => api.post('/hr/payrolls/generate', data),
   payPayroll: (id) => api.patch(`/hr/payrolls/${id}/pay`),
+}
+
+/**
+ * Endpoints du module heures enseignées / paie des enseignants à l'heure.
+ */
+export const teacherHoursApi = {
+  // Tarifs horaires
+  rates: (params) => api.get('/teacher-hours/rates', { params }),
+  createRate: (data) => api.post('/teacher-hours/rates', data),
+  toggleRate: (id, active) => api.patch(`/teacher-hours/rates/${id}/status`, null, { params: { active } }),
+  // Saisie quotidienne
+  workHours: (params) => api.get('/teacher-hours/work-hours', { params }),
+  workHoursOfDay: (params) => api.get('/teacher-hours/work-hours/day', { params }),
+  recordHours: (data) => api.post('/teacher-hours/work-hours', data),
+  updateHours: (id, data) => api.put(`/teacher-hours/work-hours/${id}`, data),
+  deleteHours: (id) => api.delete(`/teacher-hours/work-hours/${id}`),
+  // Calcul mensuel / paie
+  monthly: (params) => api.get('/teacher-hours/monthly', { params }),
+  pay: (data) => api.post('/teacher-hours/payments', data),
+  transactions: (params) => api.get('/teacher-hours/transactions', { params }),
+  receipt: (id) => api.get(`/teacher-hours/payments/receipt/${id}`, { responseType: 'blob' }),
+  // Rapports
+  reportPdf: (params) => api.get('/teacher-hours/report/monthly', { params, responseType: 'blob' }),
+  reportExcel: (params) => api.get('/teacher-hours/report/monthly/excel', { params, responseType: 'blob' }),
+  // Clôture mensuelle
+  closeMonth: (month) => api.post(`/teacher-hours/months/${month}/close`),
+  reopenMonth: (month) => api.post(`/teacher-hours/months/${month}/reopen`),
+  monthStatus: (month) => api.get(`/teacher-hours/months/${month}/status`),
+  // Espace enseignant
+  myMonthly: (params) => api.get('/teacher-hours/my/monthly', { params }),
+  myTransactions: () => api.get('/teacher-hours/my/transactions'),
+  myReceipt: (id) => api.get(`/teacher-hours/my/receipt/${id}`, { responseType: 'blob' }),
 }
 
 export const universityExamApi = {

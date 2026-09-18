@@ -20,21 +20,27 @@ export function hasPermission(permission) {
 }
 
 /**
- * Rôle principal (le plus élevé) d'un utilisateur.
+ * Ordre de priorité des rôles (le plus élevé d'abord).
+ * Source unique de vérité : utilisée par `primaryRole()` (menu latéral) et par
+ * `resolveDashboardRole()` (tableau de bord) pour qu'ils ne divergent jamais.
  * ETUDIANT est prioritaire sur ELEVE pour les comptes universitaires.
+ */
+export const ROLE_PRIORITY = [
+  'SUPER_ADMIN',
+  'DIRECTEUR',
+  'COMPTABLE',
+  'SECRETAIRE',
+  'ENSEIGNANT',
+  'PARENT',
+  'ETUDIANT',
+  'ELEVE',
+]
+
+/**
+ * Rôle principal (le plus élevé) d'un utilisateur.
  */
 export function primaryRole() {
   const user = getCurrentUser()
-  const priority = [
-    'SUPER_ADMIN',
-    'DIRECTEUR',
-    'COMPTABLE',
-    'SECRETAIRE',
-    'ENSEIGNANT',
-    'PARENT',
-    'ETUDIANT',
-    'ELEVE',
-  ]
   if (!user?.roles) return 'ELEVE'
-  return priority.find((r) => user.roles.includes(r)) ?? 'ELEVE'
+  return ROLE_PRIORITY.find((r) => user.roles.includes(r)) ?? 'ELEVE'
 }

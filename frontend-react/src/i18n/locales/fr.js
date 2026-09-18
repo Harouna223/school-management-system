@@ -22,6 +22,7 @@ export const fr = {
   'nav.reports': 'Rapports',
   'nav.payments': 'Paiements & Reçus',
   'nav.expenses': 'Dépenses',
+  'nav.teacherPayroll': 'Paie des enseignants',
   'nav.library': 'Bibliothèque',
   'nav.hr': 'Ressources Humaines',
   'nav.lmd': 'Université (LMD)',

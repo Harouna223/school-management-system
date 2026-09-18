@@ -32,6 +32,7 @@ const DECISION_COLORS = { ADMIS: 'success', AJOURNE: 'warning', REDOUBLE: 'error
  */
 export default function StudentPortalPage() {
   const role = primaryRole()
+  const location = useLocation()
   const { success, error: toastError } = useToast()
 
   const [profile, setProfile] = useState(null)
@@ -40,8 +41,13 @@ export default function StudentPortalPage() {
   const [bulletins, setBulletins] = useState([])
   const [attendances, setAttendances] = useState([])
   const [invoices, setInvoices] = useState([])
-  const [tab, setTab] = useState(0)
+  // Onglet ciblé par le tableau de bord (navigation depuis /dashboard).
+  const [tab, setTab] = useState(location.state?.tab ?? 0)
   const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (location.state?.tab != null) setTab(location.state.tab)
+  }, [location.state])
 
   useEffect(() => {
     myApi.profile().then((res) => setProfile(res.data.data || null)).catch(() => {})

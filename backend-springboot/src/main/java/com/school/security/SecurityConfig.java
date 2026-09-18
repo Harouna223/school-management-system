@@ -52,7 +52,7 @@ public class SecurityConfig {
                         // Endpoints publics (connexion uniquement)
                         .requestMatchers("/api/auth/login", "/api/auth/refresh", "/api/auth/logout",
                                 "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html",
-                                "/uploads/**", "/actuator/health").permitAll()
+                                "/uploads/**", "/actuator/health", "/actuator/health/**").permitAll()
                         // Création de compte : réservée aux gestionnaires d'utilisateurs
                         .requestMatchers("/api/auth/register")
                         .hasAnyAuthority("PERM_USER_WRITE")
@@ -77,6 +77,15 @@ public class SecurityConfig {
                         .requestMatchers("/api/finance/**").hasAnyAuthority("PERM_FINANCE_WRITE")
                         .requestMatchers(HttpMethod.GET, "/api/hr/**").hasAnyAuthority("PERM_HR_READ")
                         .requestMatchers("/api/hr/**").hasAnyAuthority("PERM_HR_WRITE")
+                        // Gestion des heures enseignées / paie des enseignants à l'heure :
+                        // lecture (heures, salaires, rapports, reçus), paiement réservé
+                        // HOURS_PAY, saisie/correction des heures HOURS_WRITE
+                        .requestMatchers(HttpMethod.GET, "/api/teacher-hours/**")
+                        .hasAnyAuthority("PERM_HOURS_READ")
+                        .requestMatchers("/api/teacher-hours/payments/**")
+                        .hasAnyAuthority("PERM_HOURS_PAY")
+                        .requestMatchers("/api/teacher-hours/**")
+                        .hasAnyAuthority("PERM_HOURS_WRITE")
                         .requestMatchers(HttpMethod.GET, "/api/library/**").hasAnyAuthority("PERM_LIBRARY_READ")
                         .requestMatchers("/api/library/**").hasAnyAuthority("PERM_LIBRARY_WRITE")
                         .requestMatchers(HttpMethod.GET, "/api/communication/**").hasAnyAuthority("PERM_COMMUNICATION_READ")

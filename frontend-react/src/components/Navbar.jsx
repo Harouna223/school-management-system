@@ -58,6 +58,7 @@ const PAGE_META = {
   '/reports': { title: 'nav.reports', group: 'nav.group.pedagogy' },
   '/payments': { title: 'nav.payments', group: 'nav.group.finance' },
   '/expenses': { title: 'nav.expenses', group: 'nav.group.finance' },
+  '/teacher-payroll': { title: 'nav.teacherPayroll', group: 'nav.group.finance' },
   '/library': { title: 'nav.library', group: 'nav.group.services' },
   '/hr': { title: 'nav.hr', group: 'nav.group.services' },
   '/lmd': { title: 'nav.lmd', group: 'nav.group.services' },

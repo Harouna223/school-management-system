@@ -60,9 +60,10 @@ const NAV_GROUPS = [
   {
     label: 'nav.group.main',
     items: [
-      // Tableau de bord réservé à l'administration (direction + staff).
-      // Les espaces élève / parent / enseignant n'exposent pas de tableau de bord.
-      { key: 'dashboard', label: 'nav.dashboard', icon: <DashboardIcon />, to: '/dashboard', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'COMPTABLE', 'SECRETAIRE'] },
+      // Tableau de bord : contenu personnalisé selon le rôle (voir pages/RoleDashboard.jsx).
+      // Administration (direction + staff) → tableau de bord de l'établissement.
+      // Parent / élève / enseignant → synthèse personnelle de leur espace.
+      { key: 'dashboard', label: 'nav.dashboard', icon: <DashboardIcon />, to: '/dashboard', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'COMPTABLE', 'SECRETAIRE', 'PARENT', 'ELEVE', 'ENSEIGNANT'] },
     ],
   },
   {
