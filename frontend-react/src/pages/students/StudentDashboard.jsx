@@ -36,6 +36,14 @@ const byPeriodDesc = (a, b) =>
   (b.term || '').localeCompare(a.term || '')
 
 /**
+ * Date locale au format AAAA-MM-JJ, comparable lexicographiquement.
+ * Évite `new Date('2026-09-30')`, qui est interprété en UTC minuit et décale
+ * la comparaison selon le fuseau.
+ */
+const localDay = (d = new Date()) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+/**
  * Tableau de bord personnalisé de l'élève (rôle ELEVE).
  * Synthèse de la scolarité : moyenne, rang, assiduité, soldes et cours du jour.
  * Toutes les données proviennent de l'espace personnel (/my/**) : aucune donnée simulée.
@@ -89,8 +97,15 @@ export default function StudentDashboard() {
     () => dueInvoices.reduce((sum, i) => sum + Number(i.remainingAmount || 0), 0),
     [dueInvoices],
   )
+  // Même règle que le backend (`InvoiceRepository.findOverdue`) : une facture est
+  // en retard si son échéance est *strictement* antérieure à aujourd'hui.
+  // Comparer `new Date(dueDate) < new Date()` la déclarait en retard dès 00:00
+  // le jour de l'échéance, soit un jour trop tôt.
   const overdueInvoices = useMemo(
-    () => dueInvoices.filter((i) => i.dueDate && new Date(i.dueDate) < new Date()),
+    () => dueInvoices.filter((i) => {
+      const due = (i.dueDate || '').slice(0, 10)
+      return due !== '' && due < localDay()
+    }),
     [dueInvoices],
   )
 
