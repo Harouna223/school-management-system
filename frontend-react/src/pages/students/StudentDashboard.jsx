@@ -324,7 +324,9 @@ export default function StudentDashboard() {
                       <Box flex={1} minWidth={0}>
                         <Typography variant="body2" fontWeight={600} noWrap>{g.subjectName}</Typography>
                         <Typography variant="caption" color="text.secondary" noWrap display="block">
-                          {g.examName} · {TERM_LABEL[g.term] || g.term}
+                          {[g.examName, g.term && (TERM_LABEL[g.term] || g.term)]
+                            .filter(Boolean)
+                            .join(' · ')}
                         </Typography>
                       </Box>
                       <Chip
