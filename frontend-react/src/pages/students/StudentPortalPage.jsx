@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useLocation } from 'react-router-dom'
 import {
   Grid, Card, CardContent, Typography, Box, Tabs, Tab, Chip, Button,
   Table, TableHead, TableRow, TableCell, TableBody, Divider,

@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useDispatch } from 'react-redux'
 import AppRoutes from './routes/index.jsx'
+import ErrorBoundary from './components/ErrorBoundary'
 import { clearCredentials } from './redux/slices/authSlice'
 import { I18nProvider } from './i18n/I18nContext'
 
@@ -15,7 +16,10 @@ export default function App() {
 
   return (
     <I18nProvider>
-      <AppRoutes />
+      {/* Frontière d'erreur : évite l'écran blanc muet si une page plante au rendu. */}
+      <ErrorBoundary>
+        <AppRoutes />
+      </ErrorBoundary>
     </I18nProvider>
   )
 }
