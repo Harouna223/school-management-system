@@ -108,6 +108,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: [backend, frontend]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    env:
+      # Le contexte `secrets` n'est pas autorise dans un `if` (ni au niveau job, ni au niveau
+      # etape) : on l'expose via `env`, qui lui est autorise dans un `if` d'etape.
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKER_USERNAME }}
 
     steps:
       - name: Checkout code
@@ -117,12 +121,17 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to Docker Hub
+        id: dockerhub
+        # Sans secrets DOCKER_USERNAME/DOCKER_PASSWORD, on saute la publication au lieu de faire
+        # echouer tout le pipeline. Renseigner les secrets reactive la publication automatiquement.
+        if: ${{ env.DOCKERHUB_USERNAME != '' }}
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build backend Docker image
+        if: ${{ steps.dockerhub.outcome == 'success' }}
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -133,6 +142,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Build frontend Docker image
+        if: ${{ steps.dockerhub.outcome == 'success' }}
         uses: docker/build-push-action@v6
         with:
           context: .
