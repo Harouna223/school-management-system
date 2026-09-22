@@ -193,6 +193,88 @@ public class ReportService {
     }
 
     /**
+     * Reçu de paiement du salaire d'un enseignant (PDF A5) :
+     * en-tête école, mois, heures × tarif = montant dû, montant payé, restant,
+     * mode de paiement, zone double signature.
+     */
+    public void teacherPaymentReceiptPdf(HttpServletResponse response, String receiptNo,
+                                         String teacherName, String monthLabel, String academicYearLabel,
+                                         String totalHours, String hourlyRate, String totalAmount,
+                                         String amount, String method, String date,
+                                         String reference, String recordedBy,
+                                         String remainingAmount, String amountInWords)
+            throws IOException {
+        Document document = new Document(PageSize.A5, 28, 28, 28, 55);
+        PdfWriter writer = documentTheme.init(response, "recu-enseignant-" + receiptNo, document);
+        document.open();
+        documentTheme.addHeader(document);
+
+        documentTheme.addTitle(document, "REÇU DE PAIEMENT ENSEIGNANT",
+                "N° " + receiptNo + "  •  " + date);
+
+        try {
+
+        PdfPTable table = new PdfPTable(2);
+        table.setWidthPercentage(100);
+        table.setSpacingBefore(6);
+        addRow(table, "Enseignant", teacherName);
+        addRow(table, "Mois concerné", monthLabel);
+        if (academicYearLabel != null && !academicYearLabel.isBlank()) {
+            addRow(table, "Année scolaire", academicYearLabel);
+        }
+        addRow(table, "Nombre d'heures", totalHours + " h");
+        addRow(table, "Tarif horaire", hourlyRate + " FCFA");
+        addRow(table, "Calcul", totalHours + " h × " + hourlyRate + " = " + totalAmount + " FCFA");
+        addRow(table, "Montant total dû", totalAmount + " FCFA");
+        addRow(table, "Montant payé", amount + " FCFA");
+        addRow(table, "Reste à payer", remainingAmount + " FCFA");
+        addRow(table, "Mode de paiement", method);
+        if (reference != null && !reference.isBlank()) {
+            addRow(table, "Référence", reference);
+        }
+        if (recordedBy != null && !recordedBy.isBlank()) {
+            addRow(table, "Enregistré par", recordedBy);
+        }
+        document.add(table);
+        document.add(Chunk.NEWLINE);
+
+        // Montant payé mis en évidence
+        PdfPTable amountRow = new PdfPTable(2);
+        amountRow.setWidthPercentage(100);
+        PdfPCell amountLabel = new PdfPCell(new Phrase("MONTANT PAYÉ", SchoolDocumentTheme.bold(11f)));
+        amountLabel.setBorder(0);
+        amountLabel.setPadding(6);
+        amountLabel.setBackgroundColor(SchoolDocumentTheme.HEADER_BG);
+        PdfPCell amountVal = new PdfPCell(new Phrase(amount + " FCFA", SchoolDocumentTheme.whiteBold(14f)));
+        amountVal.setBorder(0);
+        amountVal.setPadding(6);
+        amountVal.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        amountVal.setBackgroundColor(SchoolDocumentTheme.PRIMARY);
+        amountRow.addCell(amountLabel);
+        amountRow.addCell(amountVal);
+        document.add(amountRow);
+
+        if (amountInWords != null && !amountInWords.isBlank()) {
+            document.add(Chunk.NEWLINE);
+            Paragraph inWords = new Paragraph("Arrêté le présent reçu à la somme de : " + amountInWords,
+                    SchoolDocumentTheme.muted(9f));
+            inWords.setSpacingBefore(6);
+            document.add(inWords);
+        }
+
+        document.add(Chunk.NEWLINE);
+        document.add(documentTheme.signatureBlock("Signature du professeur",
+                "Signature / cachet de l'établissement"));
+
+        document.add(Chunk.NEWLINE);
+        document.add(new Paragraph(settingService.value(SettingService.RECEIPT_FOOTER, "Merci de votre confiance."),
+                FontFactory.getFont(FontFactory.HELVETICA_OBLIQUE, 9, SchoolDocumentTheme.TEXT_MUTED)));
+        } finally {
+            safeClose(document);
+        }
+    }
+
+    /**
      * Tableau imprimable PDF avec en-tête école, lignes de données et ligne de total.
      */
     public void exportTablePdf(HttpServletResponse response, String title,

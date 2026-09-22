@@ -45,6 +45,13 @@ public final class CodeGenerator {
     }
 
     /**
+     * Numéro de reçu de paiement enseignant : REC-ENS-YYMMDD-XXXXX.
+     */
+    public static String teacherReceiptNo(long sequence) {
+        return String.format("REC-ENS-%s-%05d", LocalDate.now().format(DATE_COMPACT), sequence);
+    }
+
+    /**
      * Identifiant académique courant : AAAA-AAAA.
      */
     public static String currentAcademicYear() {
