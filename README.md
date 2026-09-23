@@ -7,7 +7,7 @@ Système complet de gestion scolaire : élèves, enseignants, classes, emplois d
 | Couche | Technologies |
 |---|---|
 | Frontend | React 18, Vite, MUI, Tailwind CSS, Redux Toolkit, Formik + Yup, Recharts, Axios |
-| Backend | Java 17, Spring Boot 3.2.5, Spring Security (JWT), Spring Data JPA, MapStruct, Swagger |
+| Backend | Java 21, Spring Boot 3.2.5, Spring Security (JWT), Spring Data JPA, MapStruct, Swagger |
 | Base de données | MySQL 8 (utf8mb4) |
 | Déploiement | Docker Compose + Nginx |
 

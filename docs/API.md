@@ -169,6 +169,41 @@ Paramètres de pagination : `?page=0&size=10` ; recherche : `?search=...`.
 | POST | `/api/hr/payrolls/generate` | Générer un bulletin mensuel (net = base + primes − retenues) |
 | PATCH | `/api/hr/payrolls/{id}/pay` | Marquer un bulletin comme payé |
 
+## Heures & paie des enseignants — `/api/teacher-hours`
+
+Paie **à l'heure** : les heures enseignées sont saisies chaque jour, le salaire mensuel est
+recalculé côté serveur (**heures × tarif**) et le tarif appliqué est figé sur chaque saisie
+(les anciens mois ne sont jamais recalculés après un changement de tarif).
+Le mois doit toujours être transmis au **premier jour** (ex. `2026-09-01`).
+
+Permissions : `PERM_HOURS_READ` (lecture), `PERM_HOURS_WRITE` (saisie / correction), `PERM_HOURS_PAY` (paiement).
+
+| Méthode | Route | Accès | Description |
+|---|---|---|---|
+| GET | `/api/teacher-hours/rates` | HOURS_READ | Tarifs horaires (filtres enseignant / année scolaire / actif) |
+| POST | `/api/teacher-hours/rates` | HOURS_WRITE | Définir un tarif horaire (historisé : début + fin de validité) |
+| PATCH | `/api/teacher-hours/rates/{id}/status?active=` | HOURS_WRITE | Activer / désactiver un tarif |
+| GET | `/api/teacher-hours/work-hours` | HOURS_READ | Historique paginé des heures (enseignant, matière, classe, période, année) |
+| GET | `/api/teacher-hours/work-hours/day?teacherId=&date=` | HOURS_READ | Saisies d'un professeur pour une journée |
+| POST | `/api/teacher-hours/work-hours` | HOURS_WRITE | Enregistrer les heures du jour (antidoublon prof/date/matière/classe) |
+| PUT | `/api/teacher-hours/work-hours/{id}` | HOURS_WRITE | Corriger une saisie (refusé si le mois est clôturé) |
+| DELETE | `/api/teacher-hours/work-hours/{id}` | HOURS_WRITE | Supprimer une saisie (refusé si le mois est clôturé) |
+| GET | `/api/teacher-hours/monthly?month=&teacherId=&status=` | HOURS_READ | Tableau de calcul des salaires (heures, tarif, dû, payé, reste, statut) |
+| POST | `/api/teacher-hours/payments` | HOURS_PAY | Paiement total ou partiel (montant contrôlé côté serveur) |
+| GET | `/api/teacher-hours/transactions` | HOURS_READ | Historique des paiements (enseignant, mois, mode, période) |
+| GET | `/api/teacher-hours/payments/receipt/{id}` | HOURS_READ | Reçu de paiement PDF |
+| GET | `/api/teacher-hours/report/monthly?month=&teacherId=` | HOURS_READ | État mensuel des paiements des enseignants (PDF + totaux) |
+| GET | `/api/teacher-hours/report/monthly/excel` | HOURS_READ | État mensuel des paiements des enseignants (Excel) |
+| POST | `/api/teacher-hours/months/{month}/close` | SUPER_ADMIN / DIRECTEUR | Clôturer le mois (verrouille la saisie des heures) |
+| POST | `/api/teacher-hours/months/{month}/reopen` | SUPER_ADMIN / DIRECTEUR | Réouvrir un mois clôturé |
+| GET | `/api/teacher-hours/months/{month}/status` | HOURS_READ | Statut de clôture du mois |
+| GET | `/api/teacher-hours/my/monthly?month=` | ENSEIGNANT | Mes heures et mon salaire calculé |
+| GET | `/api/teacher-hours/my/transactions` | ENSEIGNANT | Mes paiements |
+| GET | `/api/teacher-hours/my/receipt/{transactionId}` | ENSEIGNANT | Mon reçu PDF (accès vérifié : uniquement ses propres paiements) |
+
+Intégration comptable : chaque paiement crée **une seule** dépense (catégorie
+`Salaires enseignants`) dans le module finances et notifie l'enseignant si un compte lui est rattaché.
+
 ## Communication — `/api/communication`
 
 | Méthode | Route | Description |
