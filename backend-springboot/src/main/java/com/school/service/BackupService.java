@@ -317,11 +317,28 @@ public class BackupService {
                 current.append(c);
             }
         }
-        if (!current.isEmpty()) {
+        // Un reste non ignorable signale une instruction non terminee (fichier tronque).
+        // ⚠️ Ne pas tester `isEmpty()` : `restoreBackup` reconstruit le contenu en
+        // ajoutant « \n » apres CHAQUE ligne, donc le texte se termine toujours par
+        // un saut de ligne — le tester faisait echouer TOUTE restauration valide.
+        // Les lignes vides et les commentaires sont ignores, comme dans addStatement() ;
+        // ce reste n'est jamais execute, il ne peut donc rien assouplir d'autre.
+        if (!isIgnorableRemainder(current.toString())) {
             throw new BusinessException(
                     "Sauvegarde corrompue : la dernière instruction n'est pas terminée par « ; ».");
         }
         return statements;
+    }
+
+    /** Vrai si le texte ne contient que des lignes vides ou des commentaires « -- ». */
+    private boolean isIgnorableRemainder(String remainder) {
+        for (String line : remainder.split("\n", -1)) {
+            String trimmed = line.trim();
+            if (!trimmed.isEmpty() && !trimmed.startsWith("--")) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private void addStatement(List<String> statements, String raw) {
