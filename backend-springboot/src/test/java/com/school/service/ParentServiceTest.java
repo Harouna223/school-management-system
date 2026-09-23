@@ -57,6 +57,8 @@ class ParentServiceTest {
     private LmdEnrollmentRepository lmdEnrollmentRepository;
     @Mock
     private LmdService lmdService;
+    @Mock
+    private GradeService gradeService;
 
     private ParentService service;
 
@@ -64,7 +66,7 @@ class ParentServiceTest {
     void setUp() {
         service = new ParentService(parentRepository, studentRepository, bulletinRepository,
                 attendanceRepository, gradeRepository, studentHistoryRepository,
-                enrollmentHistoryRepository, lmdEnrollmentRepository, lmdService);
+                enrollmentHistoryRepository, lmdEnrollmentRepository, lmdService, gradeService);
     }
 
     private User user(Long id) {
@@ -102,7 +104,7 @@ class ParentServiceTest {
         Student ownChild = child(20L, parent);
         when(parentRepository.findByUserIdOrderByIdAsc(1L)).thenReturn(List.of(parent));
         when(studentRepository.findById(20L)).thenReturn(Optional.of(ownChild));
-        when(bulletinRepository.findByStudentId(20L)).thenReturn(List.of());
+        when(bulletinRepository.findByStudentIdOrderByAcademicYearDescTermDesc(20L)).thenReturn(List.of());
 
         try (MockedStatic<com.school.utils.SecurityUtils> utils =
                      mockStatic(com.school.utils.SecurityUtils.class)) {

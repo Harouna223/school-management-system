@@ -47,6 +47,13 @@ public class ParentController {
         return ok("Bulletins trouvés", parentService.childBulletins(studentId));
     }
 
+    @GetMapping("/children/{studentId}/bulletins/{bulletinId}/pdf")
+    @Operation(summary = "Bulletin PDF d'un enfant")
+    public void childBulletinPdf(@PathVariable Long studentId, @PathVariable Long bulletinId,
+                                 HttpServletResponse response) throws java.io.IOException {
+        parentService.exportChildBulletinPdf(studentId, bulletinId, response);
+    }
+
     @GetMapping("/children/{studentId}/attendances")
     @Operation(summary = "Présences / absences d'un enfant")
     public ResponseEntity<ApiResponse<List<AttendanceResponse>>> childAttendances(@PathVariable Long studentId) {

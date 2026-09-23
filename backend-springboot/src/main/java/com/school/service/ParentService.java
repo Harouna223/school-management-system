@@ -5,6 +5,7 @@ import com.school.dto.response.AttendanceResponse;
 import com.school.dto.response.BulletinResponse;
 import com.school.dto.response.GradeResponse;
 import com.school.dto.response.StudentResponse;
+import com.school.entity.Bulletin;
 import com.school.entity.EnrollmentHistory;
 import com.school.entity.LmdEnrollment;
 import com.school.entity.Parent;
@@ -19,6 +20,7 @@ import com.school.repository.LmdEnrollmentRepository;
 import com.school.repository.ParentRepository;
 import com.school.repository.StudentHistoryRepository;
 import com.school.repository.StudentRepository;
+import com.school.service.GradeService;
 import com.school.utils.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -44,6 +46,7 @@ public class ParentService {
     private final EnrollmentHistoryRepository enrollmentHistoryRepository;
     private final LmdEnrollmentRepository lmdEnrollmentRepository;
     private final LmdService lmdService;
+    private final GradeService gradeService;
 
     @Transactional(readOnly = true)
     public List<StudentResponse> myChildren() {
@@ -56,9 +59,20 @@ public class ParentService {
     @Transactional(readOnly = true)
     public List<BulletinResponse> childBulletins(Long studentId) {
         Student student = ownedStudent(studentId);
-        return bulletinRepository.findByStudentId(student.getId()).stream()
+        return bulletinRepository.findByStudentIdOrderByAcademicYearDescTermDesc(student.getId()).stream()
                 .map(BulletinResponse::from)
+                .sorted(java.util.Comparator.comparingInt((BulletinResponse b) -> b.getRank() != null ? b.getRank() : Integer.MAX_VALUE))
                 .toList();
+    }
+
+    /**
+     * Export PDF du bulletin d'un enfant (vérifie l'appartenance au parent).
+     */
+    public void exportChildBulletinPdf(Long studentId, Long bulletinId,
+                                       jakarta.servlet.http.HttpServletResponse response)
+            throws java.io.IOException {
+        ownedStudent(studentId);
+        gradeService.exportBulletinPdf(bulletinId, response);
     }
 
     @Transactional(readOnly = true)
