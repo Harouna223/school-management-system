@@ -566,6 +566,111 @@ CREATE TABLE teacher_attendances (
 ) ENGINE=InnoDB;
 
 -- ============================================================
+-- 16 bis. Heures enseignées & paie des enseignants à l'heure
+-- ============================================================
+
+CREATE TABLE teacher_hourly_rates (
+  id BIGINT NOT NULL AUTO_INCREMENT,
+  teacher_id BIGINT NOT NULL,
+  hourly_rate DECIMAL(12,2) NOT NULL,
+  start_date DATE NOT NULL,
+  end_date DATE,
+  school_year_id BIGINT,
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME,
+  PRIMARY KEY (id),
+  KEY idx_thr_teacher (teacher_id),
+  KEY idx_thr_period (start_date, end_date),
+  CONSTRAINT fk_thr_teacher FOREIGN KEY (teacher_id) REFERENCES teachers (id) ON DELETE CASCADE,
+  CONSTRAINT fk_thr_year FOREIGN KEY (school_year_id) REFERENCES academic_years (id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE teacher_work_hours (
+  id BIGINT NOT NULL AUTO_INCREMENT,
+  teacher_id BIGINT NOT NULL,
+  work_date DATE NOT NULL,
+  hours DECIMAL(5,2) NOT NULL,
+  subject_id BIGINT,
+  class_id BIGINT,
+  school_year_id BIGINT,
+  hourly_rate_applied DECIMAL(12,2) NOT NULL,
+  amount DECIMAL(12,2) NOT NULL,
+  observation VARCHAR(255),
+  created_by BIGINT,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_twh_teacher_date_subject_class (teacher_id, work_date, subject_id, class_id),
+  KEY idx_twh_date (work_date),
+  KEY idx_twh_teacher (teacher_id),
+  CONSTRAINT fk_twh_teacher FOREIGN KEY (teacher_id) REFERENCES teachers (id) ON DELETE CASCADE,
+  CONSTRAINT fk_twh_subject FOREIGN KEY (subject_id) REFERENCES subjects (id) ON DELETE SET NULL,
+  CONSTRAINT fk_twh_class FOREIGN KEY (class_id) REFERENCES school_classes (id) ON DELETE SET NULL,
+  CONSTRAINT fk_twh_year FOREIGN KEY (school_year_id) REFERENCES academic_years (id) ON DELETE SET NULL,
+  CONSTRAINT fk_twh_user FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE teacher_monthly_payments (
+  id BIGINT NOT NULL AUTO_INCREMENT,
+  teacher_id BIGINT NOT NULL,
+  month_date DATE NOT NULL,
+  school_year_id BIGINT,
+  total_hours DECIMAL(8,2) NOT NULL DEFAULT 0,
+  hourly_rate DECIMAL(12,2) NOT NULL DEFAULT 0,
+  total_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+  amount_paid DECIMAL(12,2) NOT NULL DEFAULT 0,
+  remaining_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+  status VARCHAR(15) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_tmp_teacher_month (teacher_id, month_date),
+  KEY idx_tmp_month (month_date),
+  KEY idx_tmp_status (status),
+  CONSTRAINT fk_tmp_teacher FOREIGN KEY (teacher_id) REFERENCES teachers (id) ON DELETE CASCADE,
+  CONSTRAINT fk_tmp_year FOREIGN KEY (school_year_id) REFERENCES academic_years (id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE teacher_payment_transactions (
+  id BIGINT NOT NULL AUTO_INCREMENT,
+  monthly_payment_id BIGINT NOT NULL,
+  receipt_no VARCHAR(30) NOT NULL,
+  amount DECIMAL(12,2) NOT NULL,
+  method VARCHAR(20) NOT NULL,
+  payment_date DATETIME NOT NULL,
+  reference VARCHAR(100),
+  received_by BIGINT,
+  observation VARCHAR(255),
+  expense_id BIGINT,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_tpt_receipt (receipt_no),
+  KEY idx_tpt_payment (monthly_payment_id),
+  KEY idx_tpt_date (payment_date),
+  CONSTRAINT fk_tpt_payment FOREIGN KEY (monthly_payment_id)
+    REFERENCES teacher_monthly_payments (id) ON DELETE CASCADE,
+  CONSTRAINT fk_tpt_user FOREIGN KEY (received_by) REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE teacher_month_closures (
+  id BIGINT NOT NULL AUTO_INCREMENT,
+  month_date DATE NOT NULL,
+  school_year_id BIGINT,
+  closed_by BIGINT,
+  closed_at DATETIME,
+  reopened_by BIGINT,
+  reopened_at DATETIME,
+  closed BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_tmc_month (month_date),
+  CONSTRAINT fk_tmc_year FOREIGN KEY (school_year_id) REFERENCES academic_years (id) ON DELETE SET NULL,
+  CONSTRAINT fk_tmc_closed_by FOREIGN KEY (closed_by) REFERENCES users (id) ON DELETE SET NULL,
+  CONSTRAINT fk_tmc_reopened_by FOREIGN KEY (reopened_by) REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+-- ============================================================
 -- 17. Annonces administratives
 -- ============================================================
 
@@ -626,23 +731,30 @@ INSERT INTO permissions (name, description) VALUES
 ('LIBRARY_READ', 'Consulter la bibliothèque'),
 ('LIBRARY_WRITE', 'Gérer la bibliothèque'),
 ('HR_READ', 'Consulter le personnel'),
-('HR_WRITE', 'Gérer le personnel');
+('HR_WRITE', 'Gérer le personnel'),
+('COMMUNICATION_READ', 'Consulter les communications'),
+('COMMUNICATION_WRITE', 'Gérer les communications'),
+('ACADEMIC_YEAR_READ', 'Consulter les années académiques'),
+('ACADEMIC_YEAR_WRITE', 'Gérer les années académiques'),
+('LMD_READ', 'Consulter le module universitaire LMD'),
+('LMD_WRITE', 'Gérer le module universitaire LMD'),
+('BACKUP_WRITE', 'Gérer les sauvegardes');
 
 -- Rôles -> Permissions
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r, permissions p WHERE r.name = 'SUPER_ADMIN';
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r, permissions p
-WHERE r.name = 'DIRECTEUR' AND p.name IN ('STUDENT_READ','STUDENT_WRITE','TEACHER_READ','TEACHER_WRITE','CLASS_READ','CLASS_WRITE','SUBJECT_READ','SUBJECT_WRITE','GRADE_READ','PAYMENT_READ','ATTENDANCE_READ','EXAM_READ','EXAM_WRITE','SCHEDULE_READ','SCHEDULE_WRITE','REPORT_READ','FINANCE_READ','LIBRARY_READ','HR_READ');
+WHERE r.name = 'DIRECTEUR' AND p.name IN ('STUDENT_READ','STUDENT_WRITE','TEACHER_READ','TEACHER_WRITE','CLASS_READ','CLASS_WRITE','SUBJECT_READ','SUBJECT_WRITE','GRADE_READ','PAYMENT_READ','ATTENDANCE_READ','EXAM_READ','EXAM_WRITE','SCHEDULE_READ','SCHEDULE_WRITE','REPORT_READ','FINANCE_READ','LIBRARY_READ','HR_READ','LMD_READ','LMD_WRITE');
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r, permissions p
 WHERE r.name = 'COMPTABLE' AND p.name IN ('PAYMENT_READ','PAYMENT_WRITE','FINANCE_READ','FINANCE_WRITE','REPORT_READ','STUDENT_READ');
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r, permissions p
-WHERE r.name = 'SECRETAIRE' AND p.name IN ('STUDENT_READ','STUDENT_WRITE','TEACHER_READ','CLASS_READ','ATTENDANCE_READ','ATTENDANCE_WRITE','PAYMENT_READ','EXAM_READ','SCHEDULE_READ','LIBRARY_READ','LIBRARY_WRITE');
+WHERE r.name = 'SECRETAIRE' AND p.name IN ('STUDENT_READ','STUDENT_WRITE','TEACHER_READ','CLASS_READ','ATTENDANCE_READ','ATTENDANCE_WRITE','PAYMENT_READ','EXAM_READ','SCHEDULE_READ','LIBRARY_READ','LIBRARY_WRITE','LMD_READ','LMD_WRITE');
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r, permissions p
-WHERE r.name = 'ENSEIGNANT' AND p.name IN ('GRADE_READ','GRADE_WRITE','ATTENDANCE_READ','ATTENDANCE_WRITE','EXAM_READ','SCHEDULE_READ','STUDENT_READ','SUBJECT_READ');
+WHERE r.name = 'ENSEIGNANT' AND p.name IN ('GRADE_READ','GRADE_WRITE','ATTENDANCE_READ','ATTENDANCE_WRITE','EXAM_READ','SCHEDULE_READ','STUDENT_READ','SUBJECT_READ','LMD_READ','LMD_WRITE');
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r, permissions p
 WHERE r.name = 'PARENT' AND p.name IN ('STUDENT_READ','GRADE_READ','ATTENDANCE_READ','PAYMENT_READ','SCHEDULE_READ');
