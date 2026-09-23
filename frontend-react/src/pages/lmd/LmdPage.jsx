@@ -1234,7 +1234,7 @@ export default function LmdPage() {
 function EnrollBar({ gradeFieldId, students, enrollments, onDone, success, error }) {
   const [studentId, setStudentId] = useState('')
   const [semester, setSemester] = useState('S1')
-  const enrolled = new Set(enrollments.map((e) => e.student?.id))
+  const enrolled = new Set(enrollments.filter((e) => e.active).map((e) => e.student?.id))
   const available = students.filter((s) => !enrolled.has(s.id))
 
   const enroll = async () => {

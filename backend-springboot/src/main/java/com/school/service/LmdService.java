@@ -271,9 +271,30 @@ public class LmdService {
         Student student = studentService.findById(request.getStudentId());
         AcademicField field = fieldRepository.findById(request.getFieldId())
                 .orElseThrow(() -> ResourceNotFoundException.of("Filière", request.getFieldId()));
-        if (enrollmentRepository.findByStudentIdAndFieldId(request.getStudentId(), request.getFieldId()).isPresent()) {
-            throw new BusinessException("Cet élève est déjà inscrit dans cette filière");
+
+        var existing = enrollmentRepository.findByStudentIdAndFieldId(request.getStudentId(), request.getFieldId());
+        if (existing.isPresent()) {
+            LmdEnrollment enrollment = existing.get();
+            if (enrollment.isActive()) {
+                throw new BusinessException("Cet élève est déjà inscrit dans cette filière");
+            }
+            enrollment.setActive(true);
+            enrollment.setEnrollmentStatus(request.getEnrollmentStatus() != null
+                    ? request.getEnrollmentStatus() : EnrollmentStatus.INSCRIT);
+            enrollment.setCurrentSemester(request.getCurrentSemester());
+            enrollment.setLevel(request.getLevel());
+            enrollment.setAcademicYear(request.getAcademicYear());
+            if (request.getProgramId() != null) {
+                Program program = programRepository.findById(request.getProgramId())
+                        .orElseThrow(() -> ResourceNotFoundException.of("Programme", request.getProgramId()));
+                enrollment.setProgram(program);
+            }
+            LmdEnrollment saved = enrollmentRepository.save(enrollment);
+            auditService.log("REENROLL", "LmdEnrollment", saved.getId(),
+                    "Réinscription LMD de " + student.getFullName() + " en " + field.getName(), httpRequest);
+            return saved;
         }
+
         LmdEnrollment.LmdEnrollmentBuilder builder = LmdEnrollment.builder()
                 .student(student)
                 .field(field)
