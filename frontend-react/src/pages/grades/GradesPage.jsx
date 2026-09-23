@@ -146,7 +146,8 @@ export default function GradesPage() {
     setDeliberating(true)
     try {
       const { data } = await examApi.deliberate(classId, term)
-      setDeliberations(data.data)
+      setDeliberations((data.data || []).slice()
+        .sort((a, b) => (a.rank ?? Number.MAX_SAFE_INTEGER) - (b.rank ?? Number.MAX_SAFE_INTEGER)))
       success(`Délibération ${term} effectuée (${data.data.length} bulletins)`)
     } catch (err) {
       toastError(extractError(err))

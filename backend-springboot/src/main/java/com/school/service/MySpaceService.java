@@ -120,7 +120,10 @@ public class MySpaceService {
     public List<BulletinResponse> myBulletins() {
         return bulletinRepository
                 .findByStudentIdOrderByAcademicYearDescTermDesc(currentStudent().getId())
-                .stream().map(BulletinResponse::from).toList();
+                .stream().map(BulletinResponse::from)
+                .sorted(java.util.Comparator.comparingInt(
+                        (com.school.dto.response.BulletinResponse b) -> b.getRank() != null ? b.getRank() : Integer.MAX_VALUE))
+                .toList();
     }
 
     @Transactional(readOnly = true)

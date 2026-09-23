@@ -173,7 +173,10 @@ public class GradeService {
         auditService.log("BULLETIN", "Bulletin", classId,
                 "Génération des bulletins " + term + " pour la classe " + classId, httpRequest);
         notifyParents(saved, term, year);
-        return saved.stream().map(BulletinResponse::from).toList();
+        return saved.stream()
+                .sorted(Comparator.comparing(Bulletin::getRank,
+                        Comparator.nullsLast(Comparator.naturalOrder())))
+                .map(BulletinResponse::from).toList();
     }
 
     /**
@@ -186,7 +189,11 @@ public class GradeService {
         String year = CodeGenerator.currentAcademicYear();
         generateBulletins(classId, term, httpRequest);
         List<Bulletin> bulletins = bulletinRepository
-                .findByStudentSchoolClassIdAndTermAndAcademicYear(classId, term, year);
+                .findByStudentSchoolClassIdAndTermAndAcademicYear(classId, term, year)
+                .stream()
+                .sorted(Comparator.comparing(Bulletin::getRank,
+                        Comparator.nullsLast(Comparator.naturalOrder())))
+                .toList();
         bulletins.forEach(bulletin -> {
             BigDecimal average = bulletin.getAverage();
             if (average == null) {
@@ -211,7 +218,10 @@ public class GradeService {
     @Transactional(readOnly = true)
     public List<BulletinResponse> bulletinsByStudent(Long studentId) {
         return bulletinRepository.findByStudentIdOrderByAcademicYearDescTermDesc(studentId)
-                .stream().map(BulletinResponse::from).toList();
+                .stream().map(BulletinResponse::from)
+                .sorted(java.util.Comparator.comparingInt(
+                        (BulletinResponse b) -> b.getRank() != null ? b.getRank() : Integer.MAX_VALUE))
+                .toList();
     }
 
     /**
@@ -237,7 +247,11 @@ public class GradeService {
             throws java.io.IOException {
         String year = com.school.utils.CodeGenerator.currentAcademicYear();
         List<Bulletin> bulletins = bulletinRepository
-                .findByStudentSchoolClassIdAndTermAndAcademicYear(classId, term, year);
+                .findByStudentSchoolClassIdAndTermAndAcademicYear(classId, term, year)
+                .stream()
+                .sorted(Comparator.comparing(Bulletin::getRank,
+                        Comparator.nullsLast(Comparator.naturalOrder())))
+                .toList();
         if (bulletins.isEmpty()) {
             throw new com.school.exception.BusinessException("Aucun bulletin trouvé pour cette classe et ce trimestre");
         }
