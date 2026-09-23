@@ -60,6 +60,9 @@ public class AuthService {
     @Value("${app.jwt.refresh-expiration-ms}")
     private long refreshExpirationMs;
 
+    @Value("${app.jwt.expiration-ms}")
+    private long accessExpirationMs;
+
     @Transactional
     public AuthResponse login(LoginRequest request, HttpServletRequest httpRequest) {
         User user = userRepository.findByUsername(request.getUsername()).orElse(null);
@@ -102,7 +105,7 @@ public class AuthService {
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
                 .tokenType("Bearer")
-                .expiresIn(3600000)
+                .expiresIn(accessExpirationMs)
                 .user(UserResponse.from(user))
                 .build();
     }
@@ -159,7 +162,7 @@ public class AuthService {
                 .accessToken(newAccessToken)
                 .refreshToken(newRefreshToken)
                 .tokenType("Bearer")
-                .expiresIn(3600000)
+                .expiresIn(accessExpirationMs)
                 .user(UserResponse.from(user))
                 .build();
     }
