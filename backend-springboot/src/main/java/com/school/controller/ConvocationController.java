@@ -3,6 +3,7 @@ package com.school.controller;
 import com.school.dto.request.ConvocationRequest;
 import com.school.dto.response.ApiResponse;
 import com.school.dto.response.ConvocationResponse;
+import com.school.service.AccessControlService;
 import com.school.service.ConvocationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -25,6 +26,7 @@ import java.util.List;
 public class ConvocationController {
 
     private final ConvocationService convocationService;
+    private final AccessControlService accessControlService;
 
     @PostMapping
     @Operation(summary = "Créer une convocation", description = "Notifie automatiquement le parent de l'élève")
@@ -39,6 +41,9 @@ public class ConvocationController {
             @RequestParam(required = false) Long studentId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
+        if (studentId != null) {
+            accessControlService.assertCanAccessStudentData(studentId);
+        }
         return ok("Convocations", com.school.dto.response.PageResponse.from(
                 convocationService.listByStudent(studentId, page, size), x -> x));
     }
@@ -46,6 +51,7 @@ public class ConvocationController {
     @GetMapping("/student/{studentId}")
     @Operation(summary = "Convocations d'un élève/étudiant")
     public ResponseEntity<ApiResponse<List<ConvocationResponse>>> byStudent(@PathVariable Long studentId) {
+        accessControlService.assertCanAccessStudentData(studentId);
         return ok("Convocations", convocationService.listByStudentAll(studentId));
     }
 
