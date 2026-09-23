@@ -38,6 +38,9 @@ public class StudentResponse {
     private String className;
     private ParentResponse parent;
 
+    /** Indique si l'élève dispose déjà d'un compte utilisateur (espace élève). */
+    private Boolean hasAccount;
+
     public static StudentResponse from(Student s) {
         StudentResponse.StudentResponseBuilder b = StudentResponse.builder()
                 .id(s.getId())
@@ -55,7 +58,8 @@ public class StudentResponse {
                 .status(s.getStatus())
                 .educationCycle(s.getEducationCycle())
                 .classId(s.getSchoolClass() != null ? s.getSchoolClass().getId() : null)
-                .className(s.getSchoolClass() != null ? s.getSchoolClass().getName() : null);
+                .className(s.getSchoolClass() != null ? s.getSchoolClass().getName() : null)
+                .hasAccount(s.getUser() != null);
         if (s.getParent() != null) {
             b.parent(ParentResponse.from(s.getParent()));
         }

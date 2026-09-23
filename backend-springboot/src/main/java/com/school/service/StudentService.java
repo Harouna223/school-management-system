@@ -18,6 +18,7 @@ import com.school.repository.ParentRepository;
 import com.school.repository.SchoolClassRepository;
 import com.school.repository.StudentHistoryRepository;
 import com.school.repository.StudentRepository;
+import com.school.repository.UserRepository;
 import com.school.utils.CodeGenerator;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +44,7 @@ public class StudentService {
     private final ParentRepository parentRepository;
     private final SchoolClassRepository schoolClassRepository;
     private final StudentHistoryRepository studentHistoryRepository;
+    private final UserRepository userRepository;
     private final StudentMapper studentMapper;
     private final AuthService authService;
     private final AuditService auditService;
@@ -87,12 +89,14 @@ public class StudentService {
             student.setParent(linkParentAccount(parent, request));
         }
 
-        // Compte utilisateur optionnel
-        if (Boolean.TRUE.equals(request.getCreateUserAccount())) {
+        // Compte utilisateur (par défaut pour tout nouvel élève)
+        if (!Boolean.FALSE.equals(request.getCreateUserAccount())) {
+            String email = request.getEmail() != null ? request.getEmail()
+                    : student.getMatricule().toLowerCase() + "@school.local";
             student.setUser(authService.createLinkedAccount(
-                    request.getUsername() != null ? request.getUsername() : defaultUsername(request),
+                    uniqueUsername(request.getUsername() != null ? request.getUsername() : defaultUsername(request)),
                     request.getPassword() != null ? request.getPassword() : "Eleve@123",
-                    request.getEmail(),
+                    email,
                     request.getFirstName(), request.getLastName(), "ELEVE"));
         }
 
@@ -118,11 +122,13 @@ public class StudentService {
             parent = applyParentData(parent, request);
             student.setParent(linkParentAccount(parent, request));
         }
-        if (Boolean.TRUE.equals(request.getCreateUserAccount())) {
+        if (Boolean.TRUE.equals(request.getCreateUserAccount()) && student.getUser() == null) {
+            String email = request.getEmail() != null ? request.getEmail()
+                    : student.getMatricule().toLowerCase() + "@school.local";
             student.setUser(authService.createLinkedAccount(
-                    request.getUsername() != null ? request.getUsername() : defaultUsername(request),
+                    uniqueUsername(request.getUsername() != null ? request.getUsername() : defaultUsername(request)),
                     request.getPassword() != null ? request.getPassword() : "Eleve@123",
-                    request.getEmail(),
+                    email,
                     request.getFirstName(), request.getLastName(), "ELEVE"));
         }
         Student saved = studentRepository.save(student);
@@ -361,5 +367,19 @@ public class StudentService {
     private String defaultUsername(StudentRequest r) {
         return (r.getFirstName() + "." + r.getLastName())
                 .toLowerCase().replaceAll("[^a-z0-9.]", "");
+    }
+
+    /**
+     * Garantit un nom d'utilisateur unique : si le nom demandé (ou généré
+     * automatiquement) est déjà pris, un suffixe numérique est ajouté.
+     */
+    private String uniqueUsername(String base) {
+        String candidate = base == null || base.isBlank() ? "eleve" : base;
+        int suffix = 2;
+        while (userRepository.existsByUsername(candidate)) {
+            candidate = base + suffix;
+            suffix++;
+        }
+        return candidate;
     }
 }

@@ -72,7 +72,7 @@ export default function StudentFormPage() {
     parentPhone: '',
     parentEmail: '',
     parentProfession: '',
-    createUserAccount: false,
+    createUserAccount: true,
     username: '',
     password: '',
     createParentAccount: false,
@@ -83,6 +83,7 @@ export default function StudentFormPage() {
   const [preview, setPreview] = useState(null)
   const [parentHasAccount, setParentHasAccount] = useState(false)
 const [history, setHistory] = useState({ bulletins: [], grades: [] })
+  const [studentHasAccount, setStudentHasAccount] = useState(false)
 
   useEffect(() => {
     if (!isEdit) return
@@ -107,6 +108,7 @@ const [history, setHistory] = useState({ bulletins: [], grades: [] })
       studentApi.get(id).then((res) => {
         const s = res.data.data
         setParentHasAccount(Boolean(s.parent?.hasAccount))
+        setStudentHasAccount(Boolean(s.hasAccount))
         setInitial({
           firstName: s.firstName,
           lastName: s.lastName,
@@ -273,6 +275,42 @@ const [history, setHistory] = useState({ bulletins: [], grades: [] })
                         <TextField fullWidth label="Profession" name="parentProfession" value={values.parentProfession} onChange={handleChange} />
                       </Grid>
                     </Grid>
+
+                    {isEdit && (
+                      <>
+                        <Divider sx={{ my: 3 }} />
+                        <Typography variant="h6" mb={1}>Compte élève (espace élève)</Typography>
+                        {studentHasAccount ? (
+                          <Typography variant="body2" color="text.secondary">
+                            Cet élève dispose déjà d'un compte utilisateur. Vous pouvez le gérer (mot de passe,
+                            activer / désactiver) depuis le module Utilisateurs.
+                          </Typography>
+                        ) : (
+                          <>
+                            <FormControlLabel
+                              control={
+                                <Switch
+                                  checked={values.createUserAccount}
+                                  onChange={handleChange}
+                                  name="createUserAccount"
+                                />
+                              }
+                              label="Créer un compte utilisateur (espace élève)"
+                            />
+                            {values.createUserAccount && (
+                              <Grid container spacing={2} mt={1}>
+                                <Grid item xs={12} sm={6}>
+                                  <TextField fullWidth label="Nom d'utilisateur" name="username" value={values.username} onChange={handleChange} placeholder="ex. jean.dupont" />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                  <TextField fullWidth label="Mot de passe" type="password" name="password" value={values.password} onChange={handleChange} placeholder="Min. 8 caractères" />
+                                </Grid>
+                              </Grid>
+                            )}
+                          </>
+                        )}
+                      </>
+                    )}
 
                     {!isEdit && (
                       <>
