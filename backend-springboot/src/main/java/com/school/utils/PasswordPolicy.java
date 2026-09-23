@@ -14,8 +14,11 @@ public final class PasswordPolicy {
         if (password == null || password.length() < 8) {
             throw new BusinessException("Le mot de passe doit contenir au moins 8 caractères");
         }
-        if (!password.matches(".*[A-Za-z].*") || !password.matches(".*[0-9].*")) {
-            throw new BusinessException("Le mot de passe doit contenir des lettres et des chiffres");
+        if (!password.matches(".*[a-z].*")
+                || !password.matches(".*[A-Z].*")
+                || !password.matches(".*[0-9].*")) {
+            throw new BusinessException(
+                    "Le mot de passe doit contenir au moins une minuscule, une majuscule et un chiffre");
         }
     }
 }
