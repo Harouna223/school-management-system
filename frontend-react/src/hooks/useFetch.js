@@ -1,36 +1,33 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 
-/**
- * Fetch générique avec annulation automatique (prévient les fuites mémoire).
- */
+/** Ignore les réponses obsolètes après un changement de dépendances ou démontage. */
 export function useFetch(fetcher, deps = []) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const cancelled = useRef(false)
 
   useEffect(() => {
-    cancelled.current = false
+    let cancelled = false
     setLoading(true)
-    fetcher()
+    setError(null)
+    Promise.resolve()
+      .then(() => fetcher())
       .then((res) => {
-        if (!cancelled.current) {
+        if (!cancelled) {
           setData(res?.data?.data ?? res?.data)
           setError(null)
         }
       })
       .catch((err) => {
-        if (!cancelled.current) {
+        if (!cancelled) {
           setError(err)
           setData(null)
         }
       })
       .finally(() => {
-        if (!cancelled.current) setLoading(false)
+        if (!cancelled) setLoading(false)
       })
-    return () => {
-      cancelled.current = true
-    }
+    return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps)
 
