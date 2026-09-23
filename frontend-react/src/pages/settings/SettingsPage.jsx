@@ -3,7 +3,7 @@ import {
   Card, CardContent, Grid, TextField, Typography, Button, Box, Switch, FormControlLabel, Divider,
   Dialog, DialogTitle, DialogContent, DialogActions, Chip, IconButton,
 } from '@mui/material'
-import { Settings as SettingsIcon, Save, School, Receipt, WhatsApp, CalendarMonth, Add, Edit, Delete, Star, StarBorder, Backup, Restore, CloudDownload, CloudUpload, AccountTree } from '@mui/icons-material'
+import { Save, School, Receipt, WhatsApp, CalendarMonth, Add, Edit, Delete, Star, StarBorder, Backup, CloudDownload, CloudUpload, AccountTree } from '@mui/icons-material'
 import PageHeader from '../../components/PageHeader'
 import { useToast } from '../../hooks/useToast'
 import { settingsApi, academicYearApi, backupApi, communicationApi } from '../../api/endpoints'

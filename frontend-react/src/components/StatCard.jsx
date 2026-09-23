@@ -15,7 +15,7 @@ const colorMap = {
  * valeur, tendance et effet hover.
  */
 export default function StatCard({ title, value, icon: Icon, color = 'primary', trend, loading, suffix, subtitle }) {
-  const pickPalette = (theme) => colorMap[color] || colorMap.primary
+  const pickPalette = () => colorMap[color] || colorMap.primary
   return (
     <Card
       className="stat-card"

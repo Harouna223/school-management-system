@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Grid, TextField, Button, MenuItem } from '@mui/material'
-import { Search, FilterAlt } from '@mui/icons-material'
+import { FilterAlt } from '@mui/icons-material'
 import PageHeader from '../../components/PageHeader'
 import DataTable from '../../components/DataTable'
 import StatusChip from '../../components/StatusChip'

@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Grid, TextField, MenuItem, Button, Dialog, DialogTitle, DialogContent, DialogActions, Chip } from '@mui/material'
 import { Formik, Form } from 'formik'
 import * as Yup from 'yup'
@@ -22,7 +21,6 @@ const empty = {
  * Gestion des examens : planification, statuts, délibérations.
  */
 export default function ExamsPage() {
-  const navigate = useNavigate()
   const { success, error: toastError } = useToast()
   const [rows, setRows] = useState([])
   const [classes, setClasses] = useState([])

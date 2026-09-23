@@ -48,7 +48,6 @@ export default function UniversityPortalPage() {
     if (!selectedEnr) return
     loadReleve(selectedEnr, releveSession)
     loadUeEnrollments(selectedEnr)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedEnr, releveSession])
 
   const loadReleve = async (enr, session = 1) => {

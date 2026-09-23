@@ -10,8 +10,7 @@ import {
   CalendarMonth as ScheduleIcon,
   PictureAsPdf as PdfIcon,
   FactCheck as AttendanceIcon,
-  Payments as PaymentsIcon,
-  ReceiptLong as ReceiptIcon,
+  Payments as PaymentsIcon
 } from '@mui/icons-material'
 import PageHeader from '../../components/PageHeader'
 import StatusChip from '../../components/StatusChip'

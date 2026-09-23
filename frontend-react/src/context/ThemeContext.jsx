@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { toggleTheme as toggleThemeAction } from '../redux/slices/themeSlice'
 

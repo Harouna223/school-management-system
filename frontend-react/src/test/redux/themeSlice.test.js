@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import themeReducer, { toggleTheme } from '../../redux/slices/themeSlice'
 
 describe('themeSlice', () => {

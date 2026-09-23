@@ -1,8 +1,19 @@
 import { useEffect, useState } from 'react'
 import {
-  Grid, Card, CardContent, Typography, Box, Chip, Divider,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Avatar,
-  Skeleton, Button,
+  Grid,
+  Card,
+  Typography,
+  Box,
+  Chip,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Avatar,
+  Skeleton,
+  Button
 } from '@mui/material'
 import {
   People,
@@ -27,8 +38,7 @@ import {
   TrendingUp,
   AccessTime,
   Save,
-  HowToReg,
-  NotificationsActive,
+  HowToReg
 } from '@mui/icons-material'
 import {
   ResponsiveContainer,

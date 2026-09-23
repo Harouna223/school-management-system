@@ -1,7 +1,19 @@
 import { useEffect, useState } from 'react'
 import {
-  Grid, Card, CardContent, Typography, Box, Chip, Button, TextField, MenuItem,
-  Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Avatar,
+  Grid,
+  Card,
+  Typography,
+  Box,
+  Chip,
+  Button,
+  TextField,
+  MenuItem,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  IconButton,
+  Avatar
 } from '@mui/material'
 import { Add, Delete, Person, School, Work } from '@mui/icons-material'
 import PageHeader from '../../components/PageHeader'

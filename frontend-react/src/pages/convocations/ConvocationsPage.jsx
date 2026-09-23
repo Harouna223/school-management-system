@@ -1,9 +1,21 @@
 import { useEffect, useState } from 'react'
 import {
-  Grid, Card, CardContent, Typography, Box, Chip, Button, TextField, MenuItem,
-  Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Avatar, TablePagination,
+  Grid,
+  Card,
+  Typography,
+  Box,
+  Chip,
+  Button,
+  TextField,
+  MenuItem,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  IconButton,
+  Avatar
 } from '@mui/material'
-import { Add, Delete, PictureAsPdf, Event, Place, Person } from '@mui/icons-material'
+import { Add, Delete, Event, Place, Person } from '@mui/icons-material'
 import PageHeader from '../../components/PageHeader'
 import { useToast } from '../../hooks/useToast'
 import { convocationApi, studentApi } from '../../api/endpoints'
@@ -32,7 +44,7 @@ export default function ConvocationsPage() {
   const [location, setLocation] = useState('')
   const [filter, setFilter] = useState('')
   const [page, setPage] = useState(0)
-  const [size, setSize] = useState(10)
+  const [size] = useState(10)
 
   const load = async () => {
     setLoading(true)

@@ -28,7 +28,7 @@ import PageHeader from '../../components/PageHeader'
 import { useToast } from '../../hooks/useToast'
 import { studentApi, classApi, examApi } from '../../api/endpoints'
 import { extractError } from '../../api/axios'
-import { formatDate, formatGrade, initials, downloadBlob } from '../../utils/format'
+import { formatGrade, initials, downloadBlob } from '../../utils/format'
 
 const CYCLES = [
   { value: '', label: '— Aucun / Déduit de la classe —' },

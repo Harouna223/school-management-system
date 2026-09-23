@@ -1,15 +1,26 @@
 import { useEffect, useState } from 'react'
 import {
-  Grid, Card, CardContent, Typography, Box, Chip, Button, TextField, MenuItem,
-  Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Avatar, TablePagination,
+  Grid,
+  Card,
+  Typography,
+  Box,
+  Chip,
+  Button,
+  TextField,
+  MenuItem,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  IconButton,
+  Avatar,
+  TablePagination
 } from '@mui/material'
-import { Add, Delete, Edit, Person, School } from '@mui/icons-material'
+import { Add, Delete, Person, School } from '@mui/icons-material'
 import PageHeader from '../../components/PageHeader'
 import { useToast } from '../../hooks/useToast'
 import { candidatureApi, lmdApi } from '../../api/endpoints'
 import { extractError } from '../../api/axios'
-import { formatDate } from '../../utils/format'
-
 const STATUSES = ['EN_ATTENTE', 'RECUE', 'ACCEPTEE', 'LISTE_ATTENTE', 'REFUSEE']
 const STATUS_COLORS = {
   EN_ATTENTE: 'warning', RECUE: 'info', ACCEPTEE: 'success',

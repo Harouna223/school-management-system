@@ -162,7 +162,7 @@ export default function ClassesPage() {
           onSubmit={handleSubmit}
           enableReinitialize
         >
-          {({ values, errors, touched, handleChange, handleSubmit: submit }) => (
+          {({ values, errors, touched, handleChange }) => (
             <Form>
               <DialogTitle>{editing ? 'Modifier la classe' : 'Nouvelle classe'}</DialogTitle>
               <DialogContent>

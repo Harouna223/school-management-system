@@ -1,17 +1,33 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  Grid, Box, Typography, Card, Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Chip, Button, Avatar, Skeleton, Divider,
+  Grid,
+  Box,
+  Typography,
+  Card,
+  Tabs,
+  Tab,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Chip,
+  Button,
+  Avatar,
+  Skeleton
 } from '@mui/material'
 import {
-  Person, School, FactCheck, Payments, Description, ArrowBack, PictureAsPdf, Phone, Email, Cake,
+  ArrowBack,
+  PictureAsPdf,
+  Phone,
+  Email,
+  Cake
 } from '@mui/icons-material'
 import PageHeader from '../../components/PageHeader'
-import { useToast } from '../../hooks/useToast'
 import { studentApi, attendanceApi, paymentApi, examApi, lmdApi } from '../../api/endpoints'
-import { formatDate, formatCurrency, downloadBlob } from '../../utils/format'
-import { extractError } from '../../api/axios'
+import { formatDate, formatCurrency } from '../../utils/format'
 
 const CYCLE_LABELS = {
   JARDIN: 'Jardin',
@@ -29,7 +45,6 @@ const TABS = ['Informations', 'Notes', 'Absences', 'Paiements', 'Documents']
 export default function StudentDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { success, error: toastError } = useToast()
   const [tab, setTab] = useState(0)
   const [student, setStudent] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -57,16 +72,6 @@ export default function StudentDetailPage() {
 
   const s = student
   const fullName = `${s.firstName} ${s.lastName}`
-
-  const downloadDoc = async (apiCall, filename) => {
-    try {
-      const res = await apiCall
-      downloadBlob(res.data, filename)
-      success(`${filename} téléchargé`)
-    } catch (err) {
-      toastError(extractError(err))
-    }
-  }
 
   return (
     <>

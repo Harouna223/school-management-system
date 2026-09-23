@@ -4,7 +4,7 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Dialog, DialogTitle, DialogContent, DialogActions, Avatar, IconButton,
 } from '@mui/material'
-import { PictureAsPdf, Assignment, Leaderboard, EmojiEvents, Gavel, Save, Edit } from '@mui/icons-material'
+import { PictureAsPdf, Assignment, Leaderboard, EmojiEvents, Gavel, Save } from '@mui/icons-material'
 import PageHeader from '../../components/PageHeader'
 import FilterCard from '../../components/FilterCard'
 import { useToast } from '../../hooks/useToast'

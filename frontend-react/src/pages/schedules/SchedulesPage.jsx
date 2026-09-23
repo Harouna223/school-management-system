@@ -1,7 +1,24 @@
 import { useState, useEffect } from 'react'
 import {
-  Grid, TextField, MenuItem, Button, Card, CardContent, Typography, Box, Tab, Tabs, Dialog,
-  DialogTitle, DialogContent, DialogActions, Chip, Table, TableBody, TableCell, TableHead, TableRow,
+  Grid,
+  TextField,
+  MenuItem,
+  Button,
+  Card,
+  Typography,
+  Box,
+  Tab,
+  Tabs,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Chip,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow
 } from '@mui/material'
 import { Formik, Form } from 'formik'
 import * as Yup from 'yup'
@@ -25,7 +42,6 @@ export default function SchedulesPage() {
   const { success, error: toastError } = useToast()
   const [view, setView] = useState('class')
   const [filterId, setFilterId] = useState('')
-  const [rows, setRows] = useState([])
   const [classes, setClasses] = useState([])
   const [teachers, setTeachers] = useState([])
   const [rooms, setRooms] = useState([])
@@ -72,8 +88,7 @@ export default function SchedulesPage() {
     const dayKey = Object.keys(DAY_KEYS).find((k) => DAY_KEYS[k] === idx)
     return {
       day,
-      slots: TIMES.map((time, i) => {
-        const end = TIMES[i + 1] || time
+      slots: TIMES.map((time) => {
         return schedule.find(
           (s) => s.dayOfWeek === dayKey && String(s.startTime).slice(0, 5) === time,
         )

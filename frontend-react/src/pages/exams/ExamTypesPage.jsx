@@ -1,15 +1,15 @@
-import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Grid, Card, CardContent, CardActionArea, Typography, Box, Chip, Button,
+  Grid,
+  Card,
+  CardActionArea,
+  Typography,
+  Box
 } from '@mui/material'
 import {
   Quiz, Assignment, School, WorkspacePremium, Add,
 } from '@mui/icons-material'
 import PageHeader from '../../components/PageHeader'
-import { useToast } from '../../hooks/useToast'
-import { examApi } from '../../api/endpoints'
-import { extractError } from '../../api/axios'
 
 const TYPES = {
   CONTROLE: { icon: <Quiz sx={{ fontSize: 32 }} />, color: '#2563eb', description: 'Évaluation rapide en cours de séquence, généralement sans préparation longue.' },
@@ -20,21 +20,10 @@ const TYPES = {
 
 /**
  * Page de gestion des types d'évaluation.
- * Affiche les 4 types disponibles avec description et compteur d'évaluations.
+ * Affiche les 4 types disponibles avec leur description.
  */
 export default function ExamTypesPage() {
   const navigate = useNavigate()
-  const { success, error: toastError } = useToast()
-  const [counts, setCounts] = useState({})
-
-  useEffect(() => {
-    examApi.search({ page: 0, size: 1 })
-      .then((r) => {
-        const total = r.data.data?.totalElements || 0
-        setCounts({ all: total })
-      })
-      .catch(() => {})
-  }, [])
 
   return (
     <>

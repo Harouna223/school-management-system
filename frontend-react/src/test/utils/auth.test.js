@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { primaryRole, hasPermission, hasRole } from '../../utils/auth'
+import { primaryRole, hasPermission } from '../../utils/auth'
 
 const mockUser = (roles, permissions) => ({
   roles: roles || [],

@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import {
-  Box, Card, CardContent, Grid, TextField, MenuItem, Button, Typography, Tabs, Tab,
+  Box, Card, Grid, TextField, MenuItem, Button, Typography, Tabs, Tab,
   Dialog, DialogTitle, DialogContent, DialogActions, Chip, IconButton, Select, FormControl, InputLabel,
 } from '@mui/material'
 import {
-  AccountTree, MenuBook, EditNote, FactCheck, Add, Delete, Lock, LockOpen, Save, PictureAsPdf,
+  AccountTree, MenuBook, EditNote, FactCheck, Add, Delete, Save, PictureAsPdf,
 } from '@mui/icons-material'
 import PageHeader from '../../components/PageHeader'
 import { useToast } from '../../hooks/useToast'
@@ -55,6 +55,7 @@ export default function LmdPage() {
   const [ueDialog, setUeDialog] = useState(false)
   const [ueForm, setUeForm] = useState({ code: '', name: '', coefficient: 1, credits: 0, semester: 'S1', field: { id: '' }, type: '', optionalUe: false })
   const [ecs, setEcs] = useState([])
+  const [ecUeId, setEcUeId] = useState('')
   const [ecDialog, setEcDialog] = useState(false)
   const [ecForm, setEcForm] = useState({ code: '', name: '', credits: 0, coefficient: 1, volumeCm: 0, volumeTd: 0, volumeTp: 0, ue: { id: '' } })
 
@@ -93,11 +94,9 @@ export default function LmdPage() {
   const [attEcs, setAttEcs] = useState([])
   const [attDate, setAttDate] = useState(new Date().toISOString().slice(0, 10))
   const [attSessionType, setAttSessionType] = useState('CM')
-  const [attStatus, setAttStatus] = useState('PRESENT')
   const [attGroup, setAttGroup] = useState('')
   const [attStudents, setAttStudents] = useState([])
   const [attValues, setAttValues] = useState({})
-  const [attList, setAttList] = useState([])
   const [attStudentId, setAttStudentId] = useState('')
   const [attHist, setAttHist] = useState([])
 
@@ -109,7 +108,6 @@ export default function LmdPage() {
   const [changeSemesterValue, setChangeSemesterValue] = useState('')
   const [historyOpen, setHistoryOpen] = useState(false)
   const [historyList, setHistoryList] = useState([])
-  const [historyStudent, setHistoryStudent] = useState('')
 
   // Délibération
   const [delibFieldId, setDelibFieldId] = useState('')
@@ -299,6 +297,7 @@ export default function LmdPage() {
     if (!ueId) { setEcs([]); return }
     try { const { data } = await lmdApi.ecs(ueId); setEcs(data.data || []) } catch { /* ignore */ }
   }
+  useEffect(() => { loadEcs(ecUeId) }, [ecUeId])
 
   const saveEc = async () => {
     try {
@@ -306,12 +305,12 @@ export default function LmdPage() {
       success('EC créé')
       setEcDialog(false)
       setEcForm({ code: '', name: '', credits: 0, coefficient: 1, volumeCm: 0, volumeTd: 0, volumeTp: 0, ue: { id: '' } })
-      loadEcs(ecForm.ue.id)
+      loadEcs(ecUeId)
     } catch (err) { toastError(extractError(err)) }
   }
 
   const deleteEc = async (id) => {
-    try { await lmdApi.deleteEc(id); success('EC supprimé'); loadEcs(ecForm.ue.id || selectedUe) } catch (err) { toastError(extractError(err)) }
+    try { await lmdApi.deleteEc(id); success('EC supprimé'); loadEcs(ecUeId) } catch (err) { toastError(extractError(err)) }
   }
 
   const saveUe = async () => {
@@ -433,15 +432,13 @@ export default function LmdPage() {
   }, [attUeId])
 
   useEffect(() => {
-    if (!attEcId) { setAttList([]); return }
+    if (!attEcId) { setAttValues({}); return }
     lmdApi.universityAttendances({ ecId: attEcId, date: attDate, sessionType: attSessionType })
       .then((r) => {
-        setAttList(r.data.data || [])
         const byStudent = {}
         ;(r.data.data || []).forEach((a) => { byStudent[`${a.student?.id}`] = a.status })
         setAttValues(byStudent)
       }).catch(() => {})
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attEcId, attDate, attSessionType])
 
   const pointAttendance = async (studentId) => {
@@ -454,7 +451,6 @@ export default function LmdPage() {
       success('Présence enregistrée')
       lmdApi.universityAttendances({ ecId: attEcId, date: attDate, sessionType: attSessionType })
         .then((r) => {
-          setAttList(r.data.data || [])
           const byStudent = {}
           ;(r.data.data || []).forEach((a) => { byStudent[`${a.student?.id}`] = a.status })
           setAttValues(byStudent)
@@ -496,7 +492,6 @@ export default function LmdPage() {
     try {
       const { data } = await lmdApi.enrollmentHistory(studentId)
       setHistoryList(data.data || [])
-      setHistoryStudent(studentId)
       setHistoryOpen(true)
     } catch (err) { toastError(extractError(err)) }
   }
@@ -770,6 +765,43 @@ export default function LmdPage() {
               </Box>
             ))}
             {ues.length === 0 && <Typography variant="body2" color="text.secondary">Aucune UE pour ce semestre.</Typography>}
+          </Box>
+
+          {/* Éléments constitutifs (EC) de l'UE sélectionnée */}
+          <Box mt={3} pt={2} sx={{ borderTop: '1px solid', borderColor: 'divider' }}>
+            <Grid container spacing={2} alignItems="flex-end" mb={1.5}>
+              <Grid item xs={12} md={5}>
+                <FormControl size="small" fullWidth>
+                  <InputLabel>UE</InputLabel>
+                  <Select label="UE" value={ecUeId} onChange={(e) => setEcUeId(e.target.value)}>
+                    <MenuItem value="">Sélectionner…</MenuItem>
+                    {ues.map((u) => <MenuItem key={u.id} value={String(u.id)}>{u.code} — {u.name}</MenuItem>)}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Button variant="contained" startIcon={<Add />} disabled={!ecUeId}
+                  onClick={() => { setEcForm({ code: '', name: '', credits: 0, coefficient: 1, volumeCm: 0, volumeTd: 0, volumeTp: 0, ue: { id: ecUeId } }); setEcDialog(true) }}>
+                  Nouvel EC
+                </Button>
+              </Grid>
+            </Grid>
+            <Box display="flex" flexDirection="column" gap={1}>
+              {ecs.map((ec) => (
+                <Box key={ec.id} display="flex" alignItems="center" gap={1.5} sx={{ p: 1.5, borderRadius: '12px', border: '1px solid', borderColor: 'divider' }}>
+                  <Chip size="small" label={ec.code} color="secondary" />
+                  <Typography variant="body2" fontWeight={600} flex={1}>{ec.name}</Typography>
+                  <Chip size="small" label={`Coef ${ec.coefficient}`} variant="outlined" />
+                  <Chip size="small" label={`${ec.credits} ECTS`} variant="outlined" />
+                  <IconButton size="small" color="error" onClick={() => deleteEc(ec.id)}><Delete fontSize="small" /></IconButton>
+                </Box>
+              ))}
+              {ecs.length === 0 && (
+                <Typography variant="body2" color="text.secondary">
+                  {ecUeId ? 'Aucun EC pour cette UE.' : 'Sélectionnez une UE pour gérer ses éléments constitutifs.'}
+                </Typography>
+              )}
+            </Box>
           </Box>
         </Card>
       )}
@@ -1225,6 +1257,52 @@ export default function LmdPage() {
         <DialogActions>
           <Button onClick={() => setUeDialog(false)}>Annuler</Button>
           <Button variant="contained" onClick={saveUe} disabled={!ueForm.code || !ueForm.name}>Enregistrer</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Dialogue EC */}
+      <Dialog open={ecDialog} onClose={() => setEcDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Nouvel élément constitutif</DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} mt={0.5}>
+            <Grid item xs={12} sm={6}><TextField fullWidth label="Code" value={ecForm.code} onChange={(e) => setEcForm({ ...ecForm, code: e.target.value })} /></Grid>
+            <Grid item xs={12} sm={6}><TextField fullWidth type="number" label="Coefficient" value={ecForm.coefficient} onChange={(e) => setEcForm({ ...ecForm, coefficient: Number(e.target.value) })} /></Grid>
+            <Grid item xs={12}><TextField fullWidth label="Nom de l'EC" value={ecForm.name} onChange={(e) => setEcForm({ ...ecForm, name: e.target.value })} /></Grid>
+            <Grid item xs={6} sm={3}><TextField fullWidth type="number" label="Crédits ECTS" value={ecForm.credits} onChange={(e) => setEcForm({ ...ecForm, credits: Number(e.target.value) })} /></Grid>
+            <Grid item xs={6} sm={3}><TextField fullWidth type="number" label="Heures CM" value={ecForm.volumeCm} onChange={(e) => setEcForm({ ...ecForm, volumeCm: Number(e.target.value) })} /></Grid>
+            <Grid item xs={6} sm={3}><TextField fullWidth type="number" label="Heures TD" value={ecForm.volumeTd} onChange={(e) => setEcForm({ ...ecForm, volumeTd: Number(e.target.value) })} /></Grid>
+            <Grid item xs={6} sm={3}><TextField fullWidth type="number" label="Heures TP" value={ecForm.volumeTp} onChange={(e) => setEcForm({ ...ecForm, volumeTp: Number(e.target.value) })} /></Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEcDialog(false)}>Annuler</Button>
+          <Button variant="contained" onClick={saveEc} disabled={!ecForm.code || !ecForm.name || !ecForm.ue.id}>Enregistrer</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Dialogue Programme */}
+      <Dialog open={programDialog} onClose={() => setProgramDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Nouveau programme de formation</DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} mt={0.5}>
+            <Grid item xs={12} sm={6}><TextField fullWidth label="Code" value={programForm.code} onChange={(e) => setProgramForm({ ...programForm, code: e.target.value })} /></Grid>
+            <Grid item xs={12} sm={6}><TextField fullWidth type="number" label="Durée (années)" value={programForm.duration} onChange={(e) => setProgramForm({ ...programForm, duration: Number(e.target.value) })} /></Grid>
+            <Grid item xs={12}><TextField fullWidth label="Nom du programme" value={programForm.name} onChange={(e) => setProgramForm({ ...programForm, name: e.target.value })} /></Grid>
+            <Grid item xs={12} sm={6}><TextField fullWidth label="Diplôme" value={programForm.diploma} onChange={(e) => setProgramForm({ ...programForm, diploma: e.target.value })} /></Grid>
+            <Grid item xs={12} sm={6}><TextField fullWidth label="Année académique" placeholder="2026-2027" value={programForm.academicYear} onChange={(e) => setProgramForm({ ...programForm, academicYear: e.target.value })} /></Grid>
+            <Grid item xs={12}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Filière</InputLabel>
+                <Select label="Filière" value={programForm.field.id} onChange={(e) => setProgramForm({ ...programForm, field: { id: e.target.value } })}>
+                  {fields.map((f) => <MenuItem key={f.id} value={String(f.id)}>{f.name}</MenuItem>)}
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setProgramDialog(false)}>Annuler</Button>
+          <Button variant="contained" onClick={saveProgram} disabled={!programForm.code || !programForm.name || !programForm.diploma || !programForm.field.id}>Enregistrer</Button>
         </DialogActions>
       </Dialog>
     </>

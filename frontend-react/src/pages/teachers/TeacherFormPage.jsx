@@ -114,48 +114,48 @@ export default function TeacherFormPage() {
                     <Typography variant="h6" mb={2}>Informations personnelles</Typography>
                     <Grid container spacing={2}>
                       <Grid item xs={12} sm={6}>
-                        <TextField fullWidth label="Prénom" name="firstName" value={values.firstName} onChange={handleChange}
+                        <TextField fullWidth label="Prénom" name="firstName" value={values.firstName} onChange={handleChange} onBlur={handleBlur}
                           error={touched.firstName && Boolean(errors.firstName)} helperText={touched.firstName && errors.firstName} />
                       </Grid>
                       <Grid item xs={12} sm={6}>
-                        <TextField fullWidth label="Nom" name="lastName" value={values.lastName} onChange={handleChange}
+                        <TextField fullWidth label="Nom" name="lastName" value={values.lastName} onChange={handleChange} onBlur={handleBlur}
                           error={touched.lastName && Boolean(errors.lastName)} helperText={touched.lastName && errors.lastName} />
                       </Grid>
                       <Grid item xs={12} sm={4}>
-                        <TextField select fullWidth label="Genre" name="gender" value={values.gender} onChange={handleChange}>
+                        <TextField select fullWidth label="Genre" name="gender" value={values.gender} onChange={handleChange} onBlur={handleBlur}>
                           <MenuItem value="MALE">Masculin</MenuItem>
                           <MenuItem value="FEMALE">Féminin</MenuItem>
                         </TextField>
                       </Grid>
                       <Grid item xs={12} sm={4}>
                         <TextField fullWidth type="date" label="Naissance" name="birthDate" value={values.birthDate}
-                          onChange={handleChange} InputLabelProps={{ shrink: true }} />
+                          onChange={handleChange} onBlur={handleBlur} InputLabelProps={{ shrink: true }} />
                       </Grid>
                       <Grid item xs={12} sm={4}>
                         <TextField fullWidth type="date" label="Date d'embauche" name="hireDate" value={values.hireDate}
-                          onChange={handleChange} InputLabelProps={{ shrink: true }}
+                          onChange={handleChange} onBlur={handleBlur} InputLabelProps={{ shrink: true }}
                           error={touched.hireDate && Boolean(errors.hireDate)}
                           helperText={touched.hireDate && errors.hireDate} />
                       </Grid>
                       <Grid item xs={12} sm={4}>
-                        <TextField fullWidth label="Téléphone" name="phone" value={values.phone} onChange={handleChange} />
+                        <TextField fullWidth label="Téléphone" name="phone" value={values.phone} onChange={handleChange} onBlur={handleBlur} />
                       </Grid>
                       <Grid item xs={12} sm={4}>
-                        <TextField fullWidth label="Email" name="email" value={values.email} onChange={handleChange}
+                        <TextField fullWidth label="Email" name="email" value={values.email} onChange={handleChange} onBlur={handleBlur}
                           error={touched.email && Boolean(errors.email)} helperText={touched.email && errors.email} />
                       </Grid>
                       <Grid item xs={12} sm={4}>
-                        <TextField select fullWidth label="Contrat" name="contractType" value={values.contractType} onChange={handleChange}>
+                        <TextField select fullWidth label="Contrat" name="contractType" value={values.contractType} onChange={handleChange} onBlur={handleBlur}>
                           <MenuItem value="CDI">CDI</MenuItem>
                           <MenuItem value="CDD">CDD</MenuItem>
                           <MenuItem value="VACATAIRE">Vacataire</MenuItem>
                         </TextField>
                       </Grid>
                       <Grid item xs={12} sm={4}>
-                        <TextField fullWidth label="Salaire (FCFA)" name="salary" type="number" value={values.salary} onChange={handleChange} />
+                        <TextField fullWidth label="Salaire (FCFA)" name="salary" type="number" value={values.salary} onChange={handleChange} onBlur={handleBlur} />
                       </Grid>
                       <Grid item xs={12}>
-                        <TextField fullWidth label="Adresse" name="address" value={values.address} onChange={handleChange} />
+                        <TextField fullWidth label="Adresse" name="address" value={values.address} onChange={handleChange} onBlur={handleBlur} />
                       </Grid>
                     </Grid>
 
@@ -165,10 +165,10 @@ export default function TeacherFormPage() {
                         <Typography variant="h6" mb={2}>Compte utilisateur</Typography>
                         <Grid container spacing={2}>
                           <Grid item xs={12} sm={6}>
-                            <TextField fullWidth label="Nom d'utilisateur (laisser vide = auto)" name="username" value={values.username} onChange={handleChange} />
+                            <TextField fullWidth label="Nom d'utilisateur (laisser vide = auto)" name="username" value={values.username} onChange={handleChange} onBlur={handleBlur} />
                           </Grid>
                           <Grid item xs={12} sm={6}>
-                            <TextField fullWidth label="Mot de passe" type="password" name="password" value={values.password} onChange={handleChange} />
+                            <TextField fullWidth label="Mot de passe" type="password" name="password" value={values.password} onChange={handleChange} onBlur={handleBlur} />
                           </Grid>
                         </Grid>
                       </>

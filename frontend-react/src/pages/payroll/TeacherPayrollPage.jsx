@@ -42,7 +42,7 @@ export default function TeacherPayrollPage({ initialTab = 'monthly' }) {
   const [teachers, setTeachers] = useState([])
   const [classes, setClasses] = useState([])
   const [subjects, setSubjects] = useState([])
-  const [years, setYears] = useState([])
+  const [, setYears] = useState([])
   const [loading, setLoading] = useState(false)
 
   // Permissions alignées sur SecurityConfig :
@@ -69,7 +69,7 @@ export default function TeacherPayrollPage({ initialTab = 'monthly' }) {
   const [history, setHistory] = useState([])
   const [historyFilters, setHistoryFilters] = useState({ teacherId: '', from: '', to: '' })
   const [historyPage, setHistoryPage] = useState(0)
-  const [historySize, setHistorySize] = useState(10)
+  const [historySize] = useState(10)
   const [historyTotal, setHistoryTotal] = useState(0)
 
   // Paie mensuelle
