@@ -130,24 +130,24 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      # Les deux images sont construites a chaque push, meme sans secrets : c'est la seule
+      # validation des Dockerfile en CI. Seule la publication est conditionnee.
       - name: Build backend Docker image
-        if: ${{ steps.dockerhub.outcome == 'success' }}
         uses: docker/build-push-action@v6
         with:
           context: .
           file: docker/Dockerfile.backend
-          push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/school-management-backend:latest
+          push: ${{ env.DOCKERHUB_USERNAME != '' }}
+          tags: ${{ env.DOCKERHUB_USERNAME || 'local' }}/school-management-backend:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Build frontend Docker image
-        if: ${{ steps.dockerhub.outcome == 'success' }}
         uses: docker/build-push-action@v6
         with:
           context: .
           file: docker/Dockerfile.frontend
-          push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/school-management-frontend:latest
+          push: ${{ env.DOCKERHUB_USERNAME != '' }}
+          tags: ${{ env.DOCKERHUB_USERNAME || 'local' }}/school-management-frontend:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
