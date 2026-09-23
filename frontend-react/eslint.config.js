@@ -12,7 +12,10 @@ export default [
   {
     ignores: [
       'dist/**',
-      'dist-verify/**',
+      // Sorties de build de vérification (`--outDir dist-verify`, `dist-check`…).
+      // Le caractère générique évite qu'un répertoire de vérification laissé sur
+      // le disque fasse échouer le lint sur du code généré. Aligné sur .gitignore.
+      'dist-*/**',
       'node_modules/**',
       'public/**',
       'coverage/**',
