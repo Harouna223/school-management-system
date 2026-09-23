@@ -88,6 +88,12 @@ jobs:
         run: npm install --no-audit --no-fund
         working-directory: frontend-react
 
+      # Analyse statique : detecte notamment un composant ou un hook utilise sans
+      # import, qui passe le build mais provoque un ecran blanc au rendu.
+      - name: Run lint
+        run: npm run lint
+        working-directory: frontend-react
+
       - name: Run frontend tests
         run: npm run test
         working-directory: frontend-react
