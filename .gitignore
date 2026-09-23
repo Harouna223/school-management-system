@@ -13,6 +13,11 @@ backend-springboot/target/
 frontend-react/node_modules/
 frontend-react/dist/
 
+# Residus de build Vite : fichiers temporaires de config laisses par une execution
+# interrompue, et dossier de verification hors production.
+frontend-react/vite.config.js.timestamp-*.mjs
+frontend-react/dist-verify/
+
 # Artefacts créés par des commandes terminales accidentelles
 /[Help
 /cd
