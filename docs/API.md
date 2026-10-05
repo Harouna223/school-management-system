@@ -169,6 +169,11 @@ Paramètres de pagination : `?page=0&size=10` ; recherche : `?search=...`.
 | POST | `/api/hr/payrolls/generate` | Générer un bulletin mensuel (net = base + primes − retenues) |
 | PATCH | `/api/hr/payrolls/{id}/pay` | Marquer un bulletin comme payé |
 
+Les statuts d'enseignants sont **réconciliés automatiquement** chaque nuit (2 h) : tout
+enseignant dont le congé approuvé est terminé repasse en `ACTIVE`, et tout congé en cours
+bascule en `ON_LEAVE` (y compris les congés futurs, anticipés à leur date de début).
+Un `ON_LEAVE` posé manuellement, sans congé enregistré, est préservé.
+
 ## Heures & paie des enseignants — `/api/teacher-hours`
 
 Paie **à l'heure** : les heures enseignées sont saisies chaque jour, le salaire mensuel est
@@ -267,9 +272,37 @@ Le numéro du parent est utilisé tel que saisi (normalisation automatique : `6X
 | GET | `/api/dashboard/stats` | Statistiques globales (élèves, finances, présences, livres…) |
 | GET | `/api/dashboard/audit-logs` | Journal d'audit paginé (`?username=`) |
 
+## Université LMD — `/api/lmd`
+
+| Méthode | Route | Description |
+|---|---|---|
+| GET | `/api/lmd/faculties`, `/programs`, `/semesters`, `/groups` | Structure universitaire |
+| GET | `/api/lmd/result?studentId=&fieldId=&semester=&session=` | Résultat d'un semestre (moyenne, crédits, UE à repasser). **Accès vérifié** (IDOR : un étudiant ne voit que son résultat) |
+| POST | `/api/lmd/deliberate?fieldId=&semester=&session=` | Délibération d'une filière. Seuls les étudiants dont le **semestre courant** correspond sont traités |
+| GET | `/api/lmd/deliberations?fieldId=&semester=` | Délibérations enregistrées |
+| GET | `/api/lmd/releve/pdf` · `/releve/excel` | Relevé universitaire (programme et niveau renseignés) |
+| GET | `/api/lmd/attestation/pdf` | Attestation de réussite PDF avec QR code |
+| GET | `/api/lmd/attestation/verify?token=` | **Public** : vérifie l'authenticité d'une attestation (jeton HMAC signé, non forgeable) |
+
+**Règles de calcul** (correctifs de fiabilité) :
+
+- La **session** demandée est réellement appliquée : en session 1 (normale), seule la note
+  de session normale compte ; en session 2 (rattrapage), la meilleure note des deux sessions
+  est retenue.
+- La délibération ne concerne que les étudiants inscrits au **semestre visé** (un étudiant
+  passé en S4 n'est plus délibéré pour S1).
+- Le **total de crédits** n'inclut que les UE réellement suivies (les UE optionnelles non
+  choisies sont exclues).
+- Le **jeton d'attestation** est signé (HMAC-SHA256 du secret d'application) et expire après
+  1 an : il ne peut pas être forgé à partir du matricule et de l'horodatage.
+
 ## Fichiers
 
-- `GET /uploads/**` : fichiers téléversés (photos, reçus PDF) — servis par le backend.
+- `GET /uploads/**` : fichiers téléversés (photos élèves/enseignants, logo) — servis par le backend
+  **derrière l'authentification JWT** (`Authorization: Bearer …`). Le frontend charge ces images via
+  `fetch` (composants `FileAvatar` / `FileImage`), une balise `<img>` seule n'envoyant pas de jeton.
+  Les noms de fichiers sont des UUID non devinables ; les en-têtes `Cache-Control: private` et
+  `X-Content-Type-Options: nosniff` sont appliqués.
 
 ## Codes d'erreur
 

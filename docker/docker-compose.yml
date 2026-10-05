@@ -44,7 +44,9 @@ services:
       DB_USERNAME: root
       DB_PASSWORD: ${DB_PASSWORD:-root}
       JWT_SECRET: ${JWT_SECRET:-Y2hhbmdlLXRoaXMtc2VjcmV0LWtleS1pbi1wcm9kdWN0aW9uLXdpdGgtYTM3LWNyYXdhbGxlbg==}
+      REQUIRE_SECURE_SECRETS: ${REQUIRE_SECURE_SECRETS:-false}
       SERVER_PORT: 8080
+      OPEN_IN_VIEW: ${OPEN_IN_VIEW:-true}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
       UPLOAD_DIR: /app/uploads
       SCHOOL_NAME: ${SCHOOL_NAME:-École Moderne de Technologie}

@@ -512,7 +512,8 @@ Si vous gérez des dizaines d'écoles et souhaitez une seule instance, un refact
 Avant d'ouvrir l'application aux utilisateurs :
 
 - [ ] **Mot de passe admin** changé (pas `Admin@123`)
-- [ ] **Clé JWT** générée (pas la valeur par défaut)
+- [ ] **Clé JWT** générée (pas la valeur par défaut) — et `REQUIRE_SECURE_SECRETS=true`
+      pour que le backend **refuse de démarrer** tant que le secret reste faible
 - [ ] **Mot de passe MySQL** fort (pas `root`)
 - [ ] **HTTPS** activé (certificat SSL valide)
 - [ ] **CORS_ORIGINS** configuré avec le domaine réel

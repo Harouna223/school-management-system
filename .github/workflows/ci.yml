@@ -61,6 +61,13 @@ jobs:
           SPRING_JPA_HIBERNATE_DDL_AUTO: update
           APP_JWT_SECRET: dGVzdC1zZWNyZXQta2V5LWZvci1naXRodWItYWN0aW9ucy1taW5pbXVtLTM5LWJ5dGVz
 
+      # Tests d'intégration (*IT, PHASE 6) : spring-context complet sur un vrai
+      # MySQL via Testcontainers. Docker étant standard sur les runners GitHub,
+      # le conteneur est lancé automatiquement (aucun service à déclarer).
+      - name: Run integration tests
+        run: mvn -B verify -DskipUnitTests=true -Djacoco.skip=true
+        working-directory: backend-springboot
+
   frontend:
     name: Frontend – Build
     runs-on: ubuntu-latest
