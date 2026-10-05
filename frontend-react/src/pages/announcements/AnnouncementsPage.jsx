@@ -12,7 +12,7 @@ import { communicationApi } from '../../api/endpoints'
 import { extractError } from '../../api/axios'
 import { formatDateTime } from '../../utils/format'
 
-const ROLES = ['SUPER_ADMIN', 'DIRECTEUR', 'COMPTABLE', 'SECRETAIRE', 'ENSEIGNANT', 'PARENT', 'ELEVE']
+const ROLES = ['SUPER_ADMIN', 'DIRECTEUR', 'COMPTABLE', 'SECRETAIRE', 'ENSEIGNANT', 'PARENT', 'ELEVE', 'ETUDIANT']
 
 const ROLE_LABELS = {
   SUPER_ADMIN: 'Super Admin',
@@ -22,6 +22,7 @@ const ROLE_LABELS = {
   ENSEIGNANT: 'Enseignant',
   PARENT: 'Parent',
   ELEVE: 'Élève',
+  ETUDIANT: 'Étudiant',
 }
 
 /**

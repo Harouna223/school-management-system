@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import {
-  Grid, Card, CardContent, CardActionArea, Typography, Box, Chip, Avatar,
+  Grid, Card, CardContent, CardActionArea, Typography, Box, Chip,
   Button, Divider,
 } from '@mui/material'
 import {
@@ -24,6 +24,7 @@ import MiniMetric from '../../components/MiniMetric'
 import PortalHero from '../../components/PortalHero'
 import Loader from '../../components/Loader'
 import EmptyState from '../../components/EmptyState'
+import FileAvatar from '../../components/FileAvatar'
 import { parentApi } from '../../api/endpoints'
 import { initials, formatDate, formatCurrency } from '../../utils/format'
 
@@ -220,9 +221,9 @@ export default function ParentDashboard() {
             <Card className="chart-card animate-fade-in-up" sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
               <CardContent sx={{ flex: 1 }}>
                 <Box display="flex" alignItems="center" gap={1.6} mb={2}>
-                  <Avatar src={row.child.photo} sx={{ width: 48, height: 48, bgcolor: CHILD_COLORS[i % CHILD_COLORS.length] }}>
+                  <FileAvatar src={row.child.photo} sx={{ width: 48, height: 48, bgcolor: CHILD_COLORS[i % CHILD_COLORS.length] }}>
                     {initials(row.child.firstName, row.child.lastName)}
-                  </Avatar>
+                  </FileAvatar>
                   <Box minWidth={0} flex={1}>
                     <Typography variant="subtitle1" fontWeight={700} noWrap>
                       {row.child.firstName} {row.child.lastName}

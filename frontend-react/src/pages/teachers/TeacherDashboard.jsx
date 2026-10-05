@@ -21,6 +21,7 @@ import PortalHero from '../../components/PortalHero'
 import Loader from '../../components/Loader'
 import StatusChip from '../../components/StatusChip'
 import EmptyState from '../../components/EmptyState'
+import FileAvatar from '../../components/FileAvatar'
 import { myApi, teacherHoursApi } from '../../api/endpoints'
 import { initials, formatDate, formatCurrency, DAYS_FR, DAY_KEYS } from '../../utils/format'
 
@@ -401,9 +402,9 @@ export default function TeacherDashboard() {
         <Card className="animate-fade-in-up" sx={{ mt: 3, borderRadius: '16px' }}>
           <CardActionArea onClick={() => navigate('/profile')}>
             <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-              <Avatar src={profile.photo} sx={{ width: 52, height: 52, bgcolor: 'primary.main' }}>
+              <FileAvatar src={profile.photo} sx={{ width: 52, height: 52, bgcolor: 'primary.main' }}>
                 {initials(profile.firstName, profile.lastName)}
-              </Avatar>
+              </FileAvatar>
               <Box flex={1} minWidth={200}>
                 <Typography variant="subtitle1" fontWeight={700}>
                   {profile.firstName} {profile.lastName}

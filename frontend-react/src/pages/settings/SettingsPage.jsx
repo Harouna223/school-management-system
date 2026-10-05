@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useCallback, useEffect, useState, useRef } from 'react'
 import {
   Card, CardContent, Grid, TextField, Typography, Button, Box, Switch, FormControlLabel, Divider,
   Dialog, DialogTitle, DialogContent, DialogActions, Chip, IconButton,
@@ -9,11 +9,24 @@ import { useToast } from '../../hooks/useToast'
 import { settingsApi, academicYearApi, backupApi, communicationApi } from '../../api/endpoints'
 import { extractError } from '../../api/axios'
 import { formatDate } from '../../utils/format'
+import FileImage from '../../components/FileImage'
 import defaultLogo from '../../assets/logo.svg'
 
 const KEYS = [
   'SCHOOL_NAME', 'SCHOOL_ADDRESS', 'SCHOOL_PHONE', 'SCHOOL_EMAIL',
   'RECEIPT_FOOTER', 'WHATSAPP_ENABLED', 'WHATSAPP_DEFAULT_NUMBER',
+]
+
+/**
+ * Cycles d'enseignement proposés (constante de module : identité stable, donc
+ * utilisable telle quelle comme dépendance de useCallback / useEffect).
+ */
+const CYCLES_OPTIONS = [
+  { value: 'JARDIN', label: 'Jardin' },
+  { value: 'PRIMAIRE', label: 'Primaire' },
+  { value: 'COLLEGE', label: 'Collège' },
+  { value: 'LYCEE', label: 'Lycée' },
+  { value: 'UNIVERSITE', label: 'Université' },
 ]
 
 const LABELS = {
@@ -43,13 +56,23 @@ export default function SettingsPage() {
   const [messageLogs, setMessageLogs] = useState([])
   const [cycles, setCycles] = useState([])
 
-  const ALL_CYCLES = [
-    { value: 'JARDIN', label: 'Jardin' },
-    { value: 'PRIMAIRE', label: 'Primaire' },
-    { value: 'COLLEGE', label: 'Collège' },
-    { value: 'LYCEE', label: 'Lycée' },
-    { value: 'UNIVERSITE', label: 'Université' },
-  ]
+  const ALL_CYCLES = CYCLES_OPTIONS
+
+  // Chargeurs mémorisés : utilisés comme dépendances du useEffect de montage,
+// sans quoi l'identité changerait à chaque rendu (rechargements inutiles).
+  const loadCycles = useCallback(async () => {
+    try {
+      const { data } = await settingsApi.cycles()
+      setCycles(data.data || [])
+    } catch { setCycles(CYCLES_OPTIONS.map((c) => c.value)) }
+  }, [])
+
+  const loadMessageLogs = useCallback(async () => {
+    try {
+      const res = await communicationApi.messageLogs({ page: 0, size: 50 })
+      setMessageLogs(res.data.data?.content || [])
+    } catch { /* historique optionnel */ }
+  }, [])
 
   useEffect(() => {
     Promise.all([settingsApi.all(), settingsApi.defaults()])
@@ -67,21 +90,7 @@ export default function SettingsPage() {
     loadYears()
     loadMessageLogs()
     loadCycles()
-  }, [])
-
-  const loadCycles = async () => {
-    try {
-      const { data } = await settingsApi.cycles()
-      setCycles(data.data || [])
-    } catch { setCycles(ALL_CYCLES.map((c) => c.value)) }
-  }
-
-  const loadMessageLogs = async () => {
-    try {
-      const res = await communicationApi.messageLogs({ page: 0, size: 50 })
-      setMessageLogs(res.data.data?.content || [])
-    } catch { /* historique optionnel */ }
-  }
+  }, [loadYears, loadMessageLogs, loadCycles, toastError])
 
   const set = (key, value) => setValues((v) => ({ ...v, [key]: value }))
 
@@ -123,12 +132,12 @@ export default function SettingsPage() {
     }
   }
 
-  const loadYears = async () => {
+  const loadYears = useCallback(async () => {
     try {
       const { data } = await academicYearApi.all()
       setYears(data.data || [])
     } catch { /* ignore */ }
-  }
+  }, [])
 
   const openYearDialog = (year) => {
     setEditingYear(year)
@@ -256,12 +265,22 @@ export default function SettingsPage() {
           {section(<School color="primary" />, 'Logo de l\'établissement', (
             <Grid item xs={12}>
               <Box display="flex" alignItems="center" gap={2} flexWrap="wrap">
-                <Box
-                  component="img"
-                  src={values.SCHOOL_LOGO || defaultLogo}
-                  alt="Logo"
-                  sx={{ width: 72, height: 72, objectFit: 'contain', border: '1px dashed', borderColor: 'divider', borderRadius: 2, p: 0.5, bgcolor: '#fff' }}
-                />
+                {values.SCHOOL_LOGO ? (
+                  /* Logo téléversé : servi derrière l'authentification → FileImage. */
+                  <FileImage
+                    src={values.SCHOOL_LOGO}
+                    alt="Logo"
+                    sx={{ width: 72, height: 72, objectFit: 'contain', border: '1px dashed', borderColor: 'divider', borderRadius: 2, p: 0.5, bgcolor: '#fff' }}
+                  />
+                ) : (
+                  /* Logo par défaut embarqué dans le bundle : aucun contrôle d'accès requis. */
+                  <Box
+                    component="img"
+                    src={defaultLogo}
+                    alt="Logo"
+                    sx={{ width: 72, height: 72, objectFit: 'contain', border: '1px dashed', borderColor: 'divider', borderRadius: 2, p: 0.5, bgcolor: '#fff' }}
+                  />
+                )}
                 <Box>
                   <Button variant="outlined" component="label" startIcon={<CloudUpload />}>
                     Choisir un logo

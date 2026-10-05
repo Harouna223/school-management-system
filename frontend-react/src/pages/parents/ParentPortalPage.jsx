@@ -26,6 +26,7 @@ import PageHeader from '../../components/PageHeader'
 import StatusChip from '../../components/StatusChip'
 import Loader from '../../components/Loader'
 import EmptyState from '../../components/EmptyState'
+import FileAvatar from '../../components/FileAvatar'
 import { parentApi } from '../../api/endpoints'
 import { downloadResponse } from '../../services/exportService'
 import { useToast } from '../../hooks/useToast'
@@ -161,9 +162,9 @@ export default function ParentPortalPage() {
                   <Card sx={{ border: selected?.id === child.id ? '2px solid' : '1px solid', borderColor: selected?.id === child.id ? 'primary.main' : 'divider' }}>
                     <CardActionArea onClick={() => setSelected(child)}>
                       <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Avatar src={child.photo} sx={{ width: 48, height: 48 }}>
+                        <FileAvatar src={child.photo} sx={{ width: 48, height: 48 }}>
                           {initials(child.firstName, child.lastName)}
-                        </Avatar>
+                        </FileAvatar>
                         <Box minWidth={0} flex={1}>
                           <Typography variant="subtitle1" fontWeight={600} noWrap>
                             {child.firstName} {child.lastName}
@@ -192,9 +193,9 @@ export default function ParentPortalPage() {
             <Card>
               <CardContent>
                 <Box display="flex" alignItems="center" gap={2} mb={1} flexWrap="wrap">
-                  <Avatar src={selected.photo} sx={{ width: 56, height: 56 }}>
+                  <FileAvatar src={selected.photo} sx={{ width: 56, height: 56 }}>
                     {initials(selected.firstName, selected.lastName)}
-                  </Avatar>
+                  </FileAvatar>
                   <Box flex={1} minWidth={200}>
                     <Typography variant="h6">{selected.firstName} {selected.lastName}</Typography>
                     <Typography variant="body2" color="text.secondary">

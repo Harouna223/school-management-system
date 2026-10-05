@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   Grid,
   Card,
@@ -36,15 +36,15 @@ export default function AlumniPage() {
     email: '', phone: '', currentJob: '', company: '', notes: '',
   })
 
-  const load = () => {
+  const load = useCallback(() => {
     alumnusApi.list(fieldFilter || undefined).then((r) => setRows(r.data.data || [])).catch(() => {})
-  }
+  }, [fieldFilter])
 
   useEffect(() => {
     lmdApi.fields().then((r) => setFields(r.data.data || [])).catch(() => {})
   }, [])
 
-  useEffect(() => { load() }, [fieldFilter])
+  useEffect(() => { load() }, [load])
 
   const handleCreate = async () => {
     if (!form.firstName || !form.lastName) {

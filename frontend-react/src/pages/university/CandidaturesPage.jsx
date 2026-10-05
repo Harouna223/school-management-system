@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   Grid,
   Card,
@@ -45,7 +45,7 @@ export default function CandidaturesPage() {
     fieldId: '', level: 'L1', notes: '',
   })
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const { data } = await candidatureApi.list({
         status: statusFilter || undefined, page, size,
@@ -55,13 +55,13 @@ export default function CandidaturesPage() {
     } catch (err) {
       toastError(extractError(err))
     }
-  }
+  }, [statusFilter, page, size, toastError])
 
   useEffect(() => {
     lmdApi.fields().then((r) => setFields(r.data.data || [])).catch(() => {})
   }, [])
 
-  useEffect(() => { load() }, [page, size, statusFilter])
+  useEffect(() => { load() }, [load])
 
   const handleCreate = async () => {
     if (!form.firstName || !form.lastName || !form.fieldId) {

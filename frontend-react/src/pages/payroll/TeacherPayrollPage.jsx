@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   Grid, TextField, MenuItem, Button, Dialog, DialogTitle, DialogContent, DialogActions,
   Box, Typography, Tabs, Tab, Chip, IconButton, Tooltip, Alert,
@@ -97,14 +97,14 @@ export default function TeacherPayrollPage({ initialTab = 'monthly' }) {
 
   // ---------- Chargements ----------
 
-  const loadRates = async () => {
+  const loadRates = useCallback(async () => {
     try {
       const { data } = await teacherHoursApi.rates({})
       setRates(data.data)
     } catch (err) { toastError(extractError(err)) }
-  }
+  }, [toastError])
 
-  const loadDay = async () => {
+  const loadDay = useCallback(async () => {
     if (!entryForm.teacherId) { setDayEntries([]); return }
     try {
       const { data } = await teacherHoursApi.workHoursOfDay({
@@ -112,9 +112,9 @@ export default function TeacherPayrollPage({ initialTab = 'monthly' }) {
       })
       setDayEntries(data.data)
     } catch (err) { toastError(extractError(err)) }
-  }
+  }, [entryForm.teacherId, entryDate, toastError])
 
-  const loadHistory = async (p = 0, s = historySize) => {
+  const loadHistory = useCallback(async (p = 0, s = historySize) => {
     setLoading(true)
     try {
       const params = { page: p, size: s }
@@ -126,16 +126,16 @@ export default function TeacherPayrollPage({ initialTab = 'monthly' }) {
       setHistoryTotal(data.data.totalElements)
       setHistoryPage(p)
     } catch (err) { toastError(extractError(err)) } finally { setLoading(false) }
-  }
+  }, [historyFilters, historySize, toastError])
 
-  const loadMonthly = async () => {
+  const loadMonthly = useCallback(async () => {
     try {
       const { data } = await teacherHoursApi.monthly({ month: `${month}-01` })
       setRows(data.data)
     } catch (err) { toastError(extractError(err)) }
-  }
+  }, [month, toastError])
 
-  const loadTxs = async () => {
+  const loadTxs = useCallback(async () => {
     try {
       const params = {}
       if (txFilters.teacherId) params.teacherId = txFilters.teacherId
@@ -143,13 +143,13 @@ export default function TeacherPayrollPage({ initialTab = 'monthly' }) {
       const { data } = await teacherHoursApi.transactions(params)
       setTxs(data.data)
     } catch (err) { toastError(extractError(err)) }
-  }
+  }, [txFilters, toastError])
 
-  useEffect(() => { if (tab === 'rates') loadRates() }, [tab])
-  useEffect(() => { if (tab === 'history') loadHistory(0) }, [tab, historyFilters])
-  useEffect(() => { loadDay() }, [entryForm.teacherId, entryDate])
-  useEffect(() => { if (tab === 'monthly') loadMonthly() }, [tab, month])
-  useEffect(() => { if (tab === 'payments') loadTxs() }, [tab, txFilters])
+  useEffect(() => { if (tab === 'rates') loadRates() }, [tab, loadRates])
+  useEffect(() => { if (tab === 'history') loadHistory(0) }, [tab, loadHistory])
+  useEffect(() => { loadDay() }, [loadDay])
+  useEffect(() => { if (tab === 'monthly') loadMonthly() }, [tab, loadMonthly])
+  useEffect(() => { if (tab === 'payments') loadTxs() }, [tab, loadTxs])
 
   // ---------- Actions ----------
 

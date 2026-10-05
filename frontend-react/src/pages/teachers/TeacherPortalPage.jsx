@@ -3,7 +3,7 @@ import { Navigate } from 'react-router-dom'
 import {
   Grid, Card, CardContent, Typography, Box, Tabs, Tab, Chip,
   Table, TableHead, TableRow, TableCell, TableBody,
-  TextField, MenuItem, Avatar, IconButton,
+  TextField, MenuItem, IconButton,
 } from '@mui/material'
 import {
   CalendarMonth as ScheduleIcon,
@@ -16,6 +16,7 @@ import PageHeader from '../../components/PageHeader'
 import StatusChip from '../../components/StatusChip'
 import Loader from '../../components/Loader'
 import EmptyState from '../../components/EmptyState'
+import FileAvatar from '../../components/FileAvatar'
 import { useToast } from '../../hooks/useToast'
 import { myApi, examApi, studentApi, teacherHoursApi } from '../../api/endpoints'
 import { extractError } from '../../api/axios'
@@ -180,9 +181,9 @@ export default function TeacherPortalPage() {
           {profile && (
             <Card sx={{ mb: 3 }}>
               <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-                <Avatar src={profile.photo} sx={{ width: 56, height: 56 }}>
+                <FileAvatar src={profile.photo} sx={{ width: 56, height: 56 }}>
                   {initials(profile.firstName, profile.lastName)}
-                </Avatar>
+                </FileAvatar>
                 <Box flex={1} minWidth={200}>
                   <Typography variant="h6">{profile.firstName} {profile.lastName}</Typography>
                   <Typography variant="body2" color="text.secondary">
@@ -276,9 +277,9 @@ export default function TeacherPortalPage() {
                             <TableRow key={s.id}>
                               <TableCell>
                                 <Box display="flex" alignItems="center" gap={1.5}>
-                                  <Avatar src={s.photo} sx={{ width: 32, height: 32 }}>
+                                  <FileAvatar src={s.photo} sx={{ width: 32, height: 32 }}>
                                     {initials(s.firstName, s.lastName)}
-                                  </Avatar>
+                                  </FileAvatar>
                                   <Typography fontWeight={600}>{s.firstName} {s.lastName}</Typography>
                                 </Box>
                               </TableCell>

@@ -347,7 +347,7 @@ export default function LmdPage() {
         if (ue) setGrades({})
       }).catch(() => {})
     }
-  }, [selectedUe])
+  }, [selectedUe, gradeFieldId, gradeSemester])
 
   const gradeFor = (studentId) => grades[studentId] ?? ''
 

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import {
-  Box, Grid, TextField, MenuItem, Button, Avatar, Chip, Typography,
+import { Grid, TextField, MenuItem, Button, Box, Chip, Typography,
   IconButton, Menu, Dialog, DialogTitle, DialogContent, DialogActions, Tooltip,
 } from '@mui/material'
 import {
@@ -16,6 +15,7 @@ import StatusChip from '../../components/StatusChip'
 import StatCard from '../../components/StatCard'
 import FilterCard from '../../components/FilterCard'
 import StudentImportDialog from './StudentImportDialog'
+import FileAvatar from '../../components/FileAvatar'
 import { useToast } from '../../hooks/useToast'
 import { useFetch } from '../../hooks/useFetch'
 import { studentApi, classApi, dashboardApi } from '../../api/endpoints'
@@ -236,9 +236,12 @@ export default function StudentsPage() {
       label: 'Élève',
       render: (row) => (
         <Box display="flex" alignItems="center" gap={1.5}>
-          <Avatar src={row.photo} sx={{ width: 36, height: 36, borderRadius: '10px' }}>
+          <FileAvatar
+            src={row.photo}
+            sx={{ width: 36, height: 36, borderRadius: '10px' }}
+          >
             {initials(row.firstName, row.lastName)}
-          </Avatar>
+          </FileAvatar>
           <Box>
             <Typography variant="body2" fontWeight={600}>
               {row.firstName} {row.lastName}

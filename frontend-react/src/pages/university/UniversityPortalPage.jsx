@@ -1,12 +1,12 @@
 import { useState, useEffect, useMemo } from 'react'
-import {
-  Grid, Card, CardContent, Typography, Box, Chip, Button, Avatar, Skeleton, Divider,
+import { Grid, Card, CardContent, Typography, Box, Chip, Button, Skeleton, Divider,
   Tabs, Tab, Table, TableHead, TableRow, TableCell, TableBody, LinearProgress,
 } from '@mui/material'
 import {
   School, PictureAsPdf, TableView, MenuBook, Star, WorkspacePremium, History, Description,
 } from '@mui/icons-material'
 import PageHeader from '../../components/PageHeader'
+import FileAvatar from '../../components/FileAvatar'
 import { useToast } from '../../hooks/useToast'
 import { myApi, lmdApi } from '../../api/endpoints'
 import { extractError } from '../../api/axios'
@@ -98,9 +98,9 @@ export default function UniversityPortalPage() {
       <Card sx={{ p: 3, borderRadius: '16px', mb: 3, bgcolor: 'primary.main', color: '#fff' }}>
         <Box display="flex" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={2}>
           <Box display="flex" alignItems="center" gap={2.5}>
-            <Avatar src={profile?.photo} sx={{ width: 64, height: 64, border: '3px solid rgba(255,255,255,0.3)' }}>
+            <FileAvatar src={profile?.photo} sx={{ width: 64, height: 64, border: '3px solid rgba(255,255,255,0.3)' }}>
               {profile?.firstName?.[0]}{profile?.lastName?.[0]}
-            </Avatar>
+            </FileAvatar>
             <Box>
               <Typography variant="h5" fontWeight={800}>{profile?.firstName} {profile?.lastName}</Typography>
               <Typography variant="body2" sx={{ opacity: 0.85 }}>{profile?.matricule}</Typography>
