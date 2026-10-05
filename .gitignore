@@ -31,3 +31,7 @@ frontend-react/dist-*/
 /_*.log
 /_*.ps1
 /_*.js
+
+# Sauvegardes de bases de donnees (contiennent des donnees reelles) : ne jamais commiter.
+database/*backup*.sql
+database/*-backup.sql

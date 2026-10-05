@@ -1,0 +1,48 @@
+# Profil de test d'intégration (PHASE 6)
+# Base fournie par Testcontainers (MySQL 8.4 jetable) : les données réelles
+# de l'application ne sont jamais touchées.
+spring:
+  jpa:
+    hibernate:
+      # PHASE 7 : le test reproduit EXACTEMENT le chemin de production :
+      # MySqlTestContainer recree la base vierge, Flyway applique V1__baseline
+      # (70 tables), puis Hibernate ne fait que VALIDER la coherence.
+      # Si le baseline diverge des entites, l'integration test echoue ici,
+      # avant toute mise en production.
+      ddl-auto: validate
+    # CIBLE stricte : plus stricte que la production actuelle (OPEN_IN_VIEW=true).
+    # Un endpoint sérialisant une entité hors transaction échoue ici.
+    open-in-view: false
+  mail:
+    host: localhost
+    port: 3025
+    username: ""
+    password: ""
+
+app:
+  jwt:
+    secret: cGhhc2U2LXNlY3JldC1kZS10ZXN0LXVuaXF1ZW1lbnQtMDEyMzQ1Njc4OQ==
+    expiration-ms: 3600000
+    refresh-expiration-ms: 604800000
+  cors:
+    allowed-origins: http://localhost
+  upload-dir: ./target/test-uploads
+  admin:
+    username: admin
+    password: Admin@123
+  whatsapp:
+    enabled: false
+  sms:
+    enabled: false
+
+management:
+  endpoint:
+    health:
+      show-details: never
+
+logging:
+  level:
+    root: WARN
+    com.school: INFO
+    org.springframework.test: WARN
+    org.testcontainers: INFO

@@ -8,8 +8,21 @@ Système complet de gestion scolaire : élèves, enseignants, classes, emplois d
 |---|---|
 | Frontend | React 18, Vite, MUI, Tailwind CSS, Redux Toolkit, Formik + Yup, Recharts, Axios |
 | Backend | Java 21, Spring Boot 3.2.5, Spring Security (JWT), Spring Data JPA, MapStruct, Swagger |
-| Base de données | MySQL 8 (utf8mb4) |
+| Base de données | MySQL 8 (utf8mb4) — schéma géré par **Flyway** (`backend-springboot/src/main/resources/db/migration/`) |
 | Déploiement | Docker Compose + Nginx |
+
+## Migrations de schéma (Flyway — Phase 7)
+
+Hibernate ne modifie **plus jamais** le schéma (`ddl-auto: validate` : vérification seule).
+Le schéma est la propriété exclusive de Flyway :
+
+- `V1__baseline.sql` — schéma complet au 2026-10-03 (baseline, appliqué une seule fois sur une base vierge).
+- Toute évolution = un nouveau fichier `Vn__description.sql` (ex : `V2__add_index_users_email.sql`).
+- Au démarrage, l'application applique automatiquement les migrations en attente
+  (`baseline-on-migrate: true` : une base existante reçoit un historique SANS rejouer V1).
+- Historique consultable : table `flyway_schema_history`.
+- **Règle d'or** : sauvegarder la base avant chaque déploiement
+  (`mysqldump --single-transaction --databases school_management`).
 
 ## Démarrage rapide
 
@@ -32,7 +45,8 @@ Connexion : `admin` / `Admin@123` (modifiable via `ADMIN_PASSWORD`).
 
 ### Option 2 — Développement local
 
-1. **Base de données** : exécuter `database/schema.sql` dans MySQL (ou laisser `ddl-auto: update` créer le schéma).
+1. **Base de données** : le schéma est créé automatiquement par Flyway au premier démarrage du backend
+   (`V1__baseline.sql`). Pour une initialisation manuelle, exécuter `database/schema.sql` dans MySQL.
    Astuce : utiliser le MySQL Docker sur un autre port ne change rien à votre MySQL local :
    ```bash
    docker compose -f docker/docker-compose.yml up -d mysql
