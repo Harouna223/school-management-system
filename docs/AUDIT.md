@@ -608,7 +608,7 @@ docker/
 
 | Fonctionnalité | Action |
 |---|---|
-| Rôle ELEVE pour /my-university | **Fusionner** : créer un rôle ÉTUDIANT distinct, migrer les comptes ELEVE avec inscription LMD vers ÉTUDIANT |
+| Rôle ELEVE pour /my-university | **Fusionner** : rôle ÉTUDIANT distinct créé, comptes migrés, `/my-university` réservé à ÉTUDIANT ✅ |
 | Permission PARENT → PERM_STUDENT_READ | **Conserver** mais avec contrôle IDOR (déjà fait) |
 | Permission ELEVE → PERM_PAYMENT_READ / ATTENDANCE_READ | **Conserver** mais avec contrôle IDOR (déjà fait) |
 
@@ -704,6 +704,9 @@ SMS — PLATEFORME ÉDUCATIVE UNIFIÉE
 - SecurityConfig : ajouter les règles pour ÉTUDIANT
 - Routes : `/my-university` → rôle ÉTUDIANT
 - **Risque : ÉLEVÉ** — nécessite une migration de données et une mise à jour des guards frontend
+- ✅ **Réalisé** : rôle `ETUDIANT` créé et migré (`DataInitializer.migrateEtudiantRole`), garde de
+  route et entrée de menu `/my-university` réservées à `ETUDIANT`, libellés i18n `role.ETUDIANT`
+  ajoutés (FR/EN).
 ### Phase 4 : Architecture académique unifiée
 - Ajouter `campus`/`institution` à la structure universitaire
 - Lier les finances aux cycles d'enseignement

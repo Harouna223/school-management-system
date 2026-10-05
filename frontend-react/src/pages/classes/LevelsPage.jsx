@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useState, useEffect } from 'react'
 import { Grid, TextField, MenuItem, Button, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material'
 import { Add } from '@mui/icons-material'
 import PageHeader from '../../components/PageHeader'
@@ -30,7 +30,7 @@ export default function LevelsPage() {
   const [form, setForm] = useState(empty)
   const [toDelete, setToDelete] = useState(null)
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     try {
       const res = await classApi.levels()
@@ -40,9 +40,9 @@ export default function LevelsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [toastError])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [load])
 
   const openNew = () => { setEditing(null); setForm(empty); setDialogOpen(true) }
   const openEdit = (row) => { setEditing(row); setForm({ name: row.name, code: row.code, educationCycle: row.educationCycle || '' }); setDialogOpen(true) }

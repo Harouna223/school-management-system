@@ -735,4 +735,83 @@ class HrServiceTest {
         assertThat(resultat).hasSize(1);
         assertThat(resultat.get(0).getNetSalary()).isEqualByComparingTo("250000.00");
     }
+
+    // ---------------------------------- reconciliation automatique des statuts (D26)
+// ------------------------------------- reconciliation automatique des statuts (D26)
+
+    /** Congé approuvé couvrant une période donnée, pour un enseignant donné. */
+    private Leave congeApprouve(Long id, Teacher t, LocalDate debut, LocalDate fin) {
+        return Leave.builder()
+                .id(id)
+                .teacher(t)
+                .type(LeaveType.ANNUAL)
+                .startDate(debut)
+                .endDate(fin)
+                .reason("Congés annuels")
+                .status(LeaveStatus.APPROVED)
+                .build();
+    }
+
+    @Test
+    @DisplayName("D26 : un enseignant en congé terminé redevient automatiquement ACTIF")
+    void congeTermineRemetLEnseignantActif() {
+        Teacher t = enseignant(1L);
+        t.setStatus(TeacherStatus.ON_LEAVE);
+        LocalDate aujourdhui = LocalDate.now();
+        // Congé qui s'est terminé hier.
+        when(leaveRepository.findByStatus(LeaveStatus.APPROVED)).thenReturn(List.of(
+                congeApprouve(9L, t, aujourdhui.minusDays(10), aujourdhui.minusDays(1))));
+
+        int modifie = hrService.reconcileTeacherLeaveStatus();
+
+        assertThat(modifie).isEqualTo(1);
+        // Sans ce retour automatique, l'enseignant resterait « en congé » indéfiniment.
+        verify(teacherService).setStatusSilently(1L, TeacherStatus.ACTIVE);
+    }
+
+    @Test
+    @DisplayName("D26 : un congé en cours bascule l'enseignant en ON_LEAVE")
+    void congeEnCoursBasculeLEnseignantEnConge() {
+        Teacher t = enseignant(1L);
+        LocalDate aujourdhui = LocalDate.now();
+        when(leaveRepository.findByStatus(LeaveStatus.APPROVED)).thenReturn(List.of(
+                congeApprouve(9L, t, aujourdhui.minusDays(1), aujourdhui.plusDays(3))));
+
+        int modifie = hrService.reconcileTeacherLeaveStatus();
+
+        assertThat(modifie).isEqualTo(1);
+        verify(teacherService).setStatusSilently(1L, TeacherStatus.ON_LEAVE);
+    }
+
+    @Test
+    @DisplayName("D26 : un enseignant sans congé approuvé n'est jamais touché")
+    void aucunCongeApprouveNeModifieLesStatuts() {
+        when(leaveRepository.findByStatus(LeaveStatus.APPROVED)).thenReturn(List.of());
+
+        int modifie = hrService.reconcileTeacherLeaveStatus();
+
+        assertThat(modifie).isZero();
+        // Un ON_LEAVE posé manuellement (sans congé) doit être préservé.
+        verify(teacherService, never()).setStatusSilently(anyLong(), any());
+        verifyNoInteractions(auditService);
+    }
+
+    @Test
+    @DisplayName("D26 : un enseignant déjà dans le bon statut n'est pas réécrit")
+    void statutDejaCorrectNonReecrit() {
+        LocalDate aujourdhui = LocalDate.now();
+        // Congé à venir : l'enseignant reste donc ACTIVE (rien à signaler).
+        Teacher actif = enseignant(1L);
+        Teacher enConge = enseignant(2L);
+        enConge.setStatus(TeacherStatus.ON_LEAVE);
+        when(leaveRepository.findByStatus(LeaveStatus.APPROVED)).thenReturn(List.of(
+                congeApprouve(9L, actif, aujourdhui.plusDays(5), aujourdhui.plusDays(9)),
+                congeApprouve(10L, enConge, aujourdhui.minusDays(2), aujourdhui.plusDays(2))));
+
+        int modifie = hrService.reconcileTeacherLeaveStatus();
+
+        assertThat(modifie).isZero();
+        verify(teacherService, never()).setStatusSilently(anyLong(), any());
+    }
+
 }

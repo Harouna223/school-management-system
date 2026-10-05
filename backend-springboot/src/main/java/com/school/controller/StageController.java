@@ -2,6 +2,7 @@ package com.school.controller;
 
 import com.school.dto.response.ApiResponse;
 import com.school.entity.Stage;
+import com.school.service.AccessControlService;
 import com.school.service.StageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,10 +24,12 @@ import java.util.List;
 public class StageController {
 
     private final StageService stageService;
+    private final AccessControlService accessControlService;
 
     @GetMapping
     @Operation(summary = "Liste des stages")
     public ResponseEntity<ApiResponse<List<Stage>>> list(@RequestParam(required = false) Long studentId) {
+        if (studentId != null) accessControlService.assertCanAccessStudent(studentId);
         return ok("Stages", studentId != null ? stageService.listByStudent(studentId) : stageService.listAll());
     }
 

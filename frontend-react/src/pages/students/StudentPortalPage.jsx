@@ -16,6 +16,7 @@ import PageHeader from '../../components/PageHeader'
 import StatusChip from '../../components/StatusChip'
 import Loader from '../../components/Loader'
 import EmptyState from '../../components/EmptyState'
+import FileImage from '../../components/FileImage'
 import { myApi, examApi } from '../../api/endpoints'
 import { downloadResponse } from '../../services/exportService'
 import { useToast } from '../../hooks/useToast'
@@ -104,10 +105,18 @@ export default function StudentPortalPage() {
                   sx={{
                     width: 56, height: 56, borderRadius: 3, display: 'flex', alignItems: 'center',
                     justifyContent: 'center', background: 'linear-gradient(135deg, #2563eb, #1e3a8a)',
-                    color: '#fff', fontWeight: 800, fontSize: 20, flexShrink: 0,
+                    color: '#fff', fontWeight: 800, fontSize: 20, flexShrink: 0, overflow: 'hidden',
                   }}
                 >
-                  {profile.photo ? null : initials(profile.firstName, profile.lastName)}
+                  {profile.photo ? (
+                    <FileImage
+                      src={profile.photo}
+                      alt={`${profile.firstName} ${profile.lastName}`}
+                      sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                  ) : (
+                    initials(profile.firstName, profile.lastName)
+                  )}
                 </Box>
                 <Box flex={1} minWidth={200}>
                   <Typography variant="h6">{profile.firstName} {profile.lastName}</Typography>

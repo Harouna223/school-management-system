@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Grid, TextField, MenuItem, Button, Box, Typography, Avatar } from '@mui/material'
+import { Grid, TextField, MenuItem, Button, Box, Typography } from '@mui/material'
 import { School, PersonAddAlt1, TableView } from '@mui/icons-material'
 import PageHeader from '../../components/PageHeader'
+import FileAvatar from '../../components/FileAvatar'
 import DataTable from '../../components/DataTable'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import StatusChip from '../../components/StatusChip'
@@ -84,9 +85,9 @@ export default function TeachersPage() {
       label: 'Enseignant',
       render: (row) => (
         <Box display="flex" alignItems="center" gap={1.5}>
-          <Avatar src={row.photo} sx={{ width: 34, height: 34 }}>
+          <FileAvatar src={row.photo} sx={{ width: 34, height: 34 }}>
             {initials(row.firstName, row.lastName)}
-          </Avatar>
+          </FileAvatar>
           <Box>
             <Typography variant="body2" fontWeight={600}>
               {row.firstName} {row.lastName}

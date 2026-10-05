@@ -15,7 +15,6 @@ import {
   TableRow,
   Chip,
   Button,
-  Avatar,
   Skeleton
 } from '@mui/material'
 import {
@@ -26,6 +25,7 @@ import {
   Cake
 } from '@mui/icons-material'
 import PageHeader from '../../components/PageHeader'
+import FileAvatar from '../../components/FileAvatar'
 import { studentApi, attendanceApi, paymentApi, examApi, lmdApi } from '../../api/endpoints'
 import { formatDate, formatCurrency } from '../../utils/format'
 
@@ -83,9 +83,9 @@ export default function StudentDetailPage() {
 
       <Card sx={{ borderRadius: '16px', overflow: 'hidden', mb: 3 }}>
         <Box sx={{ bgcolor: 'primary.main', color: '#fff', p: 3, display: 'flex', alignItems: 'center', gap: 2.5 }}>
-          <Avatar src={s.photo} sx={{ width: 72, height: 72, border: '3px solid rgba(255,255,255,0.3)' }}>
+          <FileAvatar src={s.photo} sx={{ width: 72, height: 72, border: '3px solid rgba(255,255,255,0.3)' }}>
             {s.firstName?.[0]}{s.lastName?.[0]}
-          </Avatar>
+          </FileAvatar>
           <Box>
             <Typography variant="h5" fontWeight={800}>{fullName}</Typography>
             <Typography variant="body2" sx={{ opacity: 0.85 }}>{s.matricule} — {s.className || 'Sans classe'}</Typography>

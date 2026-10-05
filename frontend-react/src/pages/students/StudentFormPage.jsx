@@ -14,7 +14,6 @@ import {
   FormControlLabel,
   Switch,
   Box,
-  Avatar,
   Chip,
   Table,
   TableBody,
@@ -22,9 +21,14 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material'
 import { ArrowBack, Save, Upload, School, PictureAsPdf } from '@mui/icons-material'
 import PageHeader from '../../components/PageHeader'
+import FileAvatar from '../../components/FileAvatar'
 import { useToast } from '../../hooks/useToast'
 import { studentApi, classApi, examApi } from '../../api/endpoints'
 import { extractError } from '../../api/axios'
@@ -81,6 +85,7 @@ export default function StudentFormPage() {
   })
   const [photo, setPhoto] = useState(null)
   const [preview, setPreview] = useState(null)
+  const [generatedCreds, setGeneratedCreds] = useState(null)
   const [parentHasAccount, setParentHasAccount] = useState(false)
 const [history, setHistory] = useState({ bulletins: [], grades: [] })
   const [studentHasAccount, setStudentHasAccount] = useState(false)
@@ -135,7 +140,7 @@ const [history, setHistory] = useState({ bulletins: [], grades: [] })
         if (s.photo) setPreview(s.photo)
       })
     }
-  }, [id])
+  }, [id, isEdit])
 
   const handlePhoto = (e) => {
     const file = e.target.files?.[0]
@@ -164,6 +169,21 @@ const [history, setHistory] = useState({ bulletins: [], grades: [] })
       if (photo && saved.data.data.id) {
         await studentApi.uploadPhoto(saved.data.data.id, photo)
       }
+      // Le serveur génère un mot de passe aléatoire quand aucun n'est fourni.
+      // Il n'est affiché qu'ICI, une seule fois : on bloque la navigation tant
+      // que l'administrateur ne l'a pas noté (aucun mot de passe par défaut).
+      const created = saved.data.data
+      const lines = []
+      if (created?.generatedPassword) {
+        lines.push({ role: 'Élève', username: created.accountUsername, password: created.generatedPassword })
+      }
+      if (created?.parent?.generatedPassword) {
+        lines.push({ role: 'Parent', username: created.parent.accountUsername, password: created.parent.generatedPassword })
+      }
+      if (lines.length > 0) {
+        setGeneratedCreds({ matricule: created.matricule, lines })
+        return
+      }
       navigate('/students')
     } catch (err) {
       toastError(extractError(err))
@@ -184,9 +204,9 @@ const [history, setHistory] = useState({ bulletins: [], grades: [] })
               <Grid item xs={12} md={4}>
                 <Card>
                   <CardContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                    <Avatar src={preview} sx={{ width: 140, height: 140, fontSize: 48 }}>
+                    <FileAvatar src={preview} sx={{ width: 140, height: 140, fontSize: 48 }}>
                       {initials(values.firstName, values.lastName)}
-                    </Avatar>
+                    </FileAvatar>
                     <Button component="label" variant="outlined" startIcon={<Upload />}>
                       Photo de profil
                       <input type="file" hidden accept="image/*" onChange={handlePhoto} />
@@ -495,6 +515,29 @@ const [history, setHistory] = useState({ bulletins: [], grades: [] })
           )}
         </Card>
       )}
+
+      {/* Identifiants provisoires : le mot de passe aléatoire généré par le serveur
+          n'est affiché ici qu'une seule fois (aucun mot de passe par défaut). */}
+      <Dialog open={Boolean(generatedCreds)} onClose={() => navigate('/students')} maxWidth="xs" fullWidth>
+        <DialogTitle>Identifiants provisoires à communiquer</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" mb={2}>
+            Élève {generatedCreds?.matricule || ''} — ces mots de passe ne seront plus affichés.
+            Notez-les maintenant et transmettez-les aux personnes concernées : elles pourront
+            les modifier depuis leur profil.
+          </Typography>
+          {(generatedCreds?.lines || []).map((c) => (
+            <Box key={c.role} mb={1.5} p={1.5} sx={{ border: '1px dashed', borderColor: 'divider', borderRadius: 2 }}>
+              <Typography variant="subtitle2">{c.role}</Typography>
+              <Typography variant="body2">Identifiant : <b>{c.username || '—'}</b></Typography>
+              <Typography variant="body2">Mot de passe : <b>{c.password}</b></Typography>
+            </Box>
+          ))}
+        </DialogContent>
+        <DialogActions>
+          <Button variant="contained" onClick={() => navigate('/students')}>J&apos;ai noté les identifiants</Button>
+        </DialogActions>
+      </Dialog>
     </>
   )
 }

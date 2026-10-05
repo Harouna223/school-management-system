@@ -42,6 +42,8 @@ class GradeServiceTest {
     private EmailService emailService;
     @Mock
     private SmsService smsService;
+    @Mock
+    private AccessControlService accessControlService;
 
     private GradeService service;
 
@@ -49,7 +51,7 @@ class GradeServiceTest {
     void setUp() {
         service = new GradeService(gradeRepository, studentRepository, bulletinRepository,
                 notificationRepository, examService, auditService, reportService,
-                whatsappService, emailService, smsService);
+                whatsappService, emailService, smsService, accessControlService);
     }
 
     private GradeRequest request(String value, String maxValue) {

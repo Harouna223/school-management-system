@@ -6,6 +6,7 @@ import { studentApi, attendanceApi } from '../../api/endpoints'
 import { extractError } from '../../api/axios'
 import { formatDate, initials, downloadBlob } from '../../utils/format'
 import { useToast } from '../../hooks/useToast'
+import FileImage from '../../components/FileImage'
 import logo from '../../assets/logo.svg'
 
 const SCHOOL_NAME = 'School Manager'
@@ -140,7 +141,7 @@ export default function StudentDocumentsPage() {
               }}
             >
               {student.photo ? (
-                <Box component="img" src={student.photo} alt={fullName} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <FileImage src={student.photo} alt={fullName} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               ) : (
                 <Typography variant="h5" fontWeight={800} color="primary.main">
                   {initials(student.firstName, student.lastName)}
@@ -209,8 +210,7 @@ export default function StudentDocumentsPage() {
               </Typography>
             </Box>
             {student.photo && (
-              <Box
-                component="img"
+              <FileImage
                 src={student.photo}
                 alt={fullName}
                 sx={{ width: 72, height: 88, objectFit: 'cover', borderRadius: '6px', border: '1px solid #cbd5e1' }}

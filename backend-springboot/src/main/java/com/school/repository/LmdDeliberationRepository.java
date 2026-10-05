@@ -17,4 +17,10 @@ public interface LmdDeliberationRepository extends JpaRepository<LmdDeliberation
             Long studentId, Long fieldId, String semester, int session);
 
     List<LmdDeliberation> findByFieldIdAndSemesterOrderByAverageDesc(Long fieldId, String semester);
+
+    /**
+     * Délibérations d'une filière pour un semestre et une session donnés, en une
+     * seule requête (évite le N+1 lors d'un recalcul de délibération).
+     */
+    List<LmdDeliberation> findByFieldIdAndSemesterAndSession(Long fieldId, String semester, int session);
 }

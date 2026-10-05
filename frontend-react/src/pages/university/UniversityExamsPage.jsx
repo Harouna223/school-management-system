@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   Grid,
   Card,
@@ -39,11 +39,11 @@ export default function UniversityExamsPage() {
     session: 1, groupName: '', semester: 'S1', notes: '',
   })
 
-  const load = () => {
+  const load = useCallback(() => {
     universityExamApi.list({ date: filterDate || undefined })
       .then((r) => setRows(r.data.data || []))
       .catch(() => {})
-  }
+  }, [filterDate])
 
   useEffect(() => {
     lmdApi.ues('', 'S1').then((r) => setUes(r.data.data || [])).catch(() => {})
@@ -51,7 +51,7 @@ export default function UniversityExamsPage() {
     teacherApi.search({ page: 0, size: 500 }).then((r) => setTeachers(r.data.data.content || [])).catch(() => {})
   }, [])
 
-  useEffect(() => { load() }, [filterDate])
+  useEffect(() => { load() }, [load])
 
   const loadEcsForUe = async (ueId) => {
     if (!ueId) { setEcs([]); return }

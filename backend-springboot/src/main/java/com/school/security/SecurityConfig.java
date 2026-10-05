@@ -52,7 +52,11 @@ public class SecurityConfig {
                         // Endpoints publics (connexion uniquement)
                         .requestMatchers("/api/auth/login", "/api/auth/refresh", "/api/auth/logout",
                                 "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html",
-                                "/uploads/**", "/actuator/health", "/actuator/health/**").permitAll()
+                                "/actuator/health", "/actuator/health/**",
+                                // Vérification d'authenticité d'une attestation universitaire :
+                                // destinée à un tiers (QR code) ; n'expose que les données d'un
+                                // jeton signé valide, jamais un accès aux données de l'étudiant.
+                                "/api/lmd/attestation/verify").permitAll()
                         // Création de compte : réservée aux gestionnaires d'utilisateurs
                         .requestMatchers("/api/auth/register")
                         .hasAnyAuthority("PERM_USER_WRITE")

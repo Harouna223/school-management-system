@@ -118,7 +118,7 @@ export default function AppRoutes() {
               <Route path="/announcements" element={<AnnouncementsPage />} />
               <Route path="/my-children" element={<RoleRoute roles={['PARENT']}><ParentPortalPage /></RoleRoute>} />
               <Route path="/my-school" element={<RoleRoute roles={['ELEVE']}><StudentPortalPage /></RoleRoute>} />
-              <Route path="/my-university" element={<RoleRoute roles={['ETUDIANT', 'ELEVE']}><UniversityPortalPage /></RoleRoute>} />
+              <Route path="/my-university" element={<RoleRoute roles={['ETUDIANT']}><UniversityPortalPage /></RoleRoute>} />
               <Route path="/my-teaching" element={<RoleRoute roles={['ENSEIGNANT']}><TeacherPortalPage /></RoleRoute>} />
 
               {/* Administration */}

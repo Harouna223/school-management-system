@@ -368,7 +368,7 @@ frontend-react/              React 18 / Vite / MUI 5
 | `/reports` | Rapports | + COMPTABLE |
 | `/messages` `/announcements` | Communication | Tous |
 | `/my-school` | Espace élève | ELEVE |
-| `/my-university` | Espace universitaire | ELEVE |
+| `/my-university` | Espace universitaire | ETUDIANT |
 | `/my-children` | Espace parent | PARENT |
 | `/my-teaching` | Espace enseignant | ENSEIGNANT |
 | `/users` `/audit` | Administration | DIRECTEUR |

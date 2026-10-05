@@ -1,7 +1,7 @@
 import { useState, useEffect, createContext, useContext } from 'react'
 import {
   Drawer, Box, List, ListItemButton, ListItemIcon, ListItemText,
-  Divider, Typography, Collapse, Tooltip, Avatar,
+  Divider, Typography, Collapse, Tooltip,
 } from '@mui/material'
 import {
   Dashboard as DashboardIcon,
@@ -47,6 +47,7 @@ import { settingsApi } from '../api/endpoints'
 import { primaryRole, hasPermission } from '../utils/auth'
 import { useI18n } from '../i18n/I18nContext'
 import { initials, humanize } from '../utils/format'
+import FileAvatar from './FileAvatar'
 import logo from '../assets/logo.svg'
 
 const SidebarContext = createContext(null)
@@ -72,9 +73,9 @@ const NAV_GROUPS = [
       { key: 'students', label: 'nav.students', icon: <StudentsIcon />, to: '/students', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE', 'COMPTABLE'], requires: 'school' },
       { key: 'teachers', label: 'nav.teachers', icon: <TeachersIcon />, to: '/teachers', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE'], requires: 'school' },
       { key: 'classes', label: 'nav.classes', icon: <ClassesIcon />, to: '/classes', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE'], requires: 'school' },
-      { key: 'levels', label: 'Niveaux', icon: <LevelsIcon />, to: '/levels', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE'], requires: 'school' },
-      { key: 'sections', label: 'Sections', icon: <SectionsIcon />, to: '/sections', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE'], requires: 'school' },
-      { key: 'rooms', label: 'Salles', icon: <RoomsIcon />, to: '/rooms', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE'], requires: 'school' },
+      { key: 'levels', label: 'nav.levels', icon: <LevelsIcon />, to: '/levels', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE'], requires: 'school' },
+      { key: 'sections', label: 'nav.sections', icon: <SectionsIcon />, to: '/sections', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE'], requires: 'school' },
+      { key: 'rooms', label: 'nav.rooms', icon: <RoomsIcon />, to: '/rooms', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE'], requires: 'school' },
     ],
   },
   {
@@ -85,13 +86,13 @@ const NAV_GROUPS = [
       { key: 'attendances', label: 'nav.attendances', icon: <AttendanceIcon />, to: '/attendances', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE', 'ENSEIGNANT'], requires: 'school' },
       { key: 'grades', label: 'nav.grades', icon: <GradesIcon />, to: '/grades', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE', 'ENSEIGNANT'], requires: 'school' },
       { key: 'exams', label: 'nav.exams', icon: <ExamsIcon />, to: '/exams', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE'], requires: 'school' },
-      { key: 'exam-types', label: 'Types d\'évaluation', icon: <EditNoteIcon />, to: '/exam-types', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE'], requires: 'school' },
-      { key: 'convocations', label: 'Convocations', icon: <ConvocationIcon />, to: '/convocations', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE'] },
-      { key: 'university-exams', label: 'Examens universitaires', icon: <ExamsIcon />, to: '/university-exams', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE', 'ENSEIGNANT'], requires: 'university' },
-      { key: 'stages', label: 'Stages', icon: <AssignmentIcon />, to: '/stages', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE', 'ENSEIGNANT'], requires: 'university' },
-      { key: 'candidatures', label: 'Admission', icon: <AssignmentIcon />, to: '/candidatures', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE'], requires: 'university' },
-      { key: 'memoires', label: 'Mémoires', icon: <EditNoteIcon />, to: '/memoires', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE', 'ENSEIGNANT'], requires: 'university' },
-      { key: 'alumni', label: 'Alumni', icon: <EditNoteIcon />, to: '/alumni', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE'], requires: 'university' },
+      { key: 'exam-types', label: 'nav.examTypes', icon: <EditNoteIcon />, to: '/exam-types', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE'], requires: 'school' },
+      { key: 'convocations', label: 'nav.convocations', icon: <ConvocationIcon />, to: '/convocations', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE'] },
+      { key: 'university-exams', label: 'nav.universityExams', icon: <ExamsIcon />, to: '/university-exams', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE', 'ENSEIGNANT'], requires: 'university' },
+      { key: 'stages', label: 'nav.stages', icon: <AssignmentIcon />, to: '/stages', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE', 'ENSEIGNANT'], requires: 'university' },
+      { key: 'candidatures', label: 'nav.candidatures', icon: <AssignmentIcon />, to: '/candidatures', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE'], requires: 'university' },
+      { key: 'memoires', label: 'nav.memoires', icon: <EditNoteIcon />, to: '/memoires', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE', 'ENSEIGNANT'], requires: 'university' },
+      { key: 'alumni', label: 'nav.alumni', icon: <EditNoteIcon />, to: '/alumni', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE'], requires: 'university' },
       { key: 'reports', label: 'nav.reports', icon: <ReportsIcon />, to: '/reports', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE', 'COMPTABLE', 'ENSEIGNANT'], requires: 'school' },
     ],
   },
@@ -101,7 +102,7 @@ const NAV_GROUPS = [
       { key: 'payments', label: 'nav.payments', icon: <PaymentsIcon />, to: '/payments', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'COMPTABLE', 'SECRETAIRE'] },
       { key: 'expenses', label: 'nav.expenses', icon: <FinanceIcon />, to: '/expenses', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'COMPTABLE'] },
       { key: 'teacher-payroll', label: 'nav.teacherPayroll', icon: <TeacherPayrollIcon />, to: '/teacher-payroll', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'COMPTABLE', 'SECRETAIRE'] },
-      { key: 'fee-types', label: 'Types de frais', icon: <FeeTypesIcon />, to: '/fee-types', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'COMPTABLE', 'SECRETAIRE'] },
+      { key: 'fee-types', label: 'nav.feeTypes', icon: <FeeTypesIcon />, to: '/fee-types', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'COMPTABLE', 'SECRETAIRE'] },
     ],
   },
   {
@@ -119,7 +120,9 @@ const NAV_GROUPS = [
     items: [
       { key: 'children', label: 'nav.children', icon: <ChildrenIcon />, to: '/my-children', roles: ['PARENT'], requires: 'school' },
       { key: 'my-school', label: 'nav.my-school', icon: <StudentsIcon />, to: '/my-school', roles: ['ELEVE'], requires: 'school' },
-      { key: 'my-university', label: 'Espace université', icon: <UniversityIcon />, to: '/my-university', roles: ['ETUDIANT', 'ELEVE'], requires: 'university' },
+      // Espace universitaire réservé au rôle ETUDIANT (harmonisation des rôles) :
+      // un élève du scolaire (ELEVE) ne voit plus un espace qu'il n'a pas.
+      { key: 'my-university', label: 'nav.my-university', icon: <UniversityIcon />, to: '/my-university', roles: ['ETUDIANT'], requires: 'university' },
       { key: 'my-teaching', label: 'nav.my-teaching', icon: <TeachersIcon />, to: '/my-teaching', roles: ['ENSEIGNANT'], requires: 'school' },
     ],
   },
@@ -133,6 +136,7 @@ const ROLE_LABELS = {
   ENSEIGNANT: 'role.ENSEIGNANT',
   PARENT: 'role.PARENT',
   ELEVE: 'role.ELEVE',
+  ETUDIANT: 'role.ETUDIANT',
 }
 
 /**
@@ -363,12 +367,12 @@ export default function Sidebar({ open, onClose, collapsed, onCollapseToggle, va
               background: (t) => (t.palette.mode === 'dark' ? 'rgba(148,163,184,0.06)' : 'rgba(241,245,249,0.7)'),
             }}
           >
-            <Avatar
+            <FileAvatar
               src={user?.avatar}
               sx={{ width: 34, height: 34, bgcolor: 'primary.main', fontSize: 12.5 }}
             >
               {initials(user?.firstName, user?.lastName)}
-            </Avatar>
+            </FileAvatar>
             <Box minWidth={0}>
               <Typography variant="body2" fontWeight={700} noWrap sx={{ fontSize: 12.5, lineHeight: 1.3 }}>
                 {user?.firstName} {user?.lastName}

@@ -36,6 +36,7 @@ import {
 } from '@mui/icons-material'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
+import FileAvatar from './FileAvatar'
 import { logout, clearCredentials } from '../redux/slices/authSlice'
 import { communicationApi, searchApi } from '../api/endpoints'
 import { useThemeContext } from '../context/ThemeContext'
@@ -497,7 +498,7 @@ export default function Navbar({ onMenuClick, collapsed, onCollapseToggle }) {
           }}
           onClick={openProfile}
         >
-          <Avatar
+          <FileAvatar
             src={user?.avatar}
             sx={{
               bgcolor: 'primary.main',
@@ -508,7 +509,7 @@ export default function Navbar({ onMenuClick, collapsed, onCollapseToggle }) {
             }}
           >
             {initials(user?.firstName, user?.lastName)}
-          </Avatar>
+          </FileAvatar>
           <Box sx={{ display: { xs: 'none', md: 'block' } }}>
             <Typography variant="body2" fontWeight={700} lineHeight={1.2} sx={{ fontSize: 13.5 }}>
               {user?.firstName} {user?.lastName}

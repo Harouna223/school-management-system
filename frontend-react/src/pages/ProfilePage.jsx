@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import {
-  Grid, Card, CardContent, Typography, Box, Avatar, Button, Divider, Dialog,
+  Grid, Card, CardContent, Typography, Box, Button, Divider, Dialog,
   DialogTitle, DialogContent, DialogActions, TextField, IconButton,
 } from '@mui/material'
 import { LockReset, Key } from '@mui/icons-material'
@@ -8,6 +8,7 @@ import { useSelector } from 'react-redux'
 import { formatDate, initials } from '../utils/format'
 import PageHeader from '../components/PageHeader'
 import StatusChip from '../components/StatusChip'
+import FileAvatar from '../components/FileAvatar'
 import { authApi } from '../api/endpoints'
 import { useToast } from '../hooks/useToast'
 import { extractError } from '../api/axios'
@@ -56,12 +57,12 @@ export default function ProfilePage() {
             <CardContent>
               <Box display="flex" alignItems="center" gap={3} flexWrap="wrap" justifyContent="space-between">
                 <Box display="flex" alignItems="center" gap={3} flexWrap="wrap">
-                  <Avatar
+                  <FileAvatar
                     sx={{ width: 96, height: 96, fontSize: 40, bgcolor: 'primary.main' }}
                     src={user.avatar}
                   >
                     {initials(user.firstName, user.lastName)}
-                  </Avatar>
+                  </FileAvatar>
                   <Box>
                     <Typography variant="h5" fontWeight={700}>
                       {user.firstName} {user.lastName}

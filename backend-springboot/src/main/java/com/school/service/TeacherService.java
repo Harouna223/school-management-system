@@ -4,6 +4,7 @@ import com.school.dto.request.TeacherRequest;
 import com.school.dto.response.PageResponse;
 import com.school.dto.response.TeacherResponse;
 import com.school.entity.Teacher;
+import com.school.entity.User;
 import com.school.enums.TeacherStatus;
 import com.school.exception.ResourceNotFoundException;
 import com.school.mapper.TeacherMapper;
@@ -52,18 +53,38 @@ public class TeacherService {
         teacher.setStatus(TeacherStatus.ACTIVE);
         teacher.setSalary(request.getSalary() != null ? request.getSalary() : BigDecimal.ZERO);
 
+        String generatedPassword = null;
+        String accountUsername = null;
         if (Boolean.TRUE.equals(request.getCreateUserAccount())) {
-            teacher.setUser(authService.createLinkedAccount(
+            String rawPassword = request.getPassword();
+            if (rawPassword == null || rawPassword.isBlank()) {
+                rawPassword = CodeGenerator.randomPassword();
+                generatedPassword = rawPassword;
+            }
+            User account = authService.createLinkedAccount(
                     request.getUsername() != null ? request.getUsername() : defaultUsername(request),
-                    request.getPassword() != null ? request.getPassword() : "Enseignant@123",
+                    rawPassword,
                     request.getEmail(),
-                    request.getFirstName(), request.getLastName(), "ENSEIGNANT"));
+                    request.getFirstName(), request.getLastName(), "ENSEIGNANT");
+            if (account != null) {
+                teacher.setUser(account);
+                if (generatedPassword != null) {
+                    accountUsername = account.getUsername();
+                }
+            }
         }
 
         Teacher saved = teacherRepository.save(teacher);
+        TeacherResponse response = TeacherResponse.from(saved);
+        if (generatedPassword != null) {
+            response.setGeneratedPassword(generatedPassword);
+        }
+        if (accountUsername != null) {
+            response.setAccountUsername(accountUsername);
+        }
         auditService.log("CREATE", "Teacher", saved.getId(),
                 "Embauche enseignant " + saved.getFullName() + " (" + saved.getEmployeeNo() + ")", httpRequest);
-        return TeacherResponse.from(saved);
+        return response;
     }
 
     @Transactional
@@ -73,17 +94,37 @@ public class TeacherService {
         if (request.getSalary() != null) {
             teacher.setSalary(request.getSalary());
         }
+        String generatedPassword = null;
+        String accountUsername = null;
         if (Boolean.TRUE.equals(request.getCreateUserAccount())) {
-            teacher.setUser(authService.createLinkedAccount(
+            String rawPassword = request.getPassword();
+            if (rawPassword == null || rawPassword.isBlank()) {
+                rawPassword = CodeGenerator.randomPassword();
+                generatedPassword = rawPassword;
+            }
+            User account = authService.createLinkedAccount(
                     request.getUsername() != null ? request.getUsername() : defaultUsername(request),
-                    request.getPassword() != null ? request.getPassword() : "Enseignant@123",
+                    rawPassword,
                     request.getEmail(),
-                    request.getFirstName(), request.getLastName(), "ENSEIGNANT"));
+                    request.getFirstName(), request.getLastName(), "ENSEIGNANT");
+            if (account != null) {
+                teacher.setUser(account);
+                if (generatedPassword != null) {
+                    accountUsername = account.getUsername();
+                }
+            }
         }
         Teacher saved = teacherRepository.save(teacher);
+        TeacherResponse response = TeacherResponse.from(saved);
+        if (generatedPassword != null) {
+            response.setGeneratedPassword(generatedPassword);
+        }
+        if (accountUsername != null) {
+            response.setAccountUsername(accountUsername);
+        }
         auditService.log("UPDATE", "Teacher", saved.getId(),
                 "Modification du profil de " + saved.getFullName(), httpRequest);
-        return TeacherResponse.from(saved);
+        return response;
     }
 
     @Transactional
@@ -92,6 +133,18 @@ public class TeacherService {
         teacher.setStatus(status);
         auditService.log("UPDATE", "Teacher", id, "Statut changé : " + status, httpRequest);
         return TeacherResponse.from(teacherRepository.save(teacher));
+    }
+
+    /**
+     * Applique un statut sans écrire de ligne d'audit : réservé à la
+     * réconciliation planifiée des congés ({@code HrService}), qui journalise un
+     * seul événement pour tout le lot afin de ne pas polluer le journal.
+     */
+    @Transactional
+    public Teacher setStatusSilently(Long id, TeacherStatus status) {
+        Teacher teacher = findById(id);
+        teacher.setStatus(status);
+        return teacherRepository.save(teacher);
     }
 
     @Transactional

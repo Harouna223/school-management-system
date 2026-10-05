@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useState, useEffect } from 'react'
 import { Grid, TextField, Button, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material'
 import { Add } from '@mui/icons-material'
 import PageHeader from '../../components/PageHeader'
@@ -23,7 +23,7 @@ export default function FeeTypesPage() {
   const [form, setForm] = useState(empty)
   const [toDelete, setToDelete] = useState(null)
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     try {
       const res = await financeApi.feeTypes()
@@ -33,9 +33,9 @@ export default function FeeTypesPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [toastError])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [load])
 
   const openNew = () => { setEditing(null); setForm(empty); setDialogOpen(true) }
   const openEdit = (row) => {

@@ -3,10 +3,12 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Formik, Form } from 'formik'
 import * as Yup from 'yup'
 import {
-  Grid, TextField, MenuItem, Button, Card, CardContent, Typography, Divider, Box, Avatar,
+  Grid, TextField, MenuItem, Button, Card, CardContent, Typography, Divider, Box, Dialog,
+  DialogTitle, DialogContent, DialogActions,
 } from '@mui/material'
 import { ArrowBack, Save, Upload } from '@mui/icons-material'
 import PageHeader from '../../components/PageHeader'
+import FileAvatar from '../../components/FileAvatar'
 import { useToast } from '../../hooks/useToast'
 import { teacherApi } from '../../api/endpoints'
 import { extractError } from '../../api/axios'
@@ -37,6 +39,7 @@ export default function TeacherFormPage() {
   })
   const [photo, setPhoto] = useState(null)
   const [preview, setPreview] = useState(null)
+  const [generatedCreds, setGeneratedCreds] = useState(null)
 
   useEffect(() => {
     if (isEdit) {
@@ -52,7 +55,7 @@ export default function TeacherFormPage() {
         if (t.photo) setPreview(t.photo)
       })
     }
-  }, [id])
+  }, [id, isEdit])
 
   const handlePhoto = (e) => {
     const file = e.target.files?.[0]
@@ -79,6 +82,15 @@ export default function TeacherFormPage() {
       if (photo && saved.data.data.id) {
         await teacherApi.uploadPhoto(saved.data.data.id, photo)
       }
+      // Mot de passe aléatoire généré par le serveur : affiché une seule fois ici.
+      const created = saved.data.data
+      if (created?.generatedPassword) {
+        setGeneratedCreds({
+          employeeNo: created.employeeNo,
+          lines: [{ role: 'Enseignant', username: created.accountUsername, password: created.generatedPassword }],
+        })
+        return
+      }
       navigate('/teachers')
     } catch (err) {
       toastError(extractError(err))
@@ -98,9 +110,9 @@ export default function TeacherFormPage() {
               <Grid item xs={12} md={4}>
                 <Card>
                   <CardContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                    <Avatar src={preview} sx={{ width: 140, height: 140, fontSize: 48 }}>
+                    <FileAvatar src={preview} sx={{ width: 140, height: 140, fontSize: 48 }}>
                       {initials(values.firstName, values.lastName)}
-                    </Avatar>
+                    </FileAvatar>
                     <Button component="label" variant="outlined" startIcon={<Upload />}>
                       Photo
                       <input type="file" hidden accept="image/*" onChange={handlePhoto} />
@@ -187,6 +199,29 @@ export default function TeacherFormPage() {
           </Form>
         )}
       </Formik>
+
+      {/* Identifiants provisoires : le mot de passe aléatoire généré par le serveur
+          n'est affiché ici qu'une seule fois (aucun mot de passe par défaut). */}
+      <Dialog open={Boolean(generatedCreds)} onClose={() => navigate('/teachers')} maxWidth="xs" fullWidth>
+        <DialogTitle>Identifiants provisoires à communiquer</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" mb={2}>
+            Enseignant {generatedCreds?.employeeNo || ''} — ce mot de passe ne sera plus affiché.
+            Notez-le maintenant et transmettez-le à l&apos;intéressé(e) : il pourra le modifier
+            depuis son profil.
+          </Typography>
+          {(generatedCreds?.lines || []).map((c) => (
+            <Box key={c.role} mb={1.5} p={1.5} sx={{ border: '1px dashed', borderColor: 'divider', borderRadius: 2 }}>
+              <Typography variant="subtitle2">{c.role}</Typography>
+              <Typography variant="body2">Identifiant : <b>{c.username || '—'}</b></Typography>
+              <Typography variant="body2">Mot de passe : <b>{c.password}</b></Typography>
+            </Box>
+          ))}
+        </DialogContent>
+        <DialogActions>
+          <Button variant="contained" onClick={() => navigate('/teachers')}>J&apos;ai noté les identifiants</Button>
+        </DialogActions>
+      </Dialog>
     </>
   )
 }

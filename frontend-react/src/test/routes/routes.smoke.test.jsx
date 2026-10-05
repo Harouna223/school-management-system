@@ -228,6 +228,18 @@ describe('Câblage réel — le tableau de bord sous DashboardLayout', () => {
     await waitFor(() => expect(window.location.pathname).toBe('/my-university'))
     expectNoRenderCrash()
   })
+
+  it('ETUDIANT : /my-university est accessible (espace universitaire)', async () => {
+    mountApp('/my-university', { roles: ['ETUDIANT'] })
+    await waitFor(() => expect(window.location.pathname).toBe('/my-university'))
+    expectNoRenderCrash()
+  })
+
+  it('ELEVE : /my-university est refuse et redirige (role ETUDIANT requis)', async () => {
+    mountApp('/my-university', { roles: ['ELEVE'] })
+    await waitFor(() => expect(window.location.pathname).toBe('/dashboard'))
+    expectNoRenderCrash()
+  })
 })
 
 describe('Câblage réel — les gardes de route', () => {

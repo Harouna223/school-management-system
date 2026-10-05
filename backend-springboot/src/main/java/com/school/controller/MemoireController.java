@@ -2,6 +2,7 @@ package com.school.controller;
 
 import com.school.dto.response.ApiResponse;
 import com.school.entity.Memoire;
+import com.school.service.AccessControlService;
 import com.school.service.MemoireService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,10 +24,12 @@ import java.util.List;
 public class MemoireController {
 
     private final MemoireService memoireService;
+    private final AccessControlService accessControlService;
 
     @GetMapping
     @Operation(summary = "Liste des mémoires (filtrer par étudiant)")
     public ResponseEntity<ApiResponse<List<Memoire>>> list(@RequestParam(required = false) Long studentId) {
+        if (studentId != null) accessControlService.assertCanAccessStudent(studentId);
         return ok("Mémoires", studentId != null ? memoireService.listByStudent(studentId) : memoireService.listAll());
     }
 

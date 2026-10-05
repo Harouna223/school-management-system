@@ -132,6 +132,7 @@ public class LmdController {
 
     @GetMapping("/ue-enrollments")
     public ResponseEntity<ApiResponse<List<UeEnrollment>>> ueEnrollments(@RequestParam Long studentId) {
+        accessControlService.assertCanAccessStudent(studentId);
         return ok("Inscriptions UE", lmdService.ueEnrollmentsByStudent(studentId));
     }
 
@@ -139,6 +140,7 @@ public class LmdController {
     public ResponseEntity<ApiResponse<UeEnrollment>> enrollUe(@RequestParam Long studentId,
                                                               @RequestParam Long ueId,
                                                               HttpServletRequest httpRequest) {
+        accessControlService.assertCanAccessStudent(studentId);
         return ok("Inscription UE créée", lmdService.enrollUe(studentId, ueId, httpRequest));
     }
 
@@ -157,6 +159,7 @@ public class LmdController {
                                                             @RequestParam BigDecimal value,
                                                             @RequestParam(required = false) String appreciation,
                                                             HttpServletRequest httpRequest) {
+        accessControlService.assertCanAccessStudent(studentId);
         return ok("Note EC enregistrée",
                 lmdService.saveEcGrade(studentId, courseUnitId, session, value, appreciation, httpRequest));
     }
@@ -164,6 +167,7 @@ public class LmdController {
     @GetMapping("/ec-grades")
     public ResponseEntity<ApiResponse<List<EcGrade>>> ecGrades(@RequestParam Long studentId,
                                                                @RequestParam(required = false) Long fieldId) {
+        accessControlService.assertCanAccessStudent(studentId);
         return ok("Notes EC", lmdService.ecGradesByStudent(studentId, fieldId));
     }
 
@@ -284,6 +288,7 @@ public class LmdController {
     @GetMapping("/enrollment-history")
     public ResponseEntity<ApiResponse<List<EnrollmentHistory>>> enrollmentHistory(
             @RequestParam Long studentId) {
+        accessControlService.assertCanAccessStudent(studentId);
         return ok("Historique", lmdService.enrollmentHistory(studentId));
     }
 
@@ -292,6 +297,7 @@ public class LmdController {
     @GetMapping("/ec-evaluations")
     public ResponseEntity<ApiResponse<List<EcEvaluation>>> ecEvaluations(
             @RequestParam Long ecId, @RequestParam(required = false) Long studentId) {
+        if (studentId != null) accessControlService.assertCanAccessStudent(studentId);
         return ok("Évaluations EC", lmdService.ecEvaluations(ecId, studentId));
     }
 
@@ -344,6 +350,7 @@ public class LmdController {
     public ResponseEntity<ApiResponse<LmdDeliberationResult>> result(
             @RequestParam Long studentId, @RequestParam Long fieldId, @RequestParam String semester,
             @RequestParam(defaultValue = "1") int session) {
+        accessControlService.assertCanAccessStudent(studentId);
         return ok("Résultat calculé", lmdService.computeResult(studentId, fieldId, semester, session));
     }
 
@@ -395,6 +402,25 @@ public class LmdController {
                                jakarta.servlet.http.HttpServletResponse response) throws java.io.IOException {
         accessControlService.assertCanAccessStudent(studentId);
         reportService.universityAttestationPdf(response, lmdService.buildAttestation(studentId, fieldId, semester, session));
+    }
+
+    @GetMapping("/attestation/verify")
+    @Operation(summary = "Vérifier un jeton d'attestation universitaire (QR code / lien)",
+            description = "Endpoint distinct de l'authentification : un tiers (établissement, "
+                    + "employeur) peut vérifier l'authenticité d'une attestation via son jeton "
+                    + "HMAC signé. Renvoie les informations portées si le jeton est authentique "
+                    + "et non expiré, 400 sinon.")
+    public ResponseEntity<ApiResponse<com.school.dto.response.LmdAttestationResponse.AttestationInfo>> verifyAttestation(
+            @RequestParam String token) {
+        var info = lmdService.decodeAttestationToken(token);
+        if (info == null) {
+            return ResponseEntity.badRequest().body(ApiResponse.<com.school.dto.response.LmdAttestationResponse.AttestationInfo>builder()
+                    .success(false)
+                    .message("Jeton d'attestation invalide ou expiré")
+                    .timestamp(LocalDateTime.now())
+                    .build());
+        }
+        return ok("Attestation authentique", info);
     }
 
     // ---------- Emploi du temps universitaire ----------

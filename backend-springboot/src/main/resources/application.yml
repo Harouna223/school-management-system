@@ -8,9 +8,20 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
-      ddl-auto: update
+      # PHASE 7 — Flyway est la source de verite du schema (db/migration).
+      # Hibernate ne fait que VALIDER la coherence : aucun DDL automatique,
+      # impossible pour une erreur d'entite de modifier/supprimer une colonne
+      # contenant des donnees. Toute evolution passe par une migration Flyway.
+      ddl-auto: validate
     show-sql: false
-    open-in-view: true
+    # D10 — open-in-view.
+    # Passer à false est la bonne cible (libère les connexions plus tôt, expose
+    # réellement les N+1), MAIS 63 endpoints sérialisent aujourd'hui des ENTITÉS
+    # JPA (LMD, MEMOIRE, STAGE, UniversityExam, USER/roles…) dont les relations
+    # LAZY seraient alors hors transaction → LazyInitializationException / HTTP 500.
+    # Bascule à "false" UNIQUEMENT après conversion de ces endpoints en DTO
+    # (ou @EntityGraph), et avec la couverture de tests d'intégration en place.
+    open-in-view: ${OPEN_IN_VIEW:true}
   mail:
     host: ${MAIL_HOST:smtp.gmail.com}
     port: ${MAIL_PORT:587}
@@ -26,6 +37,19 @@ spring:
     multipart:
       max-file-size: 5MB
       max-request-size: 10MB
+  # PHASE 7 — Migrations de schema (Flyway).
+  # Flyway est la SOURCE DE VERITE du schema ; Hibernate se contente de valider.
+  # baseline-on-migrate : une base existante sans historique recoit un historique
+  # SANS rejouer V1 (aucune creation de table sur une base deja en production).
+  # Toute evolution future = un nouveau fichier Vn__description.sql.
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 1
+    validate-on-migrate: true
+    out-of-order: false
+    table: flyway_schema_history
 
 server:
   port: ${SERVER_PORT:8080}
@@ -62,6 +86,10 @@ app:
   admin:
     username: admin
     password: ${ADMIN_PASSWORD:Admin@123}
+  security:
+    # D15 : true en production → le démarrage ÉCHOUE si le secret JWT est encore
+    # le défaut ou trop court pour HS256 (au lieu d'une simple alerte).
+    require-secure-secrets: ${REQUIRE_SECURE_SECRETS:false}
 
 springdoc:
   swagger-ui:
@@ -88,7 +116,10 @@ management:
       enabled: true
   endpoint:
     health:
-      show-details: always
+      # D18 : les détails (état de la base, disque) ne sont exposés qu'aux
+      # requêtes authentifiées ; l'endpoint reste accessible publiquement pour
+      # les healthchecks (statut global uniquement).
+      show-details: when-authorized
       group:
         liveness:
           include: livenessState
