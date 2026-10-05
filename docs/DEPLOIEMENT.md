@@ -258,6 +258,40 @@ docker compose -f docker/docker-compose.yml up -d --build
 docker compose -f docker/docker-compose.yml ps
 ```
 
+#### 10.1 Mises à jour du schéma de base de données (Flyway)
+
+Depuis la phase 7, le schéma est géré par **Flyway** : Hibernate ne fait plus que
+valider (`ddl-auto: validate`), il ne crée ni ne modifie plus jamais de table.
+
+**Avant chaque mise à jour (règle d'or) : sauvegarder.**
+
+```bash
+docker exec school-mysql mysqldump -uroot -p"$DB_PASSWORD" \
+  --single-transaction --databases school_management > backup-avant-maj.sql
+```
+
+**Ajouter une évolution de schéma :**
+
+1. Créer un fichier versionné dans `backend-springboot/src/main/resources/db/migration/` :
+   `V2__ajouter_colonne_eleves_date_naissance.sql` (format `Vn__description.sql`, `n` croissant).
+2. Écrire du SQL **idempotent** (`IF NOT EXISTS` / `IF EXISTS` où c'est possible).
+3. Tester : `mvn verify` exécute le schéma complet à partir de `V1__baseline.sql`
+   sur une base de test jetable, puis Hibernate le valide.
+4. Committer + déployer (`up -d --build`) : au démarrage, Flyway applique automatiquement
+   les migrations en attente avant que l'application ne serve des requêtes.
+
+**Vérifier l'historique :**
+
+```bash
+docker exec school-mysql mysql -uroot -p"$DB_PASSWORD" \
+  -e "SELECT version, description, success, installed_on
+      FROM school_management.flyway_schema_history
+      ORDER BY installed_rank DESC LIMIT 5;"
+```
+
+Une base existante créée avant Flyway reçoit un « baseline » au démarrage
+(`baseline-on-migrate: true`) : **V1 n'est jamais rejoué**, aucune table n'est recréée.
+
 ---
 
 ### 11. Surveillance et maintenance
