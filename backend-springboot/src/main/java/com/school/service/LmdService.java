@@ -15,11 +15,16 @@ import com.school.exception.ResourceNotFoundException;
 import com.school.repository.*;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -57,6 +62,17 @@ public class LmdService {
     private final UniversityAttendanceRepository universityAttendanceRepository;
     private final StudentService studentService;
     private final AuditService auditService;
+
+    /**
+     * Secret de signature HMAC des jetons d'attestation universitaire (D4) :
+     * on réutilise le secret JWT afin de ne pas exposer de clé supplémentaire.
+     * Injecté en lecture seule au démarrage (champ non-final car @Value).
+     */
+    @Value("${app.jwt.secret:}")
+    private String attestationSecret;
+
+    /** Durée de validité d'un jeton d'attestation (1 an). */
+    private static final long ATTESTATION_TOKEN_MS = 365L * 24 * 3600 * 1000;
 
     // ---------- Validation ----------
 
@@ -377,7 +393,13 @@ public class LmdService {
                 .build();
         enrollmentHistoryRepository.save(history);
         if (newLevel != null) {
-            enrollment.setLevel(UniversityLevel.valueOf(newLevel));
+            // Une valeur invalide ne doit pas provoquer de HTTP 500 (D12) :
+            // on valide l'énumération avant de convertir.
+            try {
+                enrollment.setLevel(UniversityLevel.valueOf(newLevel));
+            } catch (IllegalArgumentException ex) {
+                throw new BusinessException("Niveau universitaire invalide : " + newLevel);
+            }
         }
         if (newSemester != null) {
             enrollment.setCurrentSemester(newSemester);
@@ -425,7 +447,11 @@ public class LmdService {
         // Upsert : une évaluation par (EC, étudiant, type, session)
         EvaluationType type = evaluation.getEvaluationType() != null
                 ? evaluation.getEvaluationType() : EvaluationType.EXAMEN;
-        int session = evaluation.getSession() < 1 ? 1 : evaluation.getSession();
+        // Session bornée à 1 (normale) ou 2 (rattrapage), comme saveEcGrade (D14).
+        int session = evaluation.getSession();
+        if (session != 1 && session != 2) {
+            throw new BusinessException("Session invalide (1 = normale, 2 = rattrapage)");
+        }
         Long studentId = evaluation.getStudent().getId();
         EcEvaluation result = evaluation;
         EcEvaluation existing = ecEvaluationRepository
@@ -540,26 +566,64 @@ public class LmdService {
     }
 
     /**
-     * Note effective d'une UE pour un étudiant :
-     * si l'UE possède des EC, moyenne pondérée des notes EC (meilleure session) ;
-     * sinon note UE directe (meilleure session 1 ou 2).
+     * Données d'un semestre chargées en un nombre de requêtes CONSTANT (au lieu
+     * d'une requête par étudiant × UE × EC). Permet de calculer les résultats
+     * de toute une filière en mémoire.
+     *
+     * @param ues        UE du semestre, triées par code
+     * @param ecsByUe    EC de chaque UE (clé = id UE)
+     * @param ueGrades   notes UE, clé = {@code etudiant|ue|session}
+     * @param ecGrades   notes EC, clé = {@code etudiant|ec|session}
+     * @param enrolledUes UE inscriptions, clé = {@code etudiant|ue}
      */
-    private BigDecimal computeUeNote(Student student, UniversityUnit ue, int session) {
-        List<CourseUnit> ecs = courseUnitRepository.findByUeIdOrderByCode(ue.getId());
+    private record SemesterGrades(
+            List<UniversityUnit> ues,
+            Map<Long, List<CourseUnit>> ecsByUe,
+            Map<String, BigDecimal> ueGrades,
+            Map<String, BigDecimal> ecGrades,
+            Set<String> enrolledUes) {
+    }
+
+    private static String gradeKey(Long studentId, Long unitId, int session) {
+        return studentId + "|" + unitId + "|" + session;
+    }
+
+    private static String uePairKey(Long studentId, Long ueId) {
+        return studentId + "|" + ueId;
+    }
+
+    /**
+     * Note effective d'une UE pour une session donnée, calculée à partir des
+     * données préchargées (aucune requête unitaire).
+     *
+     * <ul>
+     *   <li>session 1 (normale) : uniquement les notes de session 1 ;</li>
+     *   <li>session 2 (rattrapage) : meilleure note entre les sessions 1 et 2.</li>
+     * </ul>
+     */
+    private BigDecimal effectiveUeNote(Long studentId, UniversityUnit ue, int session, SemesterGrades data) {
+        if (session < 2) {
+            return ueNoteOf(studentId, ue, 1, data);
+        }
+        BigDecimal s1 = ueNoteOf(studentId, ue, 1, data);
+        BigDecimal s2 = ueNoteOf(studentId, ue, 2, data);
+        if (s1 == null) return s2;
+        if (s2 == null) return s1;
+        return s1.compareTo(s2) >= 0 ? s1 : s2;
+    }
+
+    /** Note d'une UE : moyenne pondérée des EC si la UE en a, sinon note UE directe. */
+    private BigDecimal ueNoteOf(Long studentId, UniversityUnit ue, int session, SemesterGrades data) {
+        List<CourseUnit> ecs = data.ecsByUe().getOrDefault(ue.getId(), List.of());
         if (ecs.isEmpty()) {
-            UeGrade ueGrade = ueGradeRepository
-                    .findByStudentIdAndUeIdAndSemesterAndSession(student.getId(), ue.getId(), ue.getSemester(), session)
-                    .orElse(null);
-            return ueGrade != null ? ueGrade.getValue() : null;
+            return data.ueGrades().get(gradeKey(studentId, ue.getId(), session));
         }
         BigDecimal weighted = BigDecimal.ZERO;
         int totalCoef = 0;
         for (CourseUnit ec : ecs) {
-            EcGrade grade = ecGradeRepository
-                    .findByStudentIdAndCourseUnitIdAndSession(student.getId(), ec.getId(), session)
-                    .orElse(null);
-            if (grade != null) {
-                weighted = weighted.add(grade.getValue().multiply(BigDecimal.valueOf(ec.getCoefficient())));
+            BigDecimal value = data.ecGrades().get(gradeKey(studentId, ec.getId(), session));
+            if (value != null) {
+                weighted = weighted.add(value.multiply(BigDecimal.valueOf(ec.getCoefficient())));
                 totalCoef += ec.getCoefficient();
             }
         }
@@ -570,14 +634,61 @@ public class LmdService {
     }
 
     /**
-     * Retient la meilleure note entre la session normale (1) et la session de rattrapage (2).
+     * Charge en 5 requêtes toutes les notes d'un semestre pour TOUS les
+     * étudiants d'une filière (délibération).
      */
-    private BigDecimal effectiveUeNote(Student student, UniversityUnit ue) {
-        BigDecimal s1 = computeUeNote(student, ue, 1);
-        BigDecimal s2 = computeUeNote(student, ue, 2);
-        if (s1 == null) return s2;
-        if (s2 == null) return s1;
-        return s1.compareTo(s2) >= 0 ? s1 : s2;
+    private SemesterGrades loadSemesterGrades(Long fieldId, String semester) {
+        List<UniversityUnit> ues = ueRepository.findByFieldIdAndSemesterOrderByCode(fieldId, semester);
+        return loadSemesterGrades(fieldId, semester, ues, null);
+    }
+
+    /** Charge en 5 requêtes les notes d'un semestre pour un seul étudiant. */
+    private SemesterGrades loadSemesterGradesForStudent(Long fieldId, String semester, Long studentId) {
+        List<UniversityUnit> ues = ueRepository.findByFieldIdAndSemesterOrderByCode(fieldId, semester);
+        return loadSemesterGrades(fieldId, semester, ues, studentId);
+    }
+
+    /**
+     * Chargement en lot : 5 requêtes indépendantes du nombre d'étudiants
+     * (contre 2 × UE × EC × étudiants auparavant).
+     *
+     * @param singleStudentId si non nul, seules les notes de cet étudiant sont indexées
+     */
+    private SemesterGrades loadSemesterGrades(Long fieldId, String semester,
+                                              List<UniversityUnit> ues, Long singleStudentId) {
+        List<Long> ueIds = ues.stream().map(UniversityUnit::getId).toList();
+
+        Map<Long, List<CourseUnit>> ecsByUe = ueIds.isEmpty() ? Map.of()
+                : courseUnitRepository.findByUeIdInOrderByUeIdAscCodeAsc(ueIds).stream()
+                        .collect(Collectors.groupingBy(ec -> ec.getUe().getId()));
+
+        Map<String, BigDecimal> ueGrades = new HashMap<>();
+        List<UeGrade> grades = singleStudentId != null
+                ? ueGradeRepository.findByStudentIdAndSemester(singleStudentId, semester)
+                : ueGradeRepository.findByUeFieldIdAndSemester(fieldId, semester);
+        for (UeGrade grade : grades) {
+            Long ownerId = singleStudentId != null
+                    ? singleStudentId : grade.getStudent().getId();
+            ueGrades.put(gradeKey(ownerId, grade.getUe().getId(), grade.getSession()), grade.getValue());
+        }
+
+        Map<String, BigDecimal> ecGrades = new HashMap<>();
+        List<EcGrade> ecGradeList = singleStudentId != null
+                ? ecGradeRepository.findByStudentIdAndCourseUnitUeFieldId(singleStudentId, fieldId)
+                : ecGradeRepository.findByCourseUnitUeFieldId(fieldId);
+        for (EcGrade grade : ecGradeList) {
+            Long ownerId = singleStudentId != null
+                    ? singleStudentId : grade.getStudent().getId();
+            ecGrades.put(gradeKey(ownerId, grade.getCourseUnit().getId(), grade.getSession()), grade.getValue());
+        }
+
+        Set<String> enrolled = ueIds.isEmpty() ? Set.of()
+                : ueEnrollmentRepository.findByUeIdIn(ueIds).stream()
+                        .filter(e -> singleStudentId == null || singleStudentId.equals(e.getStudent().getId()))
+                        .map(e -> uePairKey(e.getStudent().getId(), e.getUe().getId()))
+                        .collect(Collectors.toSet());
+
+        return new SemesterGrades(ues, ecsByUe, ueGrades, ecGrades, enrolled);
     }
 
     /**
@@ -606,25 +717,36 @@ public class LmdService {
     public LmdDeliberationResult computeResult(Long studentId, Long fieldId, String semester, int session) {
         validateSemester(semester);
         Student student = studentService.findById(studentId);
-        List<UniversityUnit> ues = ueRepository.findByFieldIdAndSemesterOrderByCode(fieldId, semester);
-        if (ues.isEmpty()) {
+        // Chargement en lot (5 requêtes) au lieu d'une requête par UE / EC.
+        SemesterGrades data = loadSemesterGradesForStudent(fieldId, semester, studentId);
+        if (data.ues().isEmpty()) {
             throw new BusinessException("Aucune UE définie pour ce semestre dans cette filière");
         }
+        return computeFromSemester(student, fieldId, semester, session, data);
+    }
 
+    /**
+     * Calcul pur du résultat d'un semestre à partir de données déjà chargées :
+     * aucune requête SQL, donc utilisable pour toute une filière (délibération).
+     */
+    private LmdDeliberationResult computeFromSemester(Student student, Long fieldId, String semester,
+                                                      int session, SemesterGrades data) {
         BigDecimal weighted = BigDecimal.ZERO;
         int totalCoef = 0;
         int creditsObtained = 0;
         int creditsFailed = 0;
+        int totalCredits = 0;
         List<String> uesToRetake = new ArrayList<>();
         List<String> compensatedUes = new ArrayList<>();
         boolean hasMissing = false;
         boolean hasEliminatory = false;
 
-        for (UniversityUnit ue : ues) {
-            if (ue.isOptionalUe() && !ueEnrollmentRepository.existsByStudentIdAndUeId(student.getId(), ue.getId())) {
-                continue; // UE optionnelle non choisie : ignorée
+        for (UniversityUnit ue : data.ues()) {
+            if (ue.isOptionalUe() && !data.enrolledUes().contains(uePairKey(student.getId(), ue.getId()))) {
+                continue; // UE optionnelle non choisie : ignorée (ni crédits, ni moyenne)
             }
-            BigDecimal note = effectiveUeNote(student, ue);
+            totalCredits += ue.getCredits();
+            BigDecimal note = effectiveUeNote(student.getId(), ue, session, data);
             if (note == null) {
                 hasMissing = true;
                 creditsFailed += ue.getCredits();
@@ -681,7 +803,9 @@ public class LmdService {
                 .mention(computeMention(average))
                 .creditsObtained(creditsObtained)
                 .creditsFailed(creditsFailed)
-                .totalCredits(ues.stream().mapToInt(UniversityUnit::getCredits).sum())
+                // Seules les UE réellement suivies (optionnelles choisies incluses) sont comptées :
+                // les UE optionnelles non choisies ne gonflent plus le total (D13).
+                .totalCredits(totalCredits)
                 .uesToRetake(compensated ? new ArrayList<>() : uesToRetake)
                 .compensatedUes(compensated ? compensatedUes : new ArrayList<>())
                 .build();
@@ -702,31 +826,53 @@ public class LmdService {
         validateSemester(semester);
         AcademicField field = fieldRepository.findById(fieldId)
                 .orElseThrow(() -> ResourceNotFoundException.of("Filière", fieldId));
-        List<LmdEnrollment> enrollments = enrollmentRepository.findByFieldIdAndActiveTrueOrderById(fieldId);
+        // Un étudiant est délibéré pour le SEMESTRE qu'il est en train de suivre :
+        // ceux déjà avancés (ex. S4) ne sont plus délibérés pour S1 (D2).
+        List<LmdEnrollment> enrollments =
+                enrollmentRepository.findByFieldIdAndActiveTrueAndCurrentSemesterOrderById(fieldId, semester);
         if (enrollments.isEmpty()) {
-            throw new BusinessException("Aucun étudiant inscrit dans cette filière");
+            throw new BusinessException("Aucun étudiant inscrit au semestre " + semester
+                    + " dans cette filière (délibérations non modifiées)");
         }
 
-        List<LmdDeliberationResult> results = enrollments.stream()
-                .map(e -> computeResult(e.getStudent().getId(), fieldId, semester, session))
-                .sorted(Comparator.comparing(LmdDeliberationResult::getAverage,
-                        Comparator.nullsLast(Comparator.reverseOrder())))
-                .toList();
+        // Chargement en LOT : 6 requêtes au total pour toute la filière, au lieu
+        // de ~2 × UE × EC requêtes par étudiant (D11).
+        SemesterGrades data = loadSemesterGrades(fieldId, semester);
+        if (data.ues().isEmpty()) {
+            throw new BusinessException("Aucune UE définie pour ce semestre dans cette filière");
+        }
+
+        List<LmdDeliberationResult> results = new ArrayList<>(enrollments.size());
+        Map<Long, Student> studentsById = new HashMap<>();
+        for (LmdEnrollment enrollment : enrollments) {
+            Student student = enrollment.getStudent();
+            studentsById.put(student.getId(), student);
+            results.add(computeFromSemester(student, fieldId, semester, session, data));
+        }
+        results.sort(Comparator.comparing(LmdDeliberationResult::getAverage,
+                Comparator.nullsLast(Comparator.reverseOrder())));
+
+        // Délibérations existantes chargées en une requête (au lieu d'une par étudiant).
+        Map<String, LmdDeliberation> existingByKey = new HashMap<>();
+        for (LmdDeliberation d : deliberationRepository.findByFieldIdAndSemesterAndSession(fieldId, semester, session)) {
+            existingByKey.put(d.getStudent().getId() + "|" + d.getSession(), d);
+        }
 
         int rank = 0;
         BigDecimal previous = null;
         for (LmdDeliberationResult result : results) {
             rank = (previous == null || !previous.equals(result.getAverage())) ? rank + 1 : rank;
             previous = result.getAverage();
-            LmdDeliberation deliberation = deliberationRepository
-                    .findByStudentIdAndFieldIdAndSemesterAndSession(
-                            result.getStudentId(), fieldId, semester, session)
-                    .orElseGet(() -> LmdDeliberation.builder()
-                            .student(studentService.findById(result.getStudentId()))
-                            .field(field)
-                            .semester(semester)
-                            .session(session)
-                            .build());
+            String key = result.getStudentId() + "|" + session;
+            LmdDeliberation deliberation = existingByKey.get(key);
+            if (deliberation == null) {
+                deliberation = LmdDeliberation.builder()
+                        .student(studentsById.get(result.getStudentId()))
+                        .field(field)
+                        .semester(semester)
+                        .session(session)
+                        .build();
+            }
             if (deliberation.isLocked()) {
                 throw new BusinessException("Délibération verrouillée : déverrouillez avant de recalculer (filière "
                         + field.getName() + ", semestre " + semester + ")");
@@ -981,10 +1127,16 @@ public class LmdService {
         LmdDeliberationResult result = computeResult(studentId, fieldId, semester, session);
         Student student = studentService.findById(studentId);
         AcademicField field = fieldRepository.findById(fieldId).orElse(null);
-        List<UniversityUnit> ues = ueRepository.findByFieldIdAndSemesterOrderByCode(fieldId, semester);
-        List<com.school.dto.response.LmdReleveResponse.UeLine> ueLines = ues.stream().map(ue -> {
+        // Enrichissement (précédemment laissé à null) : programme de formation et niveau.
+        LmdEnrollment enrollment = enrollmentRepository.findByStudentIdAndFieldId(studentId, fieldId).orElse(null);
+        String programName = enrollment != null && enrollment.getProgram() != null
+                ? enrollment.getProgram().getName() : null;
+        UniversityLevel level = enrollment != null ? enrollment.getLevel() : null;
+        // Un seul chargement pour toutes les lignes du relevé (pas de requête par UE).
+        SemesterGrades data = loadSemesterGradesForStudent(fieldId, semester, studentId);
+        List<com.school.dto.response.LmdReleveResponse.UeLine> ueLines = data.ues().stream().map(ue -> {
             BigDecimal note = null;
-            try { note = effectiveUeNote(student, ue); } catch (Exception ignored) {}
+            try { note = effectiveUeNote(studentId, ue, session, data); } catch (Exception ignored) {}
             return com.school.dto.response.LmdReleveResponse.UeLine.builder()
                     .code(ue.getCode()).name(ue.getName())
                     .coefficient(ue.getCoefficient()).credits(ue.getCredits()).note(note).build();
@@ -992,8 +1144,8 @@ public class LmdService {
         return com.school.dto.response.LmdReleveResponse.builder()
                 .studentName(result.getStudentName()).matricule(result.getMatricule())
                 .fieldName(field != null ? field.getName() : null)
-                .programName(null) // sera enrichi si programme disponible
-                .level(null) // sera enrichi
+                .programName(programName)
+                .level(level)
                 .academicYear(com.school.utils.CodeGenerator.currentAcademicYear())
                 .semester(semester).session(session)
                 .average(result.getAverage()).decision(result.getDecision())
@@ -1009,17 +1161,134 @@ public class LmdService {
         LmdDeliberationResult result = computeResult(studentId, fieldId, semester, session);
         Student student = studentService.findById(studentId);
         AcademicField field = fieldRepository.findById(fieldId).orElse(null);
-        String token = "ATT-" + student.getMatricule() + "-" + semester + "-" + java.time.LocalDateTime.now()
-                .format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
+        LmdEnrollment enrollment = enrollmentRepository.findByStudentIdAndFieldId(studentId, fieldId).orElse(null);
+        String programName = enrollment != null && enrollment.getProgram() != null
+                ? enrollment.getProgram().getName() : null;
+        // D4 : le jeton est désormais signé (HMAC-SHA256 du secret d'application)
+        // et porte une expiration ; il n'est plus forgeable à partir du matricule
+        // et de l'horodatage. Voir verifyAttestationToken().
+        String token = createAttestationToken(student.getMatricule(), semester, session);
         return com.school.dto.response.LmdAttestationResponse.builder()
                 .studentName(result.getStudentName()).matricule(result.getMatricule())
                 .fieldName(field != null ? field.getName() : null)
-                .programName(null).diploma(null)
+                .programName(programName).diploma(null)
                 .academicYear(com.school.utils.CodeGenerator.currentAcademicYear())
                 .semester(semester)
                 .average(result.getAverage()).mention(result.getMention())
                 .decision(result.getDecision())
                 .verificationToken(token).build();
+    }
+
+    /**
+     * Crée un jeton d'attestation signé : {@code payload.signature} en Base64URL.
+     * Le payload contient matricule, semestre, session et une expiration (1 an) ;
+     * la signature est un HMAC-SHA256 calculé avec le secret d'application. Sans
+     * la connaissance du secret, il est impossible de forger un jeton valide (D4).
+     */
+    String createAttestationToken(String matricule, String semester, int session) {
+        long expiry = System.currentTimeMillis() + ATTESTATION_TOKEN_MS;
+        String payload = matricule + "|" + semester + "|" + session + "|" + expiry;
+        return Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(payload.getBytes(java.nio.charset.StandardCharsets.UTF_8))
+                + "." + signature(payload);
+    }
+
+    /**
+     * Vérifie la signature d'un jeton d'attestation et son expiration.
+     * Renvoie {@code false} dès qu'un élément est invalide (jeton falsifié, expiré
+     * ou au format inattendu), sans jamais lever d'exception.
+     */
+    public boolean verifyAttestationToken(String token) {
+        if (token == null || token.isBlank()) {
+            return false;
+        }
+        int dot = token.indexOf('.');
+        if (dot <= 0) {
+            return false;
+        }
+        String encodedPayload = token.substring(0, dot);
+        String providedSignature = token.substring(dot + 1);
+        String payload;
+        try {
+            payload = new String(Base64.getUrlDecoder().decode(encodedPayload),
+                    java.nio.charset.StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException ex) {
+            return false;
+        }
+        if (!java.security.MessageDigest.isEqual(signature(payload).getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                providedSignature.getBytes(java.nio.charset.StandardCharsets.UTF_8))) {
+            return false;
+        }
+        String[] parts = payload.split("\\|");
+        if (parts.length != 4) {
+            return false;
+        }
+        try {
+            return Long.parseLong(parts[3]) > System.currentTimeMillis();
+        } catch (NumberFormatException ex) {
+            return false;
+        }
+    }
+
+    /**
+     * Décodage d'un jeton d'attestation VALIDE : renvoie les informations qu'il
+     * porte (matricule, semestre, session, expiration), ou {@code null} si le
+     * jeton est invalide ou expiré.
+     */
+    public com.school.dto.response.LmdAttestationResponse.AttestationInfo decodeAttestationToken(String token) {
+        if (token == null || token.isBlank()) {
+            return null;
+        }
+        int dot = token.indexOf('.');
+        if (dot <= 0) {
+            return null;
+        }
+        String encodedPayload = token.substring(0, dot);
+        String providedSignature = token.substring(dot + 1);
+        String payload;
+        try {
+            payload = new String(Base64.getUrlDecoder().decode(encodedPayload),
+                    java.nio.charset.StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+        if (!java.security.MessageDigest.isEqual(signature(payload).getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                providedSignature.getBytes(java.nio.charset.StandardCharsets.UTF_8))) {
+            return null;
+        }
+        String[] parts = payload.split("\\|");
+        if (parts.length != 4) {
+            return null;
+        }
+        try {
+            long expiry = Long.parseLong(parts[3]);
+            if (expiry <= System.currentTimeMillis()) {
+                return null;
+            }
+            return com.school.dto.response.LmdAttestationResponse.AttestationInfo.builder()
+                    .matricule(parts[0])
+                    .semester(parts[1])
+                    .session(Integer.parseInt(parts[2]))
+                    .expiresAt(java.time.Instant.ofEpochMilli(expiry))
+                    .build();
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
+    /** Signature HMAC-SHA256 (hex) du flux d'octets UTF-8 du payload. */
+    private String signature(String payload) {
+        try {
+            String secret = (attestationSecret == null || attestationSecret.isBlank())
+                    ? "attestation-fallback-dev" // uniquement si le secret n'est pas configuré (dev)
+                    : attestationSecret;
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(secret.getBytes(java.nio.charset.StandardCharsets.UTF_8), "HmacSHA256"));
+            mac.update(payload.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return java.util.HexFormat.of().formatHex(mac.doFinal());
+        } catch (NoSuchAlgorithmException | InvalidKeyException ex) {
+            throw new IllegalStateException("HMAC-SHA256 indisponible", ex);
+        }
     }
 
     // ---------- Emploi du temps universitaire ----------

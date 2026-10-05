@@ -231,7 +231,8 @@ class AuthServiceTest {
     @Test
     @DisplayName("un jeton de rafraîchissement inconnu est refusé")
     void refreshJetonInconnuRefuse() {
-        when(refreshTokenRepository.findByToken("inconnu")).thenReturn(Optional.empty());
+        when(refreshTokenRepository.findByToken(AuthService.hashRefreshToken("inconnu")))
+                .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.refresh(new RefreshTokenRequest("inconnu")))
                 .isInstanceOf(TokenRefreshException.class)
@@ -244,7 +245,8 @@ class AuthServiceTest {
         RefreshToken revoque = RefreshToken.builder()
                 .token("revoque").user(utilisateur(1L, "prof1"))
                 .expiryDate(LocalDateTime.now().plusDays(1)).revoked(true).build();
-        when(refreshTokenRepository.findByToken("revoque")).thenReturn(Optional.of(revoque));
+        when(refreshTokenRepository.findByToken(AuthService.hashRefreshToken("revoque")))
+                .thenReturn(Optional.of(revoque));
 
         assertThatThrownBy(() -> service.refresh(new RefreshTokenRequest("revoque")))
                 .isInstanceOf(TokenRefreshException.class)
@@ -260,7 +262,8 @@ class AuthServiceTest {
         RefreshToken expire = RefreshToken.builder()
                 .token("expire").user(utilisateur(1L, "prof1"))
                 .expiryDate(LocalDateTime.now().minusSeconds(1)).build();
-        when(refreshTokenRepository.findByToken("expire")).thenReturn(Optional.of(expire));
+        when(refreshTokenRepository.findByToken(AuthService.hashRefreshToken("expire")))
+                .thenReturn(Optional.of(expire));
 
         assertThatThrownBy(() -> service.refresh(new RefreshTokenRequest("expire")))
                 .isInstanceOf(TokenRefreshException.class);
@@ -275,7 +278,8 @@ class AuthServiceTest {
         User user = utilisateur(1L, "prof1");
         RefreshToken ancien = RefreshToken.builder()
                 .token("ancien").user(user).expiryDate(LocalDateTime.now().plusDays(1)).build();
-        when(refreshTokenRepository.findByToken("ancien")).thenReturn(Optional.of(ancien));
+        when(refreshTokenRepository.findByToken(AuthService.hashRefreshToken("ancien")))
+                .thenReturn(Optional.of(ancien));
         when(jwtService.generateToken(user)).thenReturn("nouvel-acces");
         when(refreshTokenRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -295,7 +299,8 @@ class AuthServiceTest {
         RefreshToken jeton = RefreshToken.builder()
                 .token("jeton").user(utilisateur(1L, "prof1"))
                 .expiryDate(LocalDateTime.now().plusDays(1)).build();
-        when(refreshTokenRepository.findByToken("jeton")).thenReturn(Optional.of(jeton));
+        when(refreshTokenRepository.findByToken(AuthService.hashRefreshToken("jeton")))
+                .thenReturn(Optional.of(jeton));
 
         service.logout("jeton");
 
@@ -304,9 +309,44 @@ class AuthServiceTest {
     }
 
     @Test
+    @DisplayName("hashRefreshToken : SHA-256 stable, préfixé, jamais le jeton brut")
+    void hashRefreshTokenEstStableEtPrefixe() {
+        String hash = AuthService.hashRefreshToken("mon-jeton");
+
+        assertThat(hash).startsWith("sha256:");
+        assertThat(hash).hasSize("sha256:".length() + 64);
+        // Stable : la même entrée produit le même hash (indispensable au lookup).
+        assertThat(AuthService.hashRefreshToken("mon-jeton")).isEqualTo(hash);
+        assertThat(AuthService.hashRefreshToken("autre-jeton")).isNotEqualTo(hash);
+        // Le jeton brut ne doit jamais apparaître dans la valeur stockée.
+        assertThat(hash).doesNotContain("mon-jeton");
+    }
+
+    @Test
+    @DisplayName("purgeStaleRefreshTokens supprime les jetons révoqués ou expirés")
+    void purgeSupprimeLesJetonsObsoletes() {
+        when(refreshTokenRepository.deleteStale(any(LocalDateTime.class))).thenReturn(270);
+
+        int purged = service.purgeStaleRefreshTokens();
+
+        // Sans cette purge, la table grossissait indéfiniment.
+        assertThat(purged).isEqualTo(270);
+        verify(refreshTokenRepository).deleteStale(any(LocalDateTime.class));
+    }
+
+    @Test
+    @DisplayName("la purge planifiée ne journalise rien quand il n'y a rien à supprimer")
+    void purgePlanifieeSilencieuseSiRienASupprimer() {
+        when(refreshTokenRepository.deleteStale(any(LocalDateTime.class))).thenReturn(0);
+
+        assertThatCode(() -> service.scheduledPurgeStaleRefreshTokens()).doesNotThrowAnyException();
+    }
+
+    @Test
     @DisplayName("la déconnexion d'un jeton inconnu ne lève pas d'erreur")
     void logoutJetonInconnuSansErreur() {
-        when(refreshTokenRepository.findByToken("absent")).thenReturn(Optional.empty());
+        when(refreshTokenRepository.findByToken(AuthService.hashRefreshToken("absent")))
+                .thenReturn(Optional.empty());
 
         assertThatCode(() -> service.logout("absent")).doesNotThrowAnyException();
 

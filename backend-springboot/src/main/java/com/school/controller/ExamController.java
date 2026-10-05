@@ -9,6 +9,7 @@ import com.school.dto.response.GradeResponse;
 import com.school.dto.response.PageResponse;
 import com.school.enums.ExamStatus;
 import com.school.enums.Term;
+import com.school.service.AccessControlService;
 import com.school.service.ExamService;
 import com.school.service.GradeService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -35,6 +36,7 @@ public class ExamController {
 
     private final ExamService examService;
     private final GradeService gradeService;
+    private final AccessControlService accessControlService;
 
     @GetMapping
     @Operation(summary = "Rechercher des évaluations")
@@ -107,6 +109,7 @@ public class ExamController {
     @GetMapping("/student/{studentId}/grades")
     @Operation(summary = "Notes d'un élève")
     public ResponseEntity<ApiResponse<List<GradeResponse>>> gradesByStudent(@PathVariable Long studentId) {
+        accessControlService.assertCanAccessStudent(studentId);
         return ok("Notes de l'élève", gradeService.listByStudent(studentId));
     }
 
@@ -114,6 +117,7 @@ public class ExamController {
     @Operation(summary = "Moyenne trimestrielle d'un élève")
     public ResponseEntity<ApiResponse<java.math.BigDecimal>> average(@PathVariable Long studentId,
                                                                      @RequestParam Term term) {
+        accessControlService.assertCanAccessStudent(studentId);
         return ok("Moyenne calculée", gradeService.averageForStudent(studentId, term));
     }
 
@@ -149,6 +153,7 @@ public class ExamController {
     @Operation(summary = "Historique académique d'un élève (bulletins)")
     public ResponseEntity<ApiResponse<List<BulletinResponse>>> bulletinsByStudent(
             @PathVariable Long studentId) {
+        accessControlService.assertCanAccessStudent(studentId);
         return ok("Historique de l'élève", gradeService.bulletinsByStudent(studentId));
     }
 

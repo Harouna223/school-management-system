@@ -1,9 +1,13 @@
 package com.school.utils;
 
+import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Utilitaires de génération de codes métier (matricules, reçus, factures...).
@@ -12,6 +16,31 @@ public final class CodeGenerator {
 
     private static final DateTimeFormatter YEAR = DateTimeFormatter.ofPattern("yyyy");
     private static final DateTimeFormatter DATE_COMPACT = DateTimeFormatter.ofPattern("yyMMdd");
+
+    /** Génère un mot de passe aléatoire conforme à {@link PasswordPolicy} (≥ 8 car., minuscule + majuscule + chiffre). */
+    public static String randomPassword() {
+        SecureRandom random = new SecureRandom();
+        // Sans « 0/O/1/l » et homoglyphes proches, pour rester lisible à la transmission.
+        String upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+        String lower = "abcdefghijkmnpqrstuvwxyz";
+        String digits = "23456789";
+        List<Character> chars = new ArrayList<>();
+        // 4 minuscules + 4 majuscules + 2 chiffres, puis mélange : chaque classe est
+        // garantie présente, ce qui satisfait toujours la politique de mot de passe.
+        for (int i = 0; i < 4; i++) {
+            chars.add(lower.charAt(random.nextInt(lower.length())));
+        }
+        for (int i = 0; i < 4; i++) {
+            chars.add(upper.charAt(random.nextInt(upper.length())));
+        }
+        for (int i = 0; i < 2; i++) {
+            chars.add(digits.charAt(random.nextInt(digits.length())));
+        }
+        Collections.shuffle(chars, random);
+        StringBuilder sb = new StringBuilder(chars.size());
+        chars.forEach(sb::append);
+        return sb.toString();
+    }
 
     private CodeGenerator() {
     }

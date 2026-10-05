@@ -274,7 +274,7 @@ class TeacherServiceTest {
     }
 
     @Test
-    @DisplayName("Sans identifiants, le nom d'utilisateur est derive du nom et le mot de passe est le defaut")
+    @DisplayName("Sans identifiants, le nom d'utilisateur est derive du nom et le mot de passe est genere")
     void lesIdentifiantsParDefautSontDerivesDuNom() {
         when(teacherRepository.count()).thenReturn(0L);
         when(teacherRepository.existsByEmployeeNo(anyString())).thenReturn(false);
@@ -285,10 +285,15 @@ class TeacherServiceTest {
         TeacherRequest requete = requestDeBase();
         requete.setCreateUserAccount(Boolean.TRUE);
 
-        teacherService.create(requete, httpRequest);
+        ArgumentCaptor<String> mdpCaptor = ArgumentCaptor.forClass(String.class);
+        TeacherResponse reponse = teacherService.create(requete, httpRequest);
 
-        verify(authService).createLinkedAccount("jean.kamdem", "Enseignant@123", null,
-                "Jean", "Kamdem", "ENSEIGNANT");
+        // Plus AUCUN mot de passe par défaut connu : le serveur génère un mot de passe
+        // aléatoire et le renvoie une seule fois dans « generatedPassword ».
+        verify(authService).createLinkedAccount(eq("jean.kamdem"), mdpCaptor.capture(), isNull(),
+                eq("Jean"), eq("Kamdem"), eq("ENSEIGNANT"));
+        assertThat(mdpCaptor.getValue()).isNotIn("Eleve@123", "Enseignant@123", "Parent@123");
+        assertThat(reponse.getGeneratedPassword()).isEqualTo(mdpCaptor.getValue());
     }
 
     @Test
@@ -308,8 +313,8 @@ class TeacherServiceTest {
         teacherService.create(requete, httpRequest);
 
         // Tout caractere hors [a-z0-9.] doit disparaitre : « aicha.ndiaye ».
-        verify(authService).createLinkedAccount("aicha.ndiaye", "Enseignant@123", null,
-                "Aicha", "N'Diaye", "ENSEIGNANT");
+        verify(authService).createLinkedAccount(eq("aicha.ndiaye"), anyString(), isNull(),
+                eq("Aicha"), eq("N'Diaye"), eq("ENSEIGNANT"));
     }
 
     @Test
@@ -399,8 +404,8 @@ class TeacherServiceTest {
         ArgumentCaptor<Teacher> captor = ArgumentCaptor.forClass(Teacher.class);
         verify(teacherRepository).save(captor.capture());
         assertThat(captor.getValue().getUser()).isSameAs(utilisateur);
-        verify(authService).createLinkedAccount("jean.kamdem", "Enseignant@123", null,
-                "Jean", "Kamdem", "ENSEIGNANT");
+        verify(authService).createLinkedAccount(eq("jean.kamdem"), anyString(), isNull(),
+                eq("Jean"), eq("Kamdem"), eq("ENSEIGNANT"));
     }
 
     @Test

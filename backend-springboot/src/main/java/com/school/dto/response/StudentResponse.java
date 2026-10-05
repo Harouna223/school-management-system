@@ -41,6 +41,20 @@ public class StudentResponse {
     /** Indique si l'élève dispose déjà d'un compte utilisateur (espace élève). */
     private Boolean hasAccount;
 
+    /**
+     * Mot de passe provisoirement généré par le serveur (uniquement si aucun mot
+     * de passe n'a été fourni à la création du compte). À transmettre à l'élève
+     * une seule fois ; jamais renvoyé pour un compte existant.
+     */
+    private String generatedPassword;
+
+    /**
+     * Nom d'utilisateur effectif du compte élève créé/modifié (peut différer de
+     * celui demandé si un suffixe d'unicité a été ajouté). Renvoyé uniquement
+     * lorsque le compte a été créé par cette requête.
+     */
+    private String accountUsername;
+
     public static StudentResponse from(Student s) {
         StudentResponse.StudentResponseBuilder b = StudentResponse.builder()
                 .id(s.getId())

@@ -8,6 +8,7 @@ import com.school.entity.Parent;
 import com.school.entity.SchoolClass;
 import com.school.entity.Student;
 import com.school.entity.StudentHistory;
+import com.school.entity.User;
 import com.school.enums.EducationCycle;
 import com.school.enums.StudentHistoryAction;
 import com.school.enums.StudentStatus;
@@ -20,9 +21,11 @@ import com.school.repository.StudentHistoryRepository;
 import com.school.repository.StudentRepository;
 import com.school.repository.UserRepository;
 import com.school.utils.CodeGenerator;
+import com.school.utils.SecurityUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -55,7 +58,25 @@ public class StudentService {
                                                 StudentStatus status, EducationCycle cycle,
                                                 int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("lastName").ascending());
-        Page<Student> result = studentRepository.search(search, classId, status, cycle, pageable);
+        Page<Student> result;
+        Long userId = SecurityUtils.currentUserId();
+        if (SecurityUtils.hasRole("PARENT")) {
+            // Un parent n'a accès qu'à la liste de SES enfants (IDOR sur les listes/exports).
+            Long parentId = parentRepository.findByUserIdOrderByIdAsc(userId).stream()
+                    .findFirst().map(Parent::getId).orElse(null);
+            result = parentId == null
+                    ? new PageImpl<>(java.util.List.of(), pageable, 0)
+                    : studentRepository.searchByParentId(parentId, search, classId, status, cycle, pageable);
+        } else if (SecurityUtils.hasRole("ELEVE") || SecurityUtils.hasRole("ETUDIANT")) {
+            // Un élève/étudiant ne voit que son propre profil, quel que soit le filtre.
+            Long selfId = userId == null ? null
+                    : studentRepository.findByUserId(userId).map(Student::getId).orElse(null);
+            result = selfId == null
+                    ? new PageImpl<>(java.util.List.of(), pageable, 0)
+                    : studentRepository.searchOwnProfile(selfId, search, classId, status, cycle, pageable);
+        } else {
+            result = studentRepository.search(search, classId, status, cycle, pageable);
+        }
         return PageResponse.from(result, StudentResponse::from);
     }
 
@@ -85,25 +106,71 @@ public class StudentService {
         } else if (hasParentData(request)) {
             parent = createParent(request);
         }
+        String generatedParentPassword = null;
+        String generatedParentUsername = null;
         if (parent != null) {
-            student.setParent(linkParentAccount(parent, request));
+            // Un mot de passe n'est généré QUE si un compte parent va réellement être créé,
+            // sinon l'API renverrait un mot de passe pour un compte inexistant.
+            boolean willCreateParentAccount = Boolean.TRUE.equals(request.getCreateParentAccount())
+                    && parent.getUser() == null;
+            String parentPassword = request.getParentPassword();
+            if (willCreateParentAccount && (parentPassword == null || parentPassword.isBlank())) {
+                parentPassword = CodeGenerator.randomPassword();
+                generatedParentPassword = parentPassword;
+            }
+            linkParentAccount(parent, request, parentPassword);
+            if (generatedParentPassword != null && parent.getUser() != null) {
+                generatedParentUsername = parent.getUser().getUsername();
+            } else {
+                generatedParentPassword = null;
+            }
+            student.setParent(parent);
         }
 
-        // Compte utilisateur (par défaut pour tout nouvel élève)
+        // Compte utilisateur (par défaut pour tout nouvel élève).
+        // Plus AUCUN mot de passe par défaut connu : si aucun mot de passe n'est
+        // fourni, le serveur en génère un aléatoire (renvoyé une seule fois dans
+        // la réponse sous « generatedPassword »).
+        String generatedStudentPassword = null;
+        String accountUsername = null;
         if (!Boolean.FALSE.equals(request.getCreateUserAccount())) {
             String email = request.getEmail() != null ? request.getEmail()
                     : student.getMatricule().toLowerCase() + "@school.local";
-            student.setUser(authService.createLinkedAccount(
+            String rawPassword = request.getPassword();
+            if (rawPassword == null || rawPassword.isBlank()) {
+                rawPassword = CodeGenerator.randomPassword();
+                generatedStudentPassword = rawPassword;
+            }
+            User account = authService.createLinkedAccount(
                     uniqueUsername(request.getUsername() != null ? request.getUsername() : defaultUsername(request)),
-                    request.getPassword() != null ? request.getPassword() : "Eleve@123",
+                    rawPassword,
                     email,
-                    request.getFirstName(), request.getLastName(), "ELEVE"));
+                    request.getFirstName(), request.getLastName(), "ELEVE");
+            if (account != null) {
+                student.setUser(account);
+                if (generatedStudentPassword != null) {
+                    accountUsername = account.getUsername();
+                }
+            }
         }
 
         Student saved = studentRepository.save(student);
+        StudentResponse response = StudentResponse.from(saved);
+        if (generatedParentPassword != null && response.getParent() != null) {
+            response.getParent().setGeneratedPassword(generatedParentPassword);
+        }
+        if (generatedParentUsername != null && response.getParent() != null) {
+            response.getParent().setAccountUsername(generatedParentUsername);
+        }
+        if (generatedStudentPassword != null) {
+            response.setGeneratedPassword(generatedStudentPassword);
+        }
+        if (accountUsername != null) {
+            response.setAccountUsername(accountUsername);
+        }
         auditService.log("CREATE", "Student", saved.getId(),
                 "Inscription élève " + saved.getFullName() + " (" + saved.getMatricule() + ")", httpRequest);
-        return StudentResponse.from(saved);
+        return response;
     }
 
     @Transactional
@@ -114,27 +181,65 @@ public class StudentService {
         if (request.getEnrollmentDate() != null) {
             student.setEnrollmentDate(request.getEnrollmentDate());
         }
+        String generatedParentPassword = null;
+        String generatedParentUsername = null;
+        String generatedStudentPassword = null;
+        String accountUsername = null;
         if (request.getParentId() != null) {
             student.setParent(parentRepository.findById(request.getParentId())
                     .orElseThrow(() -> ResourceNotFoundException.of("Parent", request.getParentId())));
         } else if (hasParentData(request)) {
             Parent parent = student.getParent() != null ? student.getParent() : createParent(request);
             parent = applyParentData(parent, request);
-            student.setParent(linkParentAccount(parent, request));
+            String parentPassword = request.getParentPassword();
+            if (Boolean.TRUE.equals(request.getCreateParentAccount()) && parent.getUser() == null
+                    && (parentPassword == null || parentPassword.isBlank())) {
+                parentPassword = CodeGenerator.randomPassword();
+                generatedParentPassword = parentPassword;
+            }
+            linkParentAccount(parent, request, parentPassword);
+            if (generatedParentPassword != null && parent.getUser() != null) {
+                generatedParentUsername = parent.getUser().getUsername();
+            }
+            student.setParent(parent);
         }
         if (Boolean.TRUE.equals(request.getCreateUserAccount()) && student.getUser() == null) {
             String email = request.getEmail() != null ? request.getEmail()
                     : student.getMatricule().toLowerCase() + "@school.local";
-            student.setUser(authService.createLinkedAccount(
+            String rawPassword = request.getPassword();
+            if (rawPassword == null || rawPassword.isBlank()) {
+                rawPassword = CodeGenerator.randomPassword();
+                generatedStudentPassword = rawPassword;
+            }
+            User account = authService.createLinkedAccount(
                     uniqueUsername(request.getUsername() != null ? request.getUsername() : defaultUsername(request)),
-                    request.getPassword() != null ? request.getPassword() : "Eleve@123",
+                    rawPassword,
                     email,
-                    request.getFirstName(), request.getLastName(), "ELEVE"));
+                    request.getFirstName(), request.getLastName(), "ELEVE");
+            if (account != null) {
+                student.setUser(account);
+                if (generatedStudentPassword != null) {
+                    accountUsername = account.getUsername();
+                }
+            }
         }
         Student saved = studentRepository.save(student);
+        StudentResponse response = StudentResponse.from(saved);
+        if (generatedParentPassword != null && response.getParent() != null) {
+            response.getParent().setGeneratedPassword(generatedParentPassword);
+        }
+        if (generatedParentUsername != null && response.getParent() != null) {
+            response.getParent().setAccountUsername(generatedParentUsername);
+        }
+        if (generatedStudentPassword != null) {
+            response.setGeneratedPassword(generatedStudentPassword);
+        }
+        if (accountUsername != null) {
+            response.setAccountUsername(accountUsername);
+        }
         auditService.log("UPDATE", "Student", saved.getId(),
                 "Modification du dossier de " + saved.getFullName(), httpRequest);
-        return StudentResponse.from(saved);
+        return response;
     }
 
     @Transactional
@@ -344,15 +449,15 @@ public class StudentService {
 
     /**
      * Crée le compte utilisateur PARENT (si demandé) et le lie au dossier parent.
+     * Le mot de passe est résolu par l'appelant (fourni ou généré aléatoirement) :
+     * plus aucun mot de passe par défaut connu n'est attribué.
      */
-    private Parent linkParentAccount(Parent parent, StudentRequest r) {
+    private Parent linkParentAccount(Parent parent, StudentRequest r, String rawPassword) {
         if (Boolean.TRUE.equals(r.getCreateParentAccount()) && parent.getUser() == null) {
             String username = r.getParentUsername() != null && !r.getParentUsername().isBlank()
                     ? r.getParentUsername() : defaultParentUsername(parent);
-            String password = r.getParentPassword() != null && !r.getParentPassword().isBlank()
-                    ? r.getParentPassword() : "Parent@123";
             parent.setUser(authService.createLinkedAccount(
-                    username, password, parent.getEmail(),
+                    username, rawPassword, parent.getEmail(),
                     parent.getFirstName(), parent.getLastName(), "PARENT"));
             return parentRepository.save(parent);
         }

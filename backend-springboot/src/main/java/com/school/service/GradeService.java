@@ -46,6 +46,7 @@ public class GradeService {
     private final WhatsAppService whatsappService;
     private final EmailService emailService;
     private final SmsService smsService;
+    private final AccessControlService accessControlService;
 
     @Transactional(readOnly = true)
     public List<GradeResponse> listByExam(Long examId) {
@@ -232,6 +233,9 @@ public class GradeService {
             throws java.io.IOException {
         Bulletin bulletin = bulletinRepository.findById(bulletinId)
                 .orElseThrow(() -> ResourceNotFoundException.of("Bulletin", bulletinId));
+        // IDOR : un élève / parent ne peut télécharger que le bulletin d'un élève
+        // auquel il a accès, même en devinant un bulletinId.
+        accessControlService.assertCanAccessStudent(bulletin.getStudent().getId());
         BulletinResponse responseData = BulletinResponse.from(bulletin);
         List<Grade> grades = gradeRepository
                 .findByStudentIdAndTerm(bulletin.getStudent().getId(), bulletin.getTerm());

@@ -304,7 +304,7 @@ class StudentServiceTest {
     // ------------------------------------------- compte utilisateur : asymetrie
 
     @Test
-    @DisplayName("create cree un compte ELEVE par defaut (drapeau absent)")
+    @DisplayName("create cree un compte ELEVE par defaut (drapeau absent) avec un mot de passe genere")
     void createCreeUnCompteParDefaut() {
         matriculeLibre();
         saveEleveRenvoieSonArgument();
@@ -313,14 +313,19 @@ class StudentServiceTest {
                 .thenReturn(User.builder().id(50L).build());
 
         ArgumentCaptor<Student> captor = ArgumentCaptor.forClass(Student.class);
+        ArgumentCaptor<String> mdpCaptor = ArgumentCaptor.forClass(String.class);
         StudentResponse reponse = studentService.create(demandeDeBase(), httpRequest);
         verify(studentRepository).save(captor.capture());
 
         // ⚠️ Asymetrie : c'est l'INVERSE de update. Le drapeau absent cree bien un compte.
-        verify(authService).createLinkedAccount(eq("aicha.kamdem"), eq("Eleve@123"), any(),
+        // Plus AUCUN mot de passe par défaut connu : le serveur en génère un aléatoire
+        // (respectant la politique) et le renvoie une seule fois dans « generatedPassword ».
+        verify(authService).createLinkedAccount(eq("aicha.kamdem"), mdpCaptor.capture(), any(),
                 eq("Aicha"), eq("Kamdem"), eq("ELEVE"));
         assertThat(captor.getValue().getUser()).isNotNull();
         assertThat(reponse.getHasAccount()).isTrue();
+        assertThat(mdpCaptor.getValue()).isNotIn("Eleve@123", "Enseignant@123", "Parent@123");
+        assertThat(reponse.getGeneratedPassword()).isEqualTo(mdpCaptor.getValue());
     }
 
     @Test
@@ -386,12 +391,12 @@ class StudentServiceTest {
 
         studentService.create(demandeDeBase(), httpRequest);
 
-        verify(authService).createLinkedAccount(eq("aicha.kamdem3"), eq("Eleve@123"), any(),
+        verify(authService).createLinkedAccount(eq("aicha.kamdem3"), anyString(), any(),
                 anyString(), anyString(), eq("ELEVE"));
     }
 
     @Test
-    @DisplayName("create n'ecrase jamais le mot de passe fourni par Eleve@123")
+    @DisplayName("create n'écrase jamais le mot de passe fourni et ne renvoie pas de mot de passe généré")
     void createNEcrasePasLeMotDePasseFourni() {
         matriculeLibre();
         saveEleveRenvoieSonArgument();
@@ -401,10 +406,11 @@ class StudentServiceTest {
         StudentRequest requete = demandeDeBase();
         requete.setPassword("MonMotDePasse!2026");
 
-        studentService.create(requete, httpRequest);
+        StudentResponse reponse = studentService.create(requete, httpRequest);
 
-        verify(authService, never()).createLinkedAccount(anyString(), eq("Eleve@123"),
+        verify(authService).createLinkedAccount(anyString(), eq("MonMotDePasse!2026"),
                 any(), anyString(), anyString(), anyString());
+        assertThat(reponse.getGeneratedPassword()).isNull();
     }
 
     // ------------------------------------------------------------- parent
@@ -518,8 +524,11 @@ class StudentServiceTest {
         studentService.create(requete, httpRequest);
 
         // Le parent doit etre lie avec le role PARENT, et non ELEVE.
-        verify(authService).createLinkedAccount(eq("harouna.siby"), eq("Parent@123"),
+        // Le mot de passe est généré aléatoirement (plus aucun défaut « Parent@123 »).
+        verify(authService).createLinkedAccount(eq("harouna.siby"), anyString(),
                 eq("h.siby@school.td"), eq("Harouna"), eq("Siby"), eq("PARENT"));
+        verify(authService, never()).createLinkedAccount(eq("harouna.siby"), eq("Parent@123"),
+                any(), anyString(), anyString(), anyString());
     }
 
     @Test
@@ -587,7 +596,7 @@ class StudentServiceTest {
 
         StudentResponse reponse = studentService.update(6L, requete, httpRequest);
 
-        verify(authService).createLinkedAccount(eq("aicha.kamdem"), eq("Eleve@123"), any(),
+        verify(authService).createLinkedAccount(eq("aicha.kamdem"), anyString(), any(),
                 anyString(), anyString(), eq("ELEVE"));
         assertThat(reponse.getHasAccount()).isTrue();
     }

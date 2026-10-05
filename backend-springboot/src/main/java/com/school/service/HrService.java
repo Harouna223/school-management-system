@@ -9,9 +9,11 @@ import com.school.dto.response.PayrollResponse;
 import com.school.entity.Contract;
 import com.school.entity.Leave;
 import com.school.entity.Payroll;
+import com.school.entity.Teacher;
 import com.school.enums.ContractStatus;
 import com.school.enums.LeaveStatus;
 import com.school.enums.PayrollStatus;
+import com.school.enums.TeacherStatus;
 import com.school.exception.BusinessException;
 import com.school.exception.ResourceNotFoundException;
 import com.school.repository.ContractRepository;
@@ -20,12 +22,16 @@ import com.school.repository.PayrollRepository;
 import com.school.utils.SecurityUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Module RH : congés des enseignants, contrats, statuts.
@@ -33,6 +39,7 @@ import java.util.List;
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
+@Slf4j
 public class HrService {
 
     private final LeaveRepository leaveRepository;
@@ -82,6 +89,62 @@ public class HrService {
         }
         auditService.log("LEAVE_DECISION", "Leave", leaveId, "Congé -> " + status, httpRequest);
         return LeaveResponse.from(leaveRepository.save(leave));
+    }
+
+    /**
+     * Réconciliation des statuts d'enseignants selon leurs congés approuvés (D26).
+     * Un enseignant est « en congé » s'il a au moins un congé approuvé couvrant la
+     * date du jour ; sinon il redevient « actif ». Cette méthode corrige aussi bien
+     * l'oubli de bascule en fin de congé que les congés futur/anticipés.
+     *
+     * <p>Seuls les enseignants ayant au moins un congé approuvé sont concernés : un
+     * statut ON_LEAVE posé manuellement (sans congé) n'est jamais écrasé.</p>
+     *
+     * @return le nombre de statuts modifiés
+     */
+    @Transactional
+    public int reconcileTeacherLeaveStatus() {
+        LocalDate today = LocalDate.now();
+        List<Leave> approved = leaveRepository.findByStatus(LeaveStatus.APPROVED);
+        if (approved.isEmpty()) {
+            return 0;
+        }
+        // Un enseignant est « en congé » s'il a AU MOINS un congé approuvé couvrant aujourd'hui.
+        Map<Long, Boolean> onLeaveNow = new HashMap<>();
+        Map<Long, Teacher> teachersById = new HashMap<>();
+        for (Leave leave : approved) {
+            Teacher teacher = leave.getTeacher();
+            teachersById.put(teacher.getId(), teacher);
+            boolean coversToday = !leave.getStartDate().isAfter(today)
+                    && !leave.getEndDate().isBefore(today);
+            onLeaveNow.merge(teacher.getId(), coversToday, Boolean::logicalOr);
+        }
+        int updated = 0;
+        for (Teacher teacher : teachersById.values()) {
+            boolean shouldBeOnLeave = Boolean.TRUE.equals(onLeaveNow.get(teacher.getId()));
+            if (shouldBeOnLeave && teacher.getStatus() != TeacherStatus.ON_LEAVE) {
+                teacherService.setStatusSilently(teacher.getId(), TeacherStatus.ON_LEAVE);
+                updated++;
+            } else if (!shouldBeOnLeave && teacher.getStatus() == TeacherStatus.ON_LEAVE) {
+                // Congé terminé (ou annulé) : l'enseignant redevient actif.
+                teacherService.setStatusSilently(teacher.getId(), TeacherStatus.ACTIVE);
+                updated++;
+            }
+        }
+        if (updated > 0) {
+            auditService.log("LEAVE_RECONCILE", "Teacher", null,
+                    updated + " statut(s) enseignant ajusté(s) selon les congés", null);
+        }
+        return updated;
+    }
+
+    /** Réconciliation quotidienne des statuts de congé (exécution à 2 h du matin). */
+    @Scheduled(cron = "0 0 2 * * *")
+    public void scheduledReconcileTeacherLeaveStatus() {
+        int updated = reconcileTeacherLeaveStatus();
+        if (updated > 0) {
+            log.info("Réconciliation des congés : {} statut(s) enseignant ajusté(s)", updated);
+        }
     }
 
     // ---------- Contrats ----------

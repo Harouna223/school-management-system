@@ -53,6 +53,51 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
                          @Param("cycle") com.school.enums.EducationCycle cycle,
                          Pageable pageable);
 
+    /**
+     * Variante de {@link #search} restreinte aux élèves d'un parent donné.
+     * Utilisée pour empêcher un compte PARENT de lister tous les élèves de
+     * l'établissement (IDOR sur les listes / exports).
+     */
+    @Query("""
+            SELECT s FROM Student s
+            WHERE s.parent.id = :parentId
+              AND (:search IS NULL OR :search = '' OR
+                   LOWER(s.firstName) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                   LOWER(s.lastName) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                   LOWER(s.matricule) LIKE LOWER(CONCAT('%', :search, '%')))
+              AND (:classId IS NULL OR s.schoolClass.id = :classId)
+              AND (:status IS NULL OR s.status = :status)
+              AND (:cycle IS NULL OR s.educationCycle = :cycle)
+            """)
+    Page<Student> searchByParentId(@Param("parentId") Long parentId,
+                                   @Param("search") String search,
+                                   @Param("classId") Long classId,
+                                   @Param("status") com.school.enums.StudentStatus status,
+                                   @Param("cycle") com.school.enums.EducationCycle cycle,
+                                   Pageable pageable);
+
+    /**
+     * Variante de {@link #search} restreinte au profil de l'élève connecté
+     * (rôles ELEVE / ETUDIANT) pour empêcher la consultation de l'annuaire.
+     */
+    @Query("""
+            SELECT s FROM Student s
+            WHERE s.id = :studentId
+              AND (:search IS NULL OR :search = '' OR
+                   LOWER(s.firstName) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                   LOWER(s.lastName) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                   LOWER(s.matricule) LIKE LOWER(CONCAT('%', :search, '%')))
+              AND (:classId IS NULL OR s.schoolClass.id = :classId)
+              AND (:status IS NULL OR s.status = :status)
+              AND (:cycle IS NULL OR s.educationCycle = :cycle)
+            """)
+    Page<Student> searchOwnProfile(@Param("studentId") Long studentId,
+                                   @Param("search") String search,
+                                   @Param("classId") Long classId,
+                                   @Param("status") com.school.enums.StudentStatus status,
+                                   @Param("cycle") com.school.enums.EducationCycle cycle,
+                                   Pageable pageable);
+
     List<Student> findByParentId(Long parentId);
 
     List<Student> findBySchoolClassId(Long classId);

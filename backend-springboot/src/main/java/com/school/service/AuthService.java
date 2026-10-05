@@ -21,6 +21,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.LockedException;
@@ -31,7 +32,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
+import java.util.HexFormat;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -142,8 +147,9 @@ public class AuthService {
 
     @Transactional
     public AuthResponse refresh(RefreshTokenRequest request) {
-        RefreshToken refreshToken = refreshTokenRepository.findByToken(request.getRefreshToken())
-                .orElseThrow(() -> new TokenRefreshException(request.getRefreshToken(),
+        String token = request.getRefreshToken();
+        RefreshToken refreshToken = refreshTokenRepository.findByToken(hashRefreshToken(token))
+                .orElseThrow(() -> new TokenRefreshException(token,
                         "Jeton de rafraîchissement inconnu"));
 
         if (refreshToken.isRevoked() || refreshToken.getExpiryDate().isBefore(LocalDateTime.now())) {
@@ -169,7 +175,7 @@ public class AuthService {
 
     @Transactional
     public void logout(String refreshToken) {
-        refreshTokenRepository.findByToken(refreshToken)
+        refreshTokenRepository.findByToken(hashRefreshToken(refreshToken))
                 .ifPresent(rt -> {
                     rt.setRevoked(true);
                     refreshTokenRepository.save(rt);
@@ -244,10 +250,52 @@ public class AuthService {
         String token = UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", "");
         RefreshToken refreshToken = RefreshToken.builder()
                 .user(user)
-                .token(token)
+                // Seul le HASH (SHA-256, préfixé « sha256: ») est stocké en base :
+                // une fuite de la table refresh_tokens ne permet plus de réutiliser
+                // les jetons. Le jeton brut n'est remis qu'au client, une seule fois.
+                .token(hashRefreshToken(token))
                 .expiryDate(LocalDateTime.now().plus(refreshExpirationMs, java.time.temporal.ChronoUnit.MILLIS))
                 .build();
         refreshTokenRepository.save(refreshToken);
         return token;
+    }
+
+    /**
+     * Purge les refresh tokens révoqués ou expirés. La table grossissait
+     * indéfiniment (un jeton par connexion, jamais effacé) : 52 % des lignes
+     * étaient des jetons révoqués inutiles.
+     *
+     * @return nombre de jetons supprimés
+     */
+    @Transactional
+    public int purgeStaleRefreshTokens() {
+        return refreshTokenRepository.deleteStale(LocalDateTime.now());
+    }
+
+    /** Purge quotidienne des refresh tokens révoqués / expirés (3 h 30). */
+    @Scheduled(cron = "0 30 3 * * *")
+    public void scheduledPurgeStaleRefreshTokens() {
+        int purged = purgeStaleRefreshTokens();
+        if (purged > 0) {
+            log.info("Purge : {} refresh token(s) révoqué(s) ou expiré(s) supprimé(s)", purged);
+        }
+    }
+
+    /**
+     * Hashage SHA-256 (hex, préfixe « sha256: ») d'un refresh token brut.
+     * Le préfixe rend la transformation idempotente et permet de distinguer les
+     * jetons déjà hachés d'éventuels reliquats en clair.
+     */
+    static String hashRefreshToken(String rawToken) {
+        if (rawToken == null) {
+            return null;
+        }
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hashed = digest.digest(rawToken.getBytes(StandardCharsets.UTF_8));
+            return "sha256:" + HexFormat.of().formatHex(hashed);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 indisponible", e);
+        }
     }
 }

@@ -33,6 +33,19 @@ public class TeacherResponse {
     private String photo;
     private TeacherStatus status;
 
+    /**
+     * Mot de passe provisoirement généré par le serveur (uniquement si aucun mot
+     * de passe n'a été fourni à la création du compte). À transmettre à
+     * l'enseignant une seule fois ; jamais renvoyé pour un compte existant.
+     */
+    private String generatedPassword;
+
+    /**
+     * Nom d'utilisateur effectif du compte enseignant créé/modifié (peut différer
+     * de celui demandé si un suffixe d'unicité a été ajouté).
+     */
+    private String accountUsername;
+
     public static TeacherResponse from(Teacher t) {
         return TeacherResponse.builder()
                 .id(t.getId())

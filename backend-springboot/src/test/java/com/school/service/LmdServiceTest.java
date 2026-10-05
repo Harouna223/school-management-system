@@ -12,7 +12,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -81,10 +84,23 @@ class LmdServiceTest {
                 enrollmentHistoryRepository, ecEvaluationRepository, academicRuleRepository,
                 universityAttendanceRepository,
                 studentService, auditService);
-        // Les UE n'ont pas d'EC : la note UE est utilisée directement.
+        // Chargement en lot : aucune UE n'a d'EC, aucune UE optionnelle suivie.
         org.mockito.Mockito.lenient()
-                .when(courseUnitRepository.findByUeIdOrderByCode(anyLong())).thenReturn(List.of());
+                .when(courseUnitRepository.findByUeIdInOrderByUeIdAscCodeAsc(org.mockito.ArgumentMatchers.anyList()))
+                .thenReturn(List.of());
+        org.mockito.Mockito.lenient()
+                .when(ecGradeRepository.findByStudentIdAndCourseUnitUeFieldId(anyLong(), anyLong()))
+                .thenReturn(List.of());
+        org.mockito.Mockito.lenient()
+                .when(ecGradeRepository.findByCourseUnitUeFieldId(anyLong())).thenReturn(List.of());
+        org.mockito.Mockito.lenient()
+                .when(ueEnrollmentRepository.findByUeIdIn(org.mockito.ArgumentMatchers.anyList()))
+                .thenReturn(List.of());
+        gradesIndex.clear();
     }
+
+    /** Notes cumulées par étudiant/semestre (le chargement en lot renvoie une liste). */
+    private final Map<String, List<UeGrade>> gradesIndex = new LinkedHashMap<>();
 
     private UniversityUnit ue(Long id, String code, int coef, int credits, String semester) {
         return UniversityUnit.builder().id(id).code(code).name(code).coefficient(coef)
@@ -92,13 +108,16 @@ class LmdServiceTest {
     }
 
     private void stubUeGrade(Long studentId, Long ueId, String semester, String value) {
-        when(ueGradeRepository.findByStudentIdAndUeIdAndSemesterAndSession(studentId, ueId, semester, 1))
-                .thenReturn(java.util.Optional.of(UeGrade.builder()
+        // Le service charge désormais TOUTES les notes d'un semestre en une requête
+        // (correction N+1) : le stub s'accumule et renvoie la liste complète.
+        String key = studentId + "|" + semester;
+        gradesIndex.computeIfAbsent(key, k -> new ArrayList<>())
+                .add(UeGrade.builder()
                         .ue(ue(ueId, "UE" + ueId, 1, 1, semester))
-                        .semester(semester).session(1).value(new BigDecimal(value)).build()));
-        // Session 2 (rattrapage) : pas de note
-        when(ueGradeRepository.findByStudentIdAndUeIdAndSemesterAndSession(studentId, ueId, semester, 2))
-                .thenReturn(java.util.Optional.empty());
+                        .semester(semester).session(1).value(new BigDecimal(value)).build());
+        org.mockito.Mockito.lenient()
+                .when(ueGradeRepository.findByStudentIdAndSemester(studentId, semester))
+                .thenAnswer(inv -> new ArrayList<>(gradesIndex.getOrDefault(key, List.of())));
     }
 
     @Test

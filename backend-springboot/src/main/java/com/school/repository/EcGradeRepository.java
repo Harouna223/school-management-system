@@ -17,4 +17,10 @@ public interface EcGradeRepository extends JpaRepository<EcGrade, Long> {
     Optional<EcGrade> findByStudentIdAndCourseUnitIdAndSession(Long studentId, Long courseUnitId, int session);
 
     List<EcGrade> findByStudentIdAndCourseUnitIdOrderBySession(Long studentId, Long courseUnitId);
+
+    /**
+     * Toutes les notes EC d'une filière en une seule requête : évite le N+1
+     * (une requête par étudiant et par EC) lors d'une délibération.
+     */
+    List<EcGrade> findByCourseUnitUeFieldId(Long fieldId);
 }

@@ -8,6 +8,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 
 /**
  * Données d'une attestation de réussite universitaire PDF avec QR code.
@@ -29,4 +30,18 @@ public class LmdAttestationResponse {
     private Mention mention;
     private LmdDecision decision;
     private String verificationToken;
+
+    /**
+     * Informations portées par un jeton d'attestation valide (vérification externe).
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class AttestationInfo {
+        private String matricule;
+        private String semester;
+        private int session;
+        private Instant expiresAt;
+    }
 }

@@ -9,4 +9,9 @@ public interface CourseUnitRepository extends JpaRepository<CourseUnit, Long> {
     List<CourseUnit> findByUeIdOrderByCode(Long ueId);
     boolean existsByUeIdAndCode(Long ueId, String code);
     List<CourseUnit> findTop8ByNameContainingIgnoreCaseOrCodeContainingIgnoreCase(String name, String code);
+
+    /**
+     * EC de plusieurs UE en une seule requête (évite le N+1 lors d'une délibération).
+     */
+    List<CourseUnit> findByUeIdInOrderByUeIdAscCodeAsc(List<Long> ueIds);
 }
