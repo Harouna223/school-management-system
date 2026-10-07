@@ -14,14 +14,13 @@ spring:
       # contenant des donnees. Toute evolution passe par une migration Flyway.
       ddl-auto: validate
     show-sql: false
-    # D10 — open-in-view.
-    # Passer à false est la bonne cible (libère les connexions plus tôt, expose
-    # réellement les N+1), MAIS 63 endpoints sérialisent aujourd'hui des ENTITÉS
-    # JPA (LMD, MEMOIRE, STAGE, UniversityExam, USER/roles…) dont les relations
-    # LAZY seraient alors hors transaction → LazyInitializationException / HTTP 500.
-    # Bascule à "false" UNIQUEMENT après conversion de ces endpoints en DTO
-    # (ou @EntityGraph), et avec la couverture de tests d'intégration en place.
-    open-in-view: ${OPEN_IN_VIEW:true}
+    # D10 — open-in-view (PHASE 7 : bascule a false effectuee).
+    # La cible stricte est maintenant la valeur par defaut : les connexions sont
+    # liberees en fin de transaction et les N+1 reels sont exposes. Le seul
+    # endpoint qui echouait en sérialisation hors transaction (/api/lmd/fields,
+    # entité AcademicField + relations LAZY) est couvert par @EntityGraph dans
+    # AcademicFieldRepository. Pilotage conservable via la variable OPEN_IN_VIEW.
+    open-in-view: ${OPEN_IN_VIEW:false}
   mail:
     host: ${MAIL_HOST:smtp.gmail.com}
     port: ${MAIL_PORT:587}
