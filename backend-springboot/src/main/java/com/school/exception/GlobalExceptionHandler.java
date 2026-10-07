@@ -10,9 +10,11 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -100,6 +102,22 @@ public class GlobalExceptionHandler {
                                                                       HttpServletRequest request) {
         log.warn("Méthode non supportée : {} {}", ex.getMethod(), request.getRequestURI());
         return build(HttpStatus.METHOD_NOT_ALLOWED, "Méthode HTTP non supportée pour cette ressource", request);
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingParam(MissingServletRequestParameterException ex,
+                                                                HttpServletRequest request) {
+        log.warn("Paramètre requis manquant : {} sur {}", ex.getParameterName(), request.getRequestURI());
+        return build(HttpStatus.BAD_REQUEST,
+                "Paramètre requis manquant : " + ex.getParameterName(), request);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTypeMismatch(MethodArgumentTypeMismatchException ex,
+                                                                HttpServletRequest request) {
+        log.warn("Paramètre invalide : {} = {}", ex.getName(), ex.getValue());
+        return build(HttpStatus.BAD_REQUEST,
+                "Paramètre invalide : " + ex.getName(), request);
     }
 
     @ExceptionHandler(Exception.class)

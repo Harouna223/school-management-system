@@ -10,8 +10,8 @@ spring:
       # Si le baseline diverge des entites, l'integration test echoue ici,
       # avant toute mise en production.
       ddl-auto: validate
-    # CIBLE stricte : plus stricte que la production actuelle (OPEN_IN_VIEW=true).
-    # Un endpoint sérialisant une entité hors transaction échoue ici.
+    # IDENTIQUE a la production (open-in-view=false depuis la fin de la phase 7).
+    # Un endpoint sérialisant une entité hors transaction échoue ici comme en prod.
     open-in-view: false
   mail:
     host: localhost

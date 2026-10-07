@@ -30,9 +30,9 @@ import java.util.Base64;
  * l'etre que dans un vrai contexte : SQL genere par Spring Data, transactions,
  * serialisation JSON et regles de securite HTTP.</p>
  *
- * <p>Configuration : {@code ddl-auto=create-drop} (schema reconstruit a chaque
- * execution) et {@code open-in-view=false}, c'est-a-dire la configuration
- * CIBLE, plus stricte que la production actuelle.</p>
+ * <p>Configuration : {@code ddl-auto=validate} (schema cree par Flyway puis
+ * verifie) et {@code open-in-view=false}, c'est-a-dire la configuration
+ * IDENTIQUE a la production depuis la fin de la phase 7.</p>
  *
  * <p>Si aucune base de test n'est joignable (Docker inaccessible ET pas de base
  * de test locale), les tests sont <strong>desactives</strong> et non en echec :
