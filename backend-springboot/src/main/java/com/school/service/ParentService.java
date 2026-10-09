@@ -6,17 +6,13 @@ import com.school.dto.response.BulletinResponse;
 import com.school.dto.response.GradeResponse;
 import com.school.dto.response.StudentResponse;
 import com.school.entity.Bulletin;
-import com.school.entity.EnrollmentHistory;
-import com.school.entity.LmdEnrollment;
 import com.school.entity.Parent;
 import com.school.entity.Student;
 import com.school.exception.BusinessException;
 import com.school.exception.ResourceNotFoundException;
 import com.school.repository.AttendanceRepository;
 import com.school.repository.BulletinRepository;
-import com.school.repository.EnrollmentHistoryRepository;
 import com.school.repository.GradeRepository;
-import com.school.repository.LmdEnrollmentRepository;
 import com.school.repository.ParentRepository;
 import com.school.repository.StudentHistoryRepository;
 import com.school.repository.StudentRepository;
@@ -43,9 +39,6 @@ public class ParentService {
     private final AttendanceRepository attendanceRepository;
     private final GradeRepository gradeRepository;
     private final StudentHistoryRepository studentHistoryRepository;
-    private final EnrollmentHistoryRepository enrollmentHistoryRepository;
-    private final LmdEnrollmentRepository lmdEnrollmentRepository;
-    private final LmdService lmdService;
     private final GradeService gradeService;
 
     @Transactional(readOnly = true)
@@ -92,7 +85,7 @@ public class ParentService {
     }
 
     /**
-     * Timeline consolidée du parcours scolaire + universitaire d'un enfant.
+     * Timeline du parcours scolaire d'un enfant.
      */
     @Transactional(readOnly = true)
     public List<AcademicTimelineEntry> childTimeline(Long studentId) {
@@ -108,18 +101,6 @@ public class ParentService {
                         .reason(h.getReason())
                         .date(h.getCreatedAt())
                         .build()));
-        enrollmentHistoryRepository.findByStudentIdOrderByCreatedAtDesc(student.getId())
-                .forEach(h -> entries.add(AcademicTimelineEntry.builder()
-                        .id(h.getId())
-                        .context("UNIVERSITY")
-                        .action(h.getEnrollmentStatus() != null ? "ENROLLMENT_" + h.getEnrollmentStatus().name() : "LEVEL_CHANGE")
-                        .fromLabel(h.getFromLevel() != null ? h.getFromLevel() : h.getFromSemester())
-                        .toLabel(h.getToLevel() != null ? h.getToLevel() : h.getToSemester())
-                        .academicYear(h.getAcademicYear())
-                        .reason(h.getReason())
-                        .status(h.getEnrollmentStatus() != null ? h.getEnrollmentStatus().name() : null)
-                        .date(h.getCreatedAt())
-                        .build()));
         entries.sort(Comparator.comparing(AcademicTimelineEntry::getDate,
                 Comparator.nullsLast(Comparator.reverseOrder())));
         return entries;
@@ -132,29 +113,6 @@ public class ParentService {
     @Transactional(readOnly = true)
     public Student getOwnedChild(Long studentId) {
         return ownedStudent(studentId);
-    }
-
-    /** Inscriptions LMD d'un enfant appartenant au parent connecté. */
-    @Transactional(readOnly = true)
-    public List<com.school.entity.LmdEnrollment> childUniversityEnrollments(Long studentId) {
-        Student student = ownedStudent(studentId);
-        return lmdEnrollmentRepository.findByStudentIdOrderByIdDesc(student.getId());
-    }
-
-    /** Relevé universitaire d'un enfant (contrôle d'appartenance). */
-    @Transactional(readOnly = true)
-    public com.school.dto.response.LmdReleveResponse childUniversityReleve(Long studentId, Long fieldId,
-                                                                           String semester, int session) {
-        Student student = ownedStudent(studentId);
-        return lmdService.buildReleve(student.getId(), fieldId, semester, session);
-    }
-
-    /** Attestation de réussite d'un enfant (contrôle d'appartenance). */
-    @Transactional(readOnly = true)
-    public com.school.dto.response.LmdAttestationResponse childUniversityAttestation(Long studentId, Long fieldId,
-                                                                                      String semester, int session) {
-        Student student = ownedStudent(studentId);
-        return lmdService.buildAttestation(student.getId(), fieldId, semester, session);
     }
 
     private Parent currentParent() {

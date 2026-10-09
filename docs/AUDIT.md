@@ -1,5 +1,13 @@
 # RAPPORT D'AUDIT FONCTIONNEL COMPLET — SMS SCHOOL MANAGEMENT SYSTEM
 
+> **⚠️ DOCUMENT HISTORIQUE — CONSTATS PÉRIMÉS**
+>
+> - **Audit d'origine** : conduit pendant les Phases 0 à 4 du plan de migration décrit au §27, **avant le 9 octobre 2026** — c'est-à-dire avant la date de l'analyse indépendante de `docs/ANALYSE_PROJET.md` (9 octobre 2026) qui fait référence à ce rapport. La date exacte de l'audit n'est pas consignée ici.
+> - Ce rapport décrit un **état antérieur du produit** : plusieurs fonctionnalités qu'il déclare « ABSENTES » (convocations, stages, mémoires, alumni, candidatures, paie des enseignants à l'heure…) ont été **livrées depuis**, et certaines fonctionnalités qu'il déclare « EXISTANTES » ont été **retirées**.
+> - **Le module universitaire / LMD a depuis été entièrement retiré** du produit : facultés, départements, domaines, filières, programmes, semestres, UE/EC et crédits ECTS, groupes universitaires, inscriptions LMD, notes UE/EC, évaluations EC, délibérations et règles académiques, relevés et attestations universitaires, examens, emplois du temps et présences universitaires, portail étudiant `/my-university`, endpoints `/api/lmd/**`, `/api/university-exams/**`, `/api/my/university*`, pages `/lmd` et `/university-exams`, ainsi que le rôle `ETUDIANT` (supprimé de l'application **et** de la base — cf. `database/cleanup-university.sql`, qui supprime les 20 tables du cœur LMD). Seuls les **modules annexes Stages, Mémoires, Alumni et Admission** subsistent ; ils sont protégés par les permissions `LMD_READ` / `LMD_WRITE`, elles aussi conservées.
+> - En conséquence, **tous les constats concernant l'université / le LMD ne sont plus applicables**. Les sections correspondantes sont annotées « *(section obsolète : module retiré)* » et conservées à titre d'archive, sans réécriture.
+> - **Le reste du document doit être revérifié** avant toute exploitation : les verdicts, comptages (contrôleurs, endpoints, entités, tables, migrations) et feuilles de route ci-dessous reflètent l'état audité, pas l'état actuel du code.
+
 ## 1. RÉSUMÉ EXÉCUTIF
 
 SMS est une plateforme éducative fonctionnelle couvrant Jardin → Université. L'audit révèle un état général **bon** avec des points forts (module scolaire mature, sécurité récemment renforcée, architecture extensible) et des lacunes identifiées (module LMD insuffisamment développé malgré les extensions récentes, absence de gestion des convocations, espace parent non finalisé, parcours académique incomplet, rôle Élève/Étudiant non distingué).
@@ -19,9 +27,13 @@ SMS est une plateforme éducative fonctionnelle couvrant Jardin → Université.
 - Rôle Élève/Étudiant : **non distingué** (ELEVE gère à la fois /my-school et /my-university)
 - Espace parent : **insuffisamment développé** (pas de centre documentaire, pas de téléchargement de certificats, pas de vue unifiée des enfants de cycles différents)
 
+*Ces lacunes sont obsolètes pour tout ce qui touche à l'université / au LMD (module retiré) et pour les convocations (livrées depuis) ; seules les lacunes concernant l'espace parent et le parcours scolaire restent à revérifier.*
+
 ---
 
 ## 2. ARCHITECTURE ACTUELLE
+
+*(section partiellement obsolète : le `LmdController` ainsi que les statistiques universitaires du `DashboardController` ont été retirés ; les comptages de contrôleurs, services, repositories et entités ne sont plus à jour)*
 
 L'architecture suivante a été **vérifiée dans le code source** :
 
@@ -97,6 +109,8 @@ docker/
 
 ## 3. MATRICE DES FONCTIONNALITÉS
 
+*(les lignes « Université LMD », « Rôle ÉTUDIANT distinct » et « Espace étudiant (/my-university) » sont obsolètes : module retiré)*
+
 | Fonctionnalité | Statut | Niveau |
 |---|---|---|
 | Authentification JWT | EXISTANTE — FONCTIONNELLE | ✅ |
@@ -155,6 +169,8 @@ docker/
 | Centre documentaire | ABSENTE | ❌ |
 | Vie étudiante | ABSENTE | ❌ |
 
+*obsolète : les lignes « Université LMD » à « Espace étudiant (/my-university) », « Admission universitaire », « Rôle ÉTUDIANT distinct » et « Vie étudiante » concernent le module universitaire/LMD retiré ; « Stages », « Mémoires/soutenances », « Alumni » et « Convocations », déclarées absentes, sont depuis livrées.*
+
 ---
 
 ## 4. AUDIT ÉCOLE (Jardin → Lycée)
@@ -197,6 +213,8 @@ docker/
 ---
 
 ## 5. AUDIT UNIVERSITÉ
+
+*(section obsolète : module retiré — l'ensemble des constats ci-dessous, favorables comme défavorables, ne s'applique plus)*
 
 ### Structure institutionnelle
 - Facultés/UFR : ✅ EXISTANTE — FONCTIONNELLE
@@ -273,9 +291,13 @@ docker/
 - Notifications visibles
 - Adapté à un élève (interface plus simple)
 
+*(constats à revérifier ; ils ne concernent pas le module universitaire retiré)*
+
 ---
 
 ## 7. AUDIT ESPACE ÉTUDIANT (/my-university)
+
+*(section obsolète : portail `/my-university` et rôle `ETUDIANT` retirés)*
 
 **Route :** `/my-university` — rôle ELEVE (même rôle que scolaire)
 
@@ -317,9 +339,13 @@ docker/
 - **Documents** : pas de téléchargement de certificat de scolarité, carte scolaire, QR code, reçu, facture
 - **Université** : pas de relevé universitaire, crédits, attestation pour les enfants universitaires
 
+*(le point « Université » ci-dessus est obsolète : le module universitaire/LMD a été retiré ; les autres manques de cette section restent à revérifier)*
+
 ---
 
 ## 9. AUDIT PARCOURS ACADÉMIQUE
+
+*(section partiellement obsolète : `EnrollmentHistory` et le parcours universitaire ont été retirés ; seul `StudentHistory`, scolaire, subsiste)*
 
 **StudentHistory** existe pour le scolaire :
 - Table `student_histories` (student_id, action, from_class, to_class, reason, recorded_by, created_at)
@@ -350,6 +376,8 @@ docker/
 | PV de délibération PDF | ✅ | ReportService.exportStudentsPdf / exportTablePdf | ExamController |
 
 ### Documents universitaires existants
+
+*(sous-section obsolète : module retiré — les relevés et attestations universitaires n'existent plus)*
 | Document | Statut | Backend | Frontend |
 |---|---|---|---|
 | Relevé universitaire PDF | ✅ | ReportService.universityRelevePdf | LmdController / portail |
@@ -365,6 +393,8 @@ docker/
 | Diplôme PDF | ❌ |
 | Certificat de scolarité universitaire PDF | ❌ |
 | PV de délibération universitaire PDF | ❌ |
+
+*(les lignes « Convocation universitaire PDF », « Fiche d'inscription universitaire PDF », « Certificat de scolarité universitaire PDF » et « PV de délibération universitaire PDF » sont obsolètes : documents universitaires retirés avec le module)*
 
 ---
 
@@ -395,6 +425,8 @@ docker/
 - GradeService : délibération
 - AttendanceService : notification absence
 - LmdService : (non utilisé pour les notifications)
+
+*(la ligne `LmdService` ci-dessus est obsolète : service retiré ; les canaux de notification, eux, ont depuis été étendus — voir `docs/API.md`)*
 - CommunicationController : notifications annonces
 
 **Canaux :** uniquement notification interne (base de données). Pas d'email, SMS ou WhatsApp automatisés pour les notifications.
@@ -415,9 +447,13 @@ docker/
 
 **Verdict : EXISTANTE — PARTIELLE** ⚠️ (manque : filtre par cycle, catégories universitaires, frais par semestre)
 
+*(les mentions « catégories universitaires » et « frais par semestre » sont obsolètes : module universitaire retiré ; la question du filtre par cycle reste à revérifier)*
+
 ---
 
 ## 14. AUDIT BASE DE DONNÉES
+
+*(section partiellement obsolète : la ligne « Université LMD » et les problèmes `academic_fields.domain_id`, `semesters.academic_year`, `lmd_enrollments.enrollment_status`, `university_enrollments` concernent des tables retirées avec le module)*
 
 ### Tables vérifiées (55 entités JPA, 30 enums)
 
@@ -446,6 +482,8 @@ docker/
 ---
 
 ## 15. AUDIT API
+
+*(section partiellement obsolète : les endpoints LMD, `university-stats` / `university-report` et `my/university*` ont été retirés ; les comptages ci-dessous ne sont plus à jour)*
 
 **22 contrôleurs, ~200 endpoints vérifiés.**
 
@@ -527,9 +565,13 @@ docker/
 - Pas de responsive pour certains tableaux complexes
 - Pas de mode sombre (themeSlice existe mais non utilisé)
 
+*(les entrées « 8 onglets LMD dans `/lmd` » et « Portail universitaire : 3 onglets » sont obsolètes : pages retirées)*
+
 ---
 
 ## 18. AUDIT PERFORMANCE
+
+*(les deux premiers points, `LmdService.computeResult` et `DashboardService.universityStats`, sont obsolètes : code retiré)*
 
 **Problèmes identifiés :**
 - `LmdService.computeResult` : charge toutes les notes UE/EC en mémoire, pourrait être lent pour des filières de 200+ étudiants
@@ -575,6 +617,8 @@ docker/
 | Doctorat (niveaux, UI) | §26-F | P2 |
 | Calendrier des examens universitaires | §39 | P2 |
 
+*(les lignes « Admission universitaire », « Vie étudiante », « Doctorat » et « Calendrier des examens universitaires » sont obsolètes : module universitaire/LMD retiré, tandis que Stages, Mémoires et Alumni ont depuis été livrés)*
+
 ---
 
 ## 21. FONCTIONNALITÉS PARTIELLES
@@ -591,9 +635,13 @@ docker/
 | Espace étudiant | Inscriptions, résultats, documents | Dashboard étudiant, EDT, notifications, dettes |
 | Sauvegarde/restauration | BackupService | Restauration non sécurisée (SQL injectable) |
 
+*(les lignes « Parcours académique », « Programme », « Mentions », « Espace étudiant » et la mention « catégories universitaires » des Finances sont obsolètes : module universitaire/LMD retiré)*
+
 ---
 
 ## 22. FONCTIONNALITÉS INSUFFISAMMENT DÉVELOPPÉES
+
+*(les lignes « Interface étudiant universitaire » et « Enseignants universitaires » sont obsolètes : module universitaire/LMD retiré)*
 
 | Fonctionnalité | Raison |
 |---|---|
@@ -606,6 +654,8 @@ docker/
 
 ## 23. FONCTIONNALITÉS À SUPPRIMER OU FUSIONNER
 
+*(la ligne « Rôle ELEVE pour /my-university » est obsolète : le portail et le rôle `ETUDIANT` envisagés ont été retirés)*
+
 | Fonctionnalité | Action |
 |---|---|
 | Rôle ELEVE pour /my-university | **Fusionner** : créer un rôle ÉTUDIANT distinct, migrer les comptes ELEVE avec inscription LMD vers ÉTUDIANT |
@@ -615,6 +665,8 @@ docker/
 ---
 
 ## 24. DUPLICATIONS DÉTECTÉES
+
+*(les lignes `EnrollmentHistory`/`StudentHistory` et `ecRepository`/`courseUnitRepository` sont obsolètes : entités et services universitaires retirés)*
 
 | Duplication | Détail | Action |
 |---|---|---|
@@ -627,6 +679,8 @@ docker/
 
 ## 25. RISQUES DE RÉGRESSION
 
+*(les risques « Changement du rôle ELEVE → ÉTUDIANT », « Migration vers ÉTUDIANT distinct » et « Ajout de campus/établissements » sont obsolètes : ils portaient sur le module universitaire/LMD retiré)*
+
 | Risque | Modules concernés | Niveau |
 |---|---|---|
 | Changement du rôle ELEVE → ÉTUDIANT | Espace scolaire, espace universitaire, auth, permissions | ÉLEVÉ |
@@ -637,6 +691,8 @@ docker/
 ---
 
 ## 26. ARCHITECTURE CIBLE
+
+*(section partiellement obsolète : le bloc « UNIVERSITÉ » ci-dessous — hormis Stages / Mémoires / Admission, livrés depuis — n'a pas été réalisé ; le LMD et le rôle `ETUDIANT` ont été retirés)*
 
 ```
 SMS — PLATEFORME ÉDUCATIVE UNIFIÉE
@@ -698,17 +754,30 @@ SMS — PLATEFORME ÉDUCATIVE UNIFIÉE
 ### Phase 0 : Audit (cette phase) — terminé
 ### Phase 1 : Correction des bugs existants (P0) — terminé
 ### Phase 2 : Correction et restructuration de /lmd — terminé
+
+*(phase obsolète : la page `/lmd` et le module LMD ont été retirés)*
+
 ### Phase 3 : Séparation Élève / Étudiant
+
+*(phase obsolète : annulée — le rôle `ETUDIANT` a été retiré au lieu d'être généralisé)*
+
 - Créer le rôle ÉTUDIANT dans DataInitializer (permissions LMD + STUDENT_READ limité)
 - Migrer les comptes ELEVE avec inscription LMD vers ÉTUDIANT
 - SecurityConfig : ajouter les règles pour ÉTUDIANT
 - Routes : `/my-university` → rôle ÉTUDIANT
 - **Risque : ÉLEVÉ** — nécessite une migration de données et une mise à jour des guards frontend
+
 ### Phase 4 : Architecture académique unifiée
+
+*(phase partiellement obsolète : les points « campus/institution » et « structure universitaire » sont sans objet, le module LMD ayant été retiré)*
+
 - Ajouter `campus`/`institution` à la structure universitaire
 - Lier les finances aux cycles d'enseignement
 - Timeline du parcours académique consolidée
+
 ### Phase 5 : Gestion universitaire avancée
+
+*(phase partiellement obsolète : seuls Admission, Stages, Mémoires et Alumni ont été livrés en tant que modules annexes ; Doctorat et le reste du périmètre universitaire sont sans objet)*
 - Admission universitaire (candidatures, dossiers)
 - Stages, mémoires, soutenances
 - Doctorat
@@ -727,10 +796,14 @@ SMS — PLATEFORME ÉDUCATIVE UNIFIÉE
 - Filtres, téléchargement, impression
 - QR code de vérification
 ### Phase 9 : Convocations + notifications
+
+*(phase partiellement obsolète : les convocations ont été livrées ; le « calendrier des examens universitaires » est sans objet)*
 - Entité convocation, CRUD, PDF
 - Notification automatique au parent
 - Calendrier des examens universitaires
 ### Phase 10 : Examens / délibérations / crédits
+
+*(phase obsolète : périmètre universitaire LMD retiré)*
 - Calendrier des examens, salles, surveillants
 - Convocations aux examens
 - Jury universitaire
@@ -739,6 +812,8 @@ SMS — PLATEFORME ÉDUCATIVE UNIFIÉE
 - Mémoires (sujet, directeur, jury, date, note, document, décision)
 - Vie étudiante (selon priorité)
 ### Phase 12 : Statistiques et analytics
+
+*(phase obsolète pour son volet « dashboard universitaire enrichi », retiré avec le module)*
 - Dashboard universitaire enrichi
 - Graphiques d'évolution
 - Export de rapports
@@ -746,11 +821,16 @@ SMS — PLATEFORME ÉDUCATIVE UNIFIÉE
 - Scénarios 1-17 (cf. §60)
 - Tests sur les modules scolaires existants
 - Tests sur les nouvelles fonctionnalités universitaires
+
+*(le dernier point est obsolète : plus de fonctionnalités universitaires LMD à tester)*
+
 ### Phase 14 : Optimisation et finalisation UX/UI
 - Responsive design
 - Mode sombre
 - Dashboard élève, étudiant, parent
 - Performance
+
+*(le volet « étudiant » du troisième point est obsolète : portail `/my-university` retiré)*
 
 ---
 
@@ -774,11 +854,16 @@ SMS — PLATEFORME ÉDUCATIVE UNIFIÉE
 | **P3** | Phase 11 | Vie étudiante | 3 jours |
 | **P3** | Phase 5 | Laboratoires, centres de recherche | 1 jour |
 
+*(les lignes « Rôle ÉTUDIANT distinct », « Admission universitaire », « Doctorat », « Calendrier examens universitaires », « Jury universitaire » et « Vie étudiante » sont obsolètes : le périmètre universitaire/LMD a été retiré ; Admission, Stages, Mémoires et Alumni sont désormais livrés)*
+
 ---
 
 ## 29. FICHIERS À MODIFIER
 
 (Phase 3 — Rôle ÉTUDIANT)
+
+*(bloc obsolète : rôle `ETUDIANT` retiré, portail `/my-university` supprimé)*
+
 - `DataInitializer.java` : ajouter ÉTUDIANT + permissions
 - `SecurityConfig.java` : règles pour ÉTUDIANT
 - `routes/index.jsx` : rôle ÉTUDIANT pour /my-university
@@ -823,6 +908,8 @@ SMS — PLATEFORME ÉDUCATIVE UNIFIÉE
 | `fee_types` | Ajouter seeds pour catégories universitaires | 5 |
 | `invoices` | Ajouter `education_cycle` (nullable) | 5 |
 
+*(les lignes `users` (distinguer ELEVE/ÉTUDIANT), `students.is_university_student` et `fee_types` (catégories universitaires) sont obsolètes : elles portaient sur le module universitaire/LMD retiré)*
+
 ---
 
 ## 32. TABLES À CRÉER
@@ -836,6 +923,8 @@ SMS — PLATEFORME ÉDUCATIVE UNIFIÉE
 | `alumni` | 5 |
 | `documents` (centre documentaire) | 8 |
 
+*(les tables `candidatures`, `stages`, `memoires` et `alumni` ont depuis été créées : ces quatre modules annexes sont livrés ; le périmètre LMD, lui, a été retiré)*
+
 ---
 
 ## 33. API À MODIFIER
@@ -845,6 +934,8 @@ SMS — PLATEFORME ÉDUCATIVE UNIFIÉE
 | `GET /api/my/university` | Restreindre au rôle ÉTUDIANT | 3 |
 | `GET /api/parents/children/{id}/documents` | Ajouter | 6 |
 | `GET /api/convocations/**` | Nouveau | 9 |
+
+*(la ligne `GET /api/my/university` est obsolète : endpoint retiré avec le portail universitaire)*
 
 ---
 
@@ -863,6 +954,8 @@ SMS — PLATEFORME ÉDUCATIVE UNIFIÉE
 | `POST /api/stages` | 5 |
 | `GET /api/memoires` | 5 |
 | `POST /api/memoires` | 5 |
+
+*(les API `admissions`, `stages` et `memoires` sont désormais livrées, sous les chemins `/api/candidatures`, `/api/stages` et `/api/memoires`)*
 
 ---
 
@@ -883,6 +976,10 @@ SMS — PLATEFORME ÉDUCATIVE UNIFIÉE
 | Rôle ÉTUDIANT vs ELEVE | 6 | 3 |
 | Non-régression modules scolaires | §61 | 13 |
 
+*(les tests « Création inscription universitaire », « Saisie notes UE/EC », « Calcul crédits ECTS », « Rattrapage session 2 », « Délibération LMD », « Génération relevé PDF » et « Rôle ÉTUDIANT vs ELEVE » sont obsolètes : module universitaire/LMD retiré ; les tests de convocations ont été livrés)*
+
 ---
 
 **Rapport produit par analyse exhaustive du code source. 0 modification effectuée.**
+
+*(Document conservé à titre d'archive ; voir le bandeau d'obsolescence en tête de rapport.)*

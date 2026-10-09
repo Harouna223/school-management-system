@@ -4,7 +4,6 @@ import com.school.entity.Alumnus;
 import com.school.exception.BusinessException;
 import com.school.exception.ResourceNotFoundException;
 import com.school.repository.AlumnusRepository;
-import com.school.repository.AcademicFieldRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -20,7 +19,6 @@ import java.util.List;
 public class AlumnusService {
 
     private final AlumnusRepository alumnusRepository;
-    private final AcademicFieldRepository fieldRepository;
     private final AuditService auditService;
 
     @Transactional(readOnly = true)
@@ -29,8 +27,10 @@ public class AlumnusService {
     }
 
     @Transactional(readOnly = true)
-    public List<Alumnus> listByField(Long fieldId) {
-        return fieldId != null ? alumnusRepository.findByFieldId(fieldId) : alumnusRepository.findAll();
+    public List<Alumnus> listByField(String fieldName) {
+        return (fieldName != null && !fieldName.isBlank())
+                ? alumnusRepository.findByFieldNameContainingIgnoreCase(fieldName.trim())
+                : alumnusRepository.findAll();
     }
 
     @Transactional
@@ -38,9 +38,8 @@ public class AlumnusService {
         if (alumnus.getFirstName() == null || alumnus.getLastName() == null) {
             throw new BusinessException("Le prénom et le nom sont obligatoires");
         }
-        if (alumnus.getField() != null && alumnus.getField().getId() != null) {
-            fieldRepository.findById(alumnus.getField().getId())
-                    .orElseThrow(() -> ResourceNotFoundException.of("Filière", alumnus.getField().getId()));
+        if (alumnus.getFieldName() != null) {
+            alumnus.setFieldName(alumnus.getFieldName().trim());
         }
         Alumnus saved = alumnusRepository.save(alumnus);
         auditService.log("CREATE", "Alumnus", saved.getId(),

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Grid,
+  Alert,
   Box,
   Typography,
   Card,
@@ -26,8 +27,9 @@ import {
   Cake
 } from '@mui/icons-material'
 import PageHeader from '../../components/PageHeader'
-import { studentApi, attendanceApi, paymentApi, examApi, lmdApi } from '../../api/endpoints'
+import { studentApi, attendanceApi, paymentApi, examApi } from '../../api/endpoints'
 import { formatDate, formatCurrency } from '../../utils/format'
+import { downloadResponse } from '../../services/exportService'
 
 const CYCLE_LABELS = {
   JARDIN: 'Jardin',
@@ -52,29 +54,80 @@ export default function StudentDetailPage() {
   const [attendances, setAttendances] = useState([])
   const [invoices, setInvoices] = useState([])
   const [payments, setPayments] = useState([])
-  const [enrollments, setEnrollments] = useState([])
+  const [loadError, setLoadError] = useState(false)
+  const [notFound, setNotFound] = useState(false)
+  const [dataLoadWarning, setDataLoadWarning] = useState(false)
+  const [retryCount, setRetryCount] = useState(0)
+  const [pdfError, setPdfError] = useState(false)
+  const [downloadingBulletin, setDownloadingBulletin] = useState(null)
 
   useEffect(() => {
     if (!id) return
     setLoading(true)
-    Promise.all([
-      studentApi.get(id).then((r) => setStudent(r.data.data)),
-      examApi.bulletinsByStudent(id).then((r) => setBulletins(r.data.data || [])).catch(() => {}),
-      attendanceApi.byStudent(id).then((r) => setAttendances(r.data.data || [])).catch(() => {}),
-      paymentApi.invoicesByStudent(id).then((r) => setInvoices(r.data.data || [])).catch(() => {}),
-      paymentApi.byStudent(id).then((r) => setPayments(r.data.data || [])).catch(() => {}),
-      lmdApi.enrollments({ studentId: id }).then((r) => setEnrollments(r.data.data || [])).catch(() => {}),
-    ]).catch(() => {}).finally(() => setLoading(false))
-  }, [id])
+    setLoadError(false)
+    setNotFound(false)
+    setDataLoadWarning(false)
+    let cancelled = false
+    Promise.allSettled([
+      studentApi.get(id),
+      examApi.bulletinsByStudent(id),
+      attendanceApi.byStudent(id),
+      paymentApi.invoicesByStudent(id),
+      paymentApi.byStudent(id),
+    ]).then((results) => {
+      if (cancelled) return
+      const [studentResult, bulletinResult, attendanceResult, invoiceResult, paymentResult] = results
+      if (studentResult.status === 'rejected') {
+        const status = studentResult.reason?.response?.status
+        setNotFound(status === 404)
+        setLoadError(status !== 404)
+        return
+      }
+      setStudent(studentResult.value.data.data)
+      if (bulletinResult.status === 'fulfilled') setBulletins(bulletinResult.value.data.data || [])
+      else setBulletins([])
+      if (attendanceResult.status === 'fulfilled') setAttendances(attendanceResult.value.data.data || [])
+      else setAttendances([])
+      if (invoiceResult.status === 'fulfilled') setInvoices(invoiceResult.value.data.data || [])
+      else setInvoices([])
+      if (paymentResult.status === 'fulfilled') setPayments(paymentResult.value.data.data || [])
+      else setPayments([])
+      setDataLoadWarning(results.slice(1).some((result) => result.status === 'rejected'))
+    }).finally(() => {
+      if (!cancelled) setLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [id, retryCount])
+
+  const handleBulletinPdf = async (bulletinId) => {
+    setPdfError(false)
+    setDownloadingBulletin(bulletinId)
+    try {
+      const response = await examApi.bulletinPdf(bulletinId)
+      await downloadResponse(response, 'bulletin-' + bulletinId + '.pdf')
+    } catch {
+      setPdfError(true)
+    } finally {
+      setDownloadingBulletin(null)
+    }
+  }
 
   if (loading) return <Box p={4}><Skeleton height={300} /><Skeleton height={200} sx={{ mt: 2 }} /></Box>
-  if (!student) return <Box p={4}><Typography>Élève introuvable</Typography></Box>
+  if (loadError) {
+    return <Box p={4}>
+      <Alert severity="error" action={<Button color="inherit" size="small" onClick={() => setRetryCount((count) => count + 1)}>Réessayer</Button>}>
+        Le dossier de l'élève n'a pas pu être chargé. Vérifiez la connexion puis réessayez.
+      </Alert>
+    </Box>
+  }
+  if (notFound || !student) return <Box p={4}><Typography>Élève introuvable</Typography></Box>
 
   const s = student
   const fullName = `${s.firstName} ${s.lastName}`
 
   return (
     <>
+      {dataLoadWarning && <Alert severity="warning" sx={{ mb: 2 }}>Certaines informations complémentaires n'ont pas pu être chargées.</Alert>}
       <PageHeader title={fullName} subtitle={`${s.matricule}  •  ${s.className || 'Sans classe'}  •  ${CYCLE_LABELS[s.educationCycle] || 'Cycle non défini'}`}
         actionLabel="Retour"
         onAction={() => navigate('/students')}
@@ -167,43 +220,13 @@ export default function StudentDetailPage() {
               )}
             </Card>
           </Grid>
-          {enrollments.length > 0 && (
-            <Grid item xs={12}>
-              <Card sx={{ p: 2.5, borderRadius: '14px' }}>
-                <Typography variant="subtitle1" fontWeight={700} mb={2}>Parcours universitaire (LMD)</Typography>
-                <TableContainer>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Filière</TableCell>
-                        <TableCell>Niveau</TableCell>
-                        <TableCell>Semestre</TableCell>
-                        <TableCell>Année</TableCell>
-                        <TableCell>Statut</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {enrollments.map((e) => (
-                        <TableRow key={e.id} hover>
-                          <TableCell>{e.field?.name || '—'}</TableCell>
-                          <TableCell>{e.level || '—'}</TableCell>
-                          <TableCell>{e.currentSemester}</TableCell>
-                          <TableCell>{e.academicYear || '—'}</TableCell>
-                          <TableCell><Chip size="small" label={e.active ? 'Actif' : 'Inactif'} color={e.active ? 'success' : 'default'} /></TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </Card>
-            </Grid>
-          )}
         </Grid>
       )}
 
       {tab === 1 && (
         <Card sx={{ p: 2.5, borderRadius: '14px' }}>
           <Typography variant="subtitle1" fontWeight={700} mb={2}>Bulletins de notes</Typography>
+          {pdfError && <Alert severity="error" sx={{ mb: 2 }}>Le téléchargement du bulletin a échoué. Réessayez.</Alert>}
           {bulletins.length === 0 ? (
             <Typography variant="body2" color="text.secondary">Aucun bulletin</Typography>
           ) : (
@@ -214,7 +237,9 @@ export default function StudentDetailPage() {
                     <Typography variant="body2" fontWeight={700}>{b.term} — {b.academicYear}</Typography>
                     <Typography variant="caption" color="text.secondary">Moyenne : {b.average ?? '—'} / Rang : {b.rank ?? '—'} / Mention : {b.mention || '—'}</Typography>
                   </Box>
-                  <Button size="small" startIcon={<PictureAsPdf />} onClick={() => {}} disabled>PDF</Button>
+                  <Button size="small" startIcon={<PictureAsPdf />} onClick={() => handleBulletinPdf(b.id)} disabled={downloadingBulletin === b.id}>
+                    {downloadingBulletin === b.id ? 'Téléchargement…' : 'PDF'}
+                  </Button>
                 </Box>
               ))}
             </Box>

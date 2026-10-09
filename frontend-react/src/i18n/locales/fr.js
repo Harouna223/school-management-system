@@ -25,7 +25,6 @@ export const fr = {
   'nav.teacherPayroll': 'Paie des enseignants',
   'nav.library': 'Bibliothèque',
   'nav.hr': 'Ressources Humaines',
-  'nav.lmd': 'Université (LMD)',
   'nav.messages': 'Messagerie',
   'nav.announcements': 'Annonces',
   'nav.children': 'Mes enfants',

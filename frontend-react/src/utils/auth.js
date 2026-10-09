@@ -23,7 +23,6 @@ export function hasPermission(permission) {
  * Ordre de priorité des rôles (le plus élevé d'abord).
  * Source unique de vérité : utilisée par `primaryRole()` (menu latéral) et par
  * `resolveDashboardRole()` (tableau de bord) pour qu'ils ne divergent jamais.
- * ETUDIANT est prioritaire sur ELEVE pour les comptes universitaires.
  */
 export const ROLE_PRIORITY = [
   'SUPER_ADMIN',
@@ -32,7 +31,6 @@ export const ROLE_PRIORITY = [
   'SECRETAIRE',
   'ENSEIGNANT',
   'PARENT',
-  'ETUDIANT',
   'ELEVE',
 ]
 

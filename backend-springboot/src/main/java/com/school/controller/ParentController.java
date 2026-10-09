@@ -6,9 +6,7 @@ import com.school.dto.response.AttendanceResponse;
 import com.school.dto.response.BulletinResponse;
 import com.school.dto.response.GradeResponse;
 import com.school.dto.response.StudentResponse;
-import com.school.entity.LmdEnrollment;
 import com.school.service.ParentService;
-import com.school.service.ReportService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
@@ -17,7 +15,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
@@ -33,7 +30,6 @@ import java.util.List;
 public class ParentController {
 
     private final ParentService parentService;
-    private final ReportService reportService;
 
     @GetMapping("/children")
     @Operation(summary = "Enfants liés au compte parent")
@@ -67,35 +63,9 @@ public class ParentController {
     }
 
     @GetMapping("/children/{studentId}/timeline")
-    @Operation(summary = "Parcours académique complet d'un enfant (scolaire + universitaire)")
+    @Operation(summary = "Parcours scolaire d'un enfant")
     public ResponseEntity<ApiResponse<List<AcademicTimelineEntry>>> childTimeline(@PathVariable Long studentId) {
         return ok("Parcours trouvé", parentService.childTimeline(studentId));
-    }
-
-    // ---------- Documents universitaires de l'enfant ----------
-
-    @GetMapping("/children/{studentId}/university/enrollments")
-    @Operation(summary = "Inscriptions LMD d'un enfant")
-    public ResponseEntity<ApiResponse<List<LmdEnrollment>>> childUniversityEnrollments(@PathVariable Long studentId) {
-        return ok("Inscriptions", parentService.childUniversityEnrollments(studentId));
-    }
-
-    @GetMapping("/children/{studentId}/university/releve")
-    @Operation(summary = "Relevé universitaire PDF d'un enfant")
-    public void childRelevePdf(@PathVariable Long studentId, @RequestParam Long fieldId,
-                               @RequestParam String semester, @RequestParam(defaultValue = "1") int session,
-                               HttpServletResponse response) throws java.io.IOException {
-        reportService.universityRelevePdf(response,
-                parentService.childUniversityReleve(studentId, fieldId, semester, session));
-    }
-
-    @GetMapping("/children/{studentId}/university/attestation")
-    @Operation(summary = "Attestation de réussite PDF d'un enfant")
-    public void childAttestationPdf(@PathVariable Long studentId, @RequestParam Long fieldId,
-                                    @RequestParam String semester, @RequestParam(defaultValue = "1") int session,
-                                    HttpServletResponse response) throws java.io.IOException {
-        reportService.universityAttestationPdf(response,
-                parentService.childUniversityAttestation(studentId, fieldId, semester, session));
     }
 
     private <T> ResponseEntity<ApiResponse<T>> ok(String message, T data) {

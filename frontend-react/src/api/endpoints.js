@@ -16,8 +16,6 @@ export const authApi = {
  */
 export const dashboardApi = {
   stats: (cycle) => api.get('/dashboard/stats', { params: cycle ? { cycle } : undefined }),
-  universityStats: () => api.get('/dashboard/university-stats'),
-  universityReport: () => api.get('/dashboard/university-report'),
   auditLogs: (params) => api.get('/dashboard/audit-logs', { params }),
 }
 
@@ -163,9 +161,6 @@ export const parentApi = {
   childQr: (studentId) => api.get(`/students/${studentId}/qr`, { responseType: 'blob' }),
   childInvoices: (studentId) => api.get(`/payments/invoices/student/${studentId}`),
   childPayments: (studentId) => api.get(`/payments/student/${studentId}`),
-  childUniversityEnrollments: (studentId) => api.get(`/parents/children/${studentId}/university/enrollments`),
-  childReleve: (params) => api.get(`/parents/children/${params.studentId}/university/releve`, { params: { fieldId: params.fieldId, semester: params.semester, session: params.session || 1 }, responseType: 'blob' }),
-  childAttestation: (params) => api.get(`/parents/children/${params.studentId}/university/attestation`, { params: { fieldId: params.fieldId, semester: params.semester, session: params.session || 1 }, responseType: 'blob' }),
 }
 
 /**
@@ -181,9 +176,6 @@ export const myApi = {
   teacherProfile: () => api.get('/my/teacher-profile'),
   teacherSchedule: () => api.get('/my/teacher/schedule'),
   teacherClasses: () => api.get('/my/teacher/classes'),
-  university: () => api.get('/my/university'),
-  universityReleve: (params) => api.get('/my/university/releve', { params }),
-  universityHistory: () => api.get('/my/university/history'),
 }
 
 /**
@@ -297,84 +289,6 @@ export const backupApi = {
 }
 
 /**
- * Endpoints du module universitaire LMD.
- */
-export const lmdApi = {
-  faculties: () => api.get('/lmd/faculties'),
-  createFaculty: (data) => api.post('/lmd/faculties', data),
-  deleteFaculty: (id) => api.delete(`/lmd/faculties/${id}`),
-  departments: (facultyId) => api.get('/lmd/departments', { params: { facultyId } }),
-  createDepartment: (data) => api.post('/lmd/departments', data),
-  deleteDepartment: (id) => api.delete(`/lmd/departments/${id}`),
-  fields: (departmentId) => api.get('/lmd/fields', { params: { departmentId } }),
-  createField: (data) => api.post('/lmd/fields', data),
-  deleteField: (id) => api.delete(`/lmd/fields/${id}`),
-  ues: (fieldId, semester) => api.get('/lmd/ues', { params: { fieldId, semester } }),
-  createUe: (data) => api.post('/lmd/ues', data),
-  deleteUe: (id) => api.delete(`/lmd/ues/${id}`),
-  enroll: (data) => api.post('/lmd/enrollments', data),
-  enrollments: (params) => api.get('/lmd/enrollments', { params }),
-  saveGrade: (data) => api.post('/lmd/grades', data),
-  result: (params) => api.get('/lmd/result', { params }),
-  deliberate: (fieldId, semester, session) => api.post('/lmd/deliberate', null, { params: { fieldId, semester, session } }),
-  deliberations: (fieldId, semester) => api.get('/lmd/deliberations', { params: { fieldId, semester } }),
-  lock: (fieldId, semester, locked) => api.patch('/lmd/lock', null, { params: { fieldId, semester, locked } }),
-  programs: (fieldId) => api.get('/lmd/programs', { params: { fieldId } }),
-  createProgram: (data) => api.post('/lmd/programs', data),
-  deleteProgram: (id) => api.delete(`/lmd/programs/${id}`),
-  semesters: (fieldId) => api.get('/lmd/semesters', { params: { fieldId } }),
-  createSemester: (data) => api.post('/lmd/semesters', data),
-  deleteSemester: (id) => api.delete(`/lmd/semesters/${id}`),
-  ecs: (ueId) => api.get('/lmd/ecs', { params: { ueId } }),
-  createEc: (data) => api.post('/lmd/ecs', data),
-  deleteEc: (id) => api.delete(`/lmd/ecs/${id}`),
-  ueEnrollments: (studentId) => api.get('/lmd/ue-enrollments', { params: { studentId } }),
-  enrollUe: (studentId, ueId) => api.post('/lmd/ue-enrollments', null, { params: { studentId, ueId } }),
-  unenrollUe: (id) => api.delete(`/lmd/ue-enrollments/${id}`),
-  saveEcGrade: (params) => api.post('/lmd/ec-grades', null, { params }),
-  ecGrades: (studentId, fieldId) => api.get('/lmd/ec-grades', { params: { studentId, fieldId } }),
-  relevePdf: (params) => api.get('/lmd/releve/pdf', { params, responseType: 'blob' }),
-  attestationPdf: (params) => api.get('/lmd/attestation/pdf', { params, responseType: 'blob' }),
-  universitySchedules: (params) => api.get('/lmd/university-schedules', { params }),
-  createUniversitySchedule: (data) => api.post('/lmd/university-schedules', data),
-  deleteUniversitySchedule: (id) => api.delete(`/lmd/university-schedules/${id}`),
-
-  // Domaines
-  domains: () => api.get('/lmd/domains'),
-  createDomain: (data) => api.post('/lmd/domains', data),
-  deleteDomain: (id) => api.delete(`/lmd/domains/${id}`),
-
-  // Groupes
-  groups: (fieldId) => api.get('/lmd/groups', { params: { fieldId } }),
-  createGroup: (data) => api.post('/lmd/groups', data),
-  deleteGroup: (id) => api.delete(`/lmd/groups/${id}`),
-
-  // Statut inscription & historique
-  updateEnrollmentStatus: (id, status, reason) => api.patch(`/lmd/enrollments/${id}/status`, null, { params: { status, reason } }),
-  changeLevel: (id, params) => api.post(`/lmd/enrollments/${id}/change-level`, null, { params }),
-  enrollmentHistory: (studentId) => api.get('/lmd/enrollment-history', { params: { studentId } }),
-
-  // Évaluations EC
-  ecEvaluations: (ecId, studentId) => api.get('/lmd/ec-evaluations', { params: { ecId, studentId } }),
-  createEcEvaluation: (data) => api.post('/lmd/ec-evaluations', data),
-  deleteEcEvaluation: (id) => api.delete(`/lmd/ec-evaluations/${id}`),
-
-  // Règles académiques
-  academicRules: (cycle) => api.get('/lmd/academic-rules', { params: { cycle } }),
-  createAcademicRule: (data) => api.post('/lmd/academic-rules', data),
-  deleteAcademicRule: (id) => api.delete(`/lmd/academic-rules/${id}`),
-
-  // Relevé Excel
-  releveExcel: (params) => api.get('/lmd/releve/excel', { params, responseType: 'blob' }),
-
-  // Présences universitaires
-  universityAttendances: (params) => api.get('/lmd/university-attendances', { params }),
-  studentUniversityAttendances: (studentId) => api.get('/lmd/student-university-attendances', { params: { studentId } }),
-  saveUniversityAttendance: (params) => api.post('/lmd/university-attendances', null, { params }),
-  deleteUniversityAttendance: (id) => api.delete(`/lmd/university-attendances/${id}`),
-}
-
-/**
  * Endpoints du module bibliothèque.
  */
 export const libraryApi = {
@@ -437,13 +351,6 @@ export const teacherHoursApi = {
   myReceipt: (id) => api.get(`/teacher-hours/my/receipt/${id}`, { responseType: 'blob' }),
 }
 
-export const universityExamApi = {
-  list: (params) => api.get('/university-exams', { params }),
-  create: (data) => api.post('/university-exams', data),
-  update: (id, data) => api.put(`/university-exams/${id}`, data),
-  delete: (id) => api.delete(`/university-exams/${id}`),
-}
-
 export const stageApi = {
   list: (studentId) => api.get('/stages', { params: { studentId } }),
   create: (data) => api.post('/stages', data),
@@ -466,7 +373,7 @@ export const memoireApi = {
 }
 
 export const alumnusApi = {
-  list: (fieldId) => api.get('/alumni', { params: { fieldId } }),
+  list: (fieldName) => api.get('/alumni', { params: { fieldName } }),
   create: (data) => api.post('/alumni', data),
   delete: (id) => api.delete(`/alumni/${id}`),
 }

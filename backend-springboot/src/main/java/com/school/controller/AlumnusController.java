@@ -26,8 +26,8 @@ public class AlumnusController {
 
     @GetMapping
     @Operation(summary = "Liste des diplômés")
-    public ResponseEntity<ApiResponse<List<Alumnus>>> list(@RequestParam(required = false) Long fieldId) {
-        return ok("Diplômés", alumnusService.listByField(fieldId));
+    public ResponseEntity<ApiResponse<List<Alumnus>>> list(@RequestParam(required = false) String fieldName) {
+        return ok("Diplômés", alumnusService.listByField(fieldName));
     }
 
     @PostMapping

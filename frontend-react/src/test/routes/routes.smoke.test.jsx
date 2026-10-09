@@ -110,8 +110,8 @@ vi.mock('../../api/endpoints', () => {
     'authApi', 'dashboardApi', 'studentApi', 'teacherApi', 'classApi',
     'subjectApi', 'scheduleApi', 'attendanceApi', 'parentApi', 'myApi',
     'examApi', 'paymentApi', 'financeApi', 'settingsApi', 'academicYearApi',
-    'backupApi', 'lmdApi', 'libraryApi', 'hrApi', 'teacherHoursApi',
-    'universityExamApi', 'stageApi', 'candidatureApi', 'memoireApi',
+    'backupApi', 'libraryApi', 'hrApi', 'teacherHoursApi',
+    'stageApi', 'candidatureApi', 'memoireApi',
     'alumnusApi', 'searchApi', 'communicationApi', 'convocationApi', 'userApi',
   ]
   const mocked = {}
@@ -121,8 +121,6 @@ vi.mock('../../api/endpoints', () => {
   // copiees de reponses REELLES de l'API.
   mocked.dashboardApi = {
     stats: () => ok({}),
-    universityStats: () => ok({}),
-    universityReport: () => ok({}),
     auditLogs: () => ok({ content: [] }),
   }
   mocked.myApi = {
@@ -135,8 +133,6 @@ vi.mock('../../api/endpoints', () => {
     teacherProfile: () => ok(TEACHER),
     teacherSchedule: () => ok([SCHEDULE]),
     teacherClasses: () => ok([TEACHER_CLASS]),
-    university: () => ok([]),
-    universityHistory: () => ok([]),
   }
   mocked.parentApi = {
     children: () => ok([STUDENT]),
@@ -145,7 +141,6 @@ vi.mock('../../api/endpoints', () => {
     childGrades: () => ok([MY_GRADE]),
     childTimeline: () => ok([]),
     childInvoices: () => ok([INVOICE]),
-    childUniversityEnrollments: () => ok([]),
   }
   mocked.teacherHoursApi = {
     myMonthly: () => ok([PAYROLL_ROW]),
@@ -220,12 +215,6 @@ describe('Câblage réel — le tableau de bord sous DashboardLayout', () => {
   it('ENSEIGNANT : rendu complet, sans plantage', async () => {
     mountApp('/dashboard', { roles: ['ENSEIGNANT'] })
     expect(await screen.findByText('Classes assignées')).toBeInTheDocument()
-    expectNoRenderCrash()
-  })
-
-  it('ETUDIANT : /dashboard redirige vers /my-university', async () => {
-    mountApp('/dashboard', { roles: ['ETUDIANT'] })
-    await waitFor(() => expect(window.location.pathname).toBe('/my-university'))
     expectNoRenderCrash()
   })
 })

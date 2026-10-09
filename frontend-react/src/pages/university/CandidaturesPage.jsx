@@ -19,7 +19,7 @@ import {
 import { Add, Delete, Person, School } from '@mui/icons-material'
 import PageHeader from '../../components/PageHeader'
 import { useToast } from '../../hooks/useToast'
-import { candidatureApi, lmdApi } from '../../api/endpoints'
+import { candidatureApi } from '../../api/endpoints'
 import { extractError } from '../../api/axios'
 const STATUSES = ['EN_ATTENTE', 'RECUE', 'ACCEPTEE', 'LISTE_ATTENTE', 'REFUSEE']
 const STATUS_COLORS = {
@@ -34,7 +34,6 @@ export default function CandidaturesPage() {
   const { success, error: toastError } = useToast()
 
   const [rows, setRows] = useState([])
-  const [fields, setFields] = useState([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(0)
   const [size, setSize] = useState(10)
@@ -42,7 +41,7 @@ export default function CandidaturesPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [form, setForm] = useState({
     firstName: '', lastName: '', birthDate: '', email: '', phone: '',
-    fieldId: '', level: 'L1', notes: '',
+    fieldName: '', level: 'L1', notes: '',
   })
 
   const load = async () => {
@@ -57,14 +56,11 @@ export default function CandidaturesPage() {
     }
   }
 
-  useEffect(() => {
-    lmdApi.fields().then((r) => setFields(r.data.data || [])).catch(() => {})
-  }, [])
-
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load() }, [page, size, statusFilter])
 
   const handleCreate = async () => {
-    if (!form.firstName || !form.lastName || !form.fieldId) {
+    if (!form.firstName || !form.lastName || !form.fieldName) {
       toastError('Prénom, nom et filière sont obligatoires')
       return
     }
@@ -72,11 +68,11 @@ export default function CandidaturesPage() {
       await candidatureApi.create({
         firstName: form.firstName, lastName: form.lastName,
         birthDate: form.birthDate || undefined, email: form.email || undefined, phone: form.phone || undefined,
-        field: { id: Number(form.fieldId) }, level: form.level, notes: form.notes || undefined,
+        fieldName: form.fieldName, level: form.level, notes: form.notes || undefined,
       })
       success('Candidature déposée')
       setDialogOpen(false)
-      setForm({ firstName: '', lastName: '', birthDate: '', email: '', phone: '', fieldId: '', level: 'L1', notes: '' })
+      setForm({ firstName: '', lastName: '', birthDate: '', email: '', phone: '', fieldName: '', level: 'L1', notes: '' })
       load()
     } catch (err) {
       toastError(extractError(err))
@@ -138,7 +134,7 @@ export default function CandidaturesPage() {
               </Box>
               <Box display="flex" alignItems="center" gap={1} mt={1.5}>
                 <School color="action" sx={{ fontSize: 18 }} />
-                <Typography variant="body2">{c.field?.name} — {c.level || ''}</Typography>
+                <Typography variant="body2">{c.fieldName} — {c.level || ''}</Typography>
               </Box>
               {c.notes && <Typography variant="body2" color="text.secondary" mt={1} sx={{ fontStyle: 'italic' }}>{c.notes}</Typography>}
 
@@ -178,9 +174,7 @@ export default function CandidaturesPage() {
             <Grid item xs={6}><TextField fullWidth size="small" label="Nom" value={form.lastName} onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))} /></Grid>
             <Grid item xs={6}><TextField fullWidth size="small" type="date" label="Naissance" value={form.birthDate} onChange={(e) => setForm((f) => ({ ...f, birthDate: e.target.value }))} /></Grid>
             <Grid item xs={6}><TextField fullWidth size="small" label="Niveau" value={form.level} onChange={(e) => setForm((f) => ({ ...f, level: e.target.value }))} /></Grid>
-            <Grid item xs={12}><TextField select fullWidth size="small" label="Filière" value={form.fieldId} onChange={(e) => setForm((f) => ({ ...f, fieldId: e.target.value }))}>
-              {fields.map((f) => <MenuItem key={f.id} value={String(f.id)}>{f.name}</MenuItem>)}
-            </TextField></Grid>
+            <Grid item xs={12}><TextField fullWidth size="small" label="Filière" value={form.fieldName} onChange={(e) => setForm((f) => ({ ...f, fieldName: e.target.value }))} /></Grid>
             <Grid item xs={6}><TextField fullWidth size="small" label="Email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} /></Grid>
             <Grid item xs={6}><TextField fullWidth size="small" label="Téléphone" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} /></Grid>
             <Grid item xs={12}><TextField fullWidth size="small" label="Notes" multiline minRows={2} value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} /></Grid>

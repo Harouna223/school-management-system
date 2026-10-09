@@ -15,12 +15,12 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
 
 /**
- * Module admission universitaire : candidatures, dossiers, sélection.
+ * Module admission : candidatures, dossiers, sélection.
  */
 @RestController
 @RequestMapping("/api/candidatures")
 @RequiredArgsConstructor
-@Tag(name = "Admission", description = "Candidatures d'admission universitaire")
+@Tag(name = "Admission", description = "Candidatures d'admission")
 public class CandidatureController {
 
     private final CandidatureService candidatureService;
@@ -28,11 +28,11 @@ public class CandidatureController {
     @GetMapping
     @Operation(summary = "Liste paginée des candidatures")
     public ResponseEntity<ApiResponse<PageResponse<Candidature>>> list(
-            @RequestParam(required = false) Long fieldId,
+            @RequestParam(required = false) String fieldName,
             @RequestParam(required = false) CandidatureStatus status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        return ok("Candidatures", PageResponse.from(candidatureService.list(fieldId, status, page, size), x -> x));
+        return ok("Candidatures", PageResponse.from(candidatureService.list(fieldName, status, page, size), x -> x));
     }
 
     @PostMapping

@@ -142,9 +142,9 @@ describe('Analyse statique — table de routage', () => {
 
   it('les espaces personnels sont tous declares', () => {
     const paths = declaredPaths()
-    // Ces quatre routes sont celles des portails : une suppression accidentelle
+    // Ces trois routes sont celles des portails : une suppression accidentelle
     // les rendrait inaccessibles (redirection vers /dashboard).
-    for (const p of ['/my-children', '/my-school', '/my-teaching', '/my-university']) {
+    for (const p of ['/my-children', '/my-school', '/my-teaching']) {
       expect(paths).toContain(p)
     }
   })

@@ -13,6 +13,7 @@ import {
   Chip,
   Button,
   Table,
+  TableContainer,
   TableHead,
   TableRow,
   TableCell,
@@ -20,7 +21,7 @@ import {
 } from '@mui/material'
 import {
   PictureAsPdf, MenuBook, FactCheck, Assignment, Timeline as TimelineIcon,
-  Description, School, Receipt,
+  Description, Receipt,
 } from '@mui/icons-material'
 import PageHeader from '../../components/PageHeader'
 import StatusChip from '../../components/StatusChip'
@@ -61,7 +62,6 @@ export default function ParentPortalPage() {
   const [grades, setGrades] = useState([])
   const [timeline, setTimeline] = useState([])
   const [invoices, setInvoices] = useState([])
-  const [univEnrollments, setUnivEnrollments] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -91,13 +91,11 @@ export default function ParentPortalPage() {
     setGrades([])
     setTimeline([])
     setInvoices([])
-    setUnivEnrollments([])
     parentApi.childBulletins(selected.id).then((res) => setBulletins(res.data.data || [])).catch(() => {})
     parentApi.childAttendances(selected.id).then((res) => setAttendances(res.data.data || [])).catch(() => {})
     parentApi.childGrades(selected.id).then((res) => setGrades(res.data.data || [])).catch(() => {})
     parentApi.childTimeline(selected.id).then((res) => setTimeline(res.data.data || [])).catch(() => {})
     parentApi.childInvoices(selected.id).then((res) => setInvoices(res.data.data || [])).catch(() => {})
-    parentApi.childUniversityEnrollments(selected.id).then((res) => setUnivEnrollments(res.data.data || [])).catch(() => {})
   }, [selected])
 
   if (role !== 'PARENT') {
@@ -122,12 +120,6 @@ export default function ParentPortalPage() {
     } catch (err) {
       toastError(extractError(err))
     }
-  }
-
-  const downloadUnivDoc = async (type, enr) => {
-    const params = { studentId: selected.id, fieldId: enr.field.id, semester: enr.currentSemester, session: 1 }
-    const promise = type === 'releve' ? parentApi.childReleve(params) : parentApi.childAttestation(params)
-    await downloadDoc(promise, `${type}-${selected.matricule}-${enr.currentSemester}.pdf`)
   }
 
   const summary = bulletins.map((b) => ({
@@ -207,7 +199,7 @@ export default function ParentPortalPage() {
                   )}
                 </Box>
 
-                <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }} variant="scrollable">
+                <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }} variant="scrollable" allowScrollButtonsMobile>
                   <Tab icon={<MenuBook />} iconPosition="start" label="Bulletins" />
                   <Tab icon={<FactCheck />} iconPosition="start" label="Présences" />
                   <Tab icon={<Assignment />} iconPosition="start" label="Notes" />
@@ -228,7 +220,7 @@ export default function ParentPortalPage() {
                           <ResponsiveContainer width="100%" height={200}>
                             <LineChart data={progressionData} margin={{ top: 8, right: 16, left: -8, bottom: 0 }}>
                               <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.25)" />
-                              <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                              <XAxis dataKey="name" interval="preserveStartEnd" angle={-18} textAnchor="end" height={48} tickMargin={8} tick={{ fontSize: 9.5 }} tickFormatter={(value) => String(value).replace("1er Trimestre", "T1").replace("2e Trimestre", "T2").replace("3e Trimestre", "T3")} />
                               <YAxis domain={[0, 20]} tick={{ fontSize: 10 }} />
                               <Tooltip />
                               <Legend />
@@ -272,24 +264,26 @@ export default function ParentPortalPage() {
                   attendances.length === 0 ? (
                     <EmptyState message="Aucune présence enregistrée pour cet enfant." />
                   ) : (
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Date</TableCell>
-                          <TableCell>Statut</TableCell>
-                          <TableCell>Justification</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {attendances.slice(0, 30).map((a) => (
-                          <TableRow key={a.id}>
-                            <TableCell>{formatDate(a.date)}</TableCell>
-                            <TableCell><StatusChip status={a.status} /></TableCell>
-                            <TableCell>{a.justification || '—'}</TableCell>
+                    <TableContainer sx={{ width: "100%", maxWidth: "100%" }}>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Date</TableCell>
+                            <TableCell>Statut</TableCell>
+                            <TableCell>Justification</TableCell>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHead>
+                        <TableBody>
+                          {attendances.slice(0, 30).map((a) => (
+                            <TableRow key={a.id}>
+                              <TableCell>{formatDate(a.date)}</TableCell>
+                              <TableCell><StatusChip status={a.status} /></TableCell>
+                              <TableCell>{a.justification || '—'}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
                   )
                 )}
 
@@ -298,26 +292,28 @@ export default function ParentPortalPage() {
                   grades.length === 0 ? (
                     <EmptyState message="Aucune note saisie pour cet enfant." />
                   ) : (
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Matière</TableCell>
-                          <TableCell>Évaluation</TableCell>
-                          <TableCell>Note</TableCell>
-                          <TableCell>Appréciation</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {grades.map((g) => (
-                          <TableRow key={g.id}>
-                            <TableCell>{g.subjectName}</TableCell>
-                            <TableCell>{g.examName}</TableCell>
-                            <TableCell fontWeight={600}>{g.value} / {g.maxValue}</TableCell>
-                            <TableCell>{g.appreciation || '—'}</TableCell>
+                    <TableContainer sx={{ width: "100%", maxWidth: "100%" }}>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Matière</TableCell>
+                            <TableCell>Évaluation</TableCell>
+                            <TableCell>Note</TableCell>
+                            <TableCell>Appréciation</TableCell>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHead>
+                        <TableBody>
+                          {grades.map((g) => (
+                            <TableRow key={g.id}>
+                              <TableCell>{g.subjectName}</TableCell>
+                              <TableCell>{g.examName}</TableCell>
+                              <TableCell fontWeight={600}>{g.value} / {g.maxValue}</TableCell>
+                              <TableCell>{g.appreciation || '—'}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
                   )
                 )}
 
@@ -330,8 +326,8 @@ export default function ParentPortalPage() {
                       {timeline.map((entry, i) => (
                         <Box key={`${entry.context}-${entry.id}`} display="flex" gap={1.5} alignItems="flex-start">
                           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 28 }}>
-                            <Avatar sx={{ width: 26, height: 26, bgcolor: entry.context === 'UNIVERSITY' ? 'secondary.main' : 'primary.main', fontSize: 12 }}>
-                              {entry.context === 'UNIVERSITY' ? <School sx={{ fontSize: 14 }} /> : <MenuBook sx={{ fontSize: 14 }} />}
+                            <Avatar sx={{ width: 26, height: 26, bgcolor: 'primary.main', fontSize: 12 }}>
+                              <MenuBook sx={{ fontSize: 14 }} />
                             </Avatar>
                             {i < timeline.length - 1 && <Box sx={{ width: 2, height: '100%', bgcolor: 'divider' }} />}
                           </Box>
@@ -405,38 +401,6 @@ export default function ParentPortalPage() {
                         ))}
                       </>
                     )}
-
-                    {univEnrollments.length > 0 && (
-                      <>
-                        <Grid item xs={12}>
-                          <Typography variant="subtitle2" color="secondary" fontWeight={700} mb={1} mt={1}>
-                            Documents universitaires
-                          </Typography>
-                        </Grid>
-                        {univEnrollments.map((enr) => (
-                          <Grid item xs={12} md={6} key={enr.id}>
-                            <Card variant="outlined" sx={{ p: 2 }}>
-                              <Typography variant="body2" fontWeight={600}>
-                                {enr.field?.name} — Semestre {enr.currentSemester}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary" display="block" mb={1}>
-                                {enr.level ? `${enr.level} · ` : ''}{enr.academicYear || ''}
-                              </Typography>
-                              <Box display="flex" gap={1} flexWrap="wrap">
-                                <Button size="small" variant="outlined" startIcon={<PictureAsPdf />}
-                                  onClick={() => downloadUnivDoc('releve', enr)}>
-                                  Relevé
-                                </Button>
-                                <Button size="small" variant="outlined" startIcon={<PictureAsPdf />}
-                                  onClick={() => downloadUnivDoc('attestation', enr)}>
-                                  Attestation
-                                </Button>
-                              </Box>
-                            </Card>
-                          </Grid>
-                        ))}
-                      </>
-                    )}
                   </Grid>
                 )}
 
@@ -445,28 +409,30 @@ export default function ParentPortalPage() {
                   invoices.length === 0 ? (
                     <EmptyState message="Aucune facture pour cet enfant." />
                   ) : (
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Facture</TableCell>
-                          <TableCell>Frais</TableCell>
-                          <TableCell align="right">Montant</TableCell>
-                          <TableCell align="right">Payé</TableCell>
-                          <TableCell>Statut</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {invoices.slice(0, 20).map((inv) => (
-                          <TableRow key={inv.id}>
-                            <TableCell>{inv.invoiceNo}</TableCell>
-                            <TableCell>{inv.feeTypeName}</TableCell>
-                            <TableCell align="right">{formatCurrency(inv.amount)}</TableCell>
-                            <TableCell align="right">{formatCurrency(inv.paidAmount)}</TableCell>
-                            <TableCell><Chip size="small" label={inv.status} color={inv.status === 'PAID' ? 'success' : inv.status === 'PARTIAL' ? 'warning' : 'error'} /></TableCell>
+                    <TableContainer sx={{ width: "100%", maxWidth: "100%" }}>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Facture</TableCell>
+                            <TableCell>Frais</TableCell>
+                            <TableCell align="right">Montant</TableCell>
+                            <TableCell align="right">Payé</TableCell>
+                            <TableCell>Statut</TableCell>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHead>
+                        <TableBody>
+                          {invoices.slice(0, 20).map((inv) => (
+                            <TableRow key={inv.id}>
+                              <TableCell>{inv.invoiceNo}</TableCell>
+                              <TableCell>{inv.feeTypeName}</TableCell>
+                              <TableCell align="right">{formatCurrency(inv.amount)}</TableCell>
+                              <TableCell align="right">{formatCurrency(inv.paidAmount)}</TableCell>
+                              <TableCell><Chip size="small" label={inv.status} color={inv.status === 'PAID' ? 'success' : inv.status === 'PARTIAL' ? 'warning' : 'error'} /></TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
                   )
                 )}
               </CardContent>

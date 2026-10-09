@@ -6,18 +6,17 @@ import { MemoryRouter } from 'react-router-dom'
 import ParentPortalPage from '../../pages/parents/ParentPortalPage'
 import StudentPortalPage from '../../pages/students/StudentPortalPage'
 import TeacherPortalPage from '../../pages/teachers/TeacherPortalPage'
-import UniversityPortalPage from '../../pages/university/UniversityPortalPage'
 import { I18nProvider } from '../../i18n/I18nContext'
 
 /*
  * Garde-fou de rendu des ESPACES PERSONNELS (/my-children, /my-school,
- * /my-teaching, /my-university).
+ * /my-teaching).
  *
- * Ces quatre pages n'etaient couvertes par aucun test : seul le tableau de bord
+ * Ces trois pages n'etaient couvertes par aucun test : seul le tableau de bord
  * (/dashboard) etait rendu. Un identifiant manquant dans leurs imports (par ex.
  * `useLocation` utilise mais non importe) provoquait donc un ReferenceError au
  * rendu — donc un ecran blanc, l'application n'ayant aucun ErrorBoundary.
- * Ce fichier monte reellement les quatre pages pour fermer cette breche.
+ * Ce fichier monte reellement les trois pages pour fermer cette breche.
  */
 
 afterEach(cleanup)
@@ -128,7 +127,6 @@ vi.mock('../../api/endpoints', () => {
       childGrades: () => ok([MY_GRADE]),
       childTimeline: () => ok([]),
       childInvoices: () => ok([INVOICE]),
-      childUniversityEnrollments: () => ok([]),
     },
     myApi: {
       profile: () => ok(STUDENT),
@@ -140,8 +138,6 @@ vi.mock('../../api/endpoints', () => {
       teacherProfile: () => ok(TEACHER),
       teacherSchedule: () => ok([SCHEDULE]),
       teacherClasses: () => ok([TEACHER_CLASS]),
-      university: () => ok([]),
-      universityHistory: () => ok([]),
     },
     examApi: {
       byClass: () => ok([]),
@@ -191,11 +187,6 @@ describe('Espaces personnels — rendu', () => {
   it('rend /my-teaching (espace enseignant)', async () => {
     renderPortal(<TeacherPortalPage />, ['ENSEIGNANT'])
     expect(await screen.findByText('Mon espace')).toBeInTheDocument()
-  })
-
-  it('rend /my-university (espace université)', async () => {
-    renderPortal(<UniversityPortalPage />, ['ETUDIANT'])
-    expect(await screen.findByText('Mon espace universitaire')).toBeInTheDocument()
   })
 
   it('redirige un rôle non autorisé hors de /my-children', async () => {

@@ -1,8 +1,8 @@
 # 📚 SMS — School Management System
 ## Documentation fonctionnelle complète
 
-**SMS** est une plateforme de gestion scolaire unifiée qui couvre tous les cycles d'enseignement :
-**Jardin → Primaire → Collège → Lycée → Université (système LMD)**.
+**SMS** est une plateforme de gestion scolaire unifiée qui couvre les cycles d'enseignement
+scolaires : **Jardin → Primaire → Collège → Lycée**.
 
 ---
 
@@ -26,10 +26,15 @@ SMS
       ├── PRIMAIRE (CP → CM2)
       ├── COLLÈGE (6ème → 3ème)
       ├── LYCÉE (2nde → Terminale)
-      └── UNIVERSITÉ (L1 → L3, M1, M2) — système LMD
+      └── UNIVERSITÉ — modules annexes uniquement (Stages, Mémoires, Alumni, Admission)
 ```
 
 Les cycles sont **activables/désactivables** dans *Paramètres → Cycles d'enseignement*. Le menu latéral s'adapte automatiquement.
+
+> Le cycle « Université » n'active plus de cursus LMD (facultés, filières, UE/EC, crédits ECTS,
+> semestres) : ce module a été entièrement retiré du produit. Seuls les **modules annexes**
+> Stages, Mémoires, Alumni et Admission restent disponibles lorsque ce cycle est activé ;
+> ils s'appuient sur les permissions `LMD_READ` / `LMD_WRITE`.
 
 ---
 
@@ -43,9 +48,9 @@ Les cycles sont **activables/désactivables** dans *Paramètres → Cycles d'ens
 | **COMPTABLE** | Finances : paiements, factures, dépenses, reçus |
 | **ENSEIGNANT** | Ses classes, saisie des notes, présences, emploi du temps |
 | **PARENT** | Ses enfants : bulletins, présences, notes, paiements |
-| **ELEVE** | Son profil : bulletins, notes, emploi du temps, paiements, espace universitaire |
+| **ELEVE** | Son profil : bulletins, notes, emploi du temps, paiements |
 
-Chaque rôle dispose de **permissions fines** (`PERM_STUDENT_READ`, `PERM_PAYMENT_WRITE`, `PERM_LMD_READ`, etc.) contrôlées côté backend.
+Chaque rôle dispose de **permissions fines** (`PERM_STUDENT_READ`, `PERM_PAYMENT_WRITE`, `PERM_LMD_READ`, etc.) contrôlées côté backend. Les permissions `PERM_LMD_READ` / `PERM_LMD_WRITE` couvrent désormais les seuls modules annexes Stages, Mémoires, Alumni et Admission.
 
 ---
 
@@ -70,12 +75,11 @@ Chaque rôle dispose de **permissions fines** (`PERM_STUDENT_READ`, `PERM_PAYMEN
 ### 4.1 Élèves
 - **CRUD complet** : inscription avec génération automatique de matricule, modification, radiation, réinscription, transfert de classe
 - **Recherche avancée** : nom, matricule, classe, statut, **cycle d'enseignement**, pagination
-- **Fiche élève détaillée** : identité, classe, parent, historique du parcours (transferts, radiations), parcours universitaire LMD
+- **Fiche élève détaillée** : identité, classe, parent, historique du parcours (transferts, radiations)
 - **Photos** : upload et affichage de la photo de profil
 - **Import Excel** : modèle téléchargeable, validation ligne par ligne, détection de doublons, rapport d'import
 - **Export** : liste PDF et Excel
 - **Documents officiels** : certificat de scolarité PDF, carte d'identité scolaire PDF (format ID-1), certificat de fréquentation PDF, **QR code** de la carte scolaire
-- **Étudiant universitaire** : un élève peut être inscrit en université sans classe scolaire (cycle UNIVERSITE)
 
 ### 4.2 Structure pédagogique
 - **Niveaux** : associés à un cycle (PS→TLE), codes et noms
@@ -125,12 +129,12 @@ Chaque rôle dispose de **permissions fines** (`PERM_STUDENT_READ`, `PERM_PAYMEN
 
 | Fonctionnalité | Description |
 |---|---|
-| **Types de frais** | Inscription, scolarité, cantine, transport, et catégories universitaires |
+| **Types de frais** | Inscription, scolarité, cantine, transport |
 | **Factures** | Génération par élève, numéro séquentiel, montant, échéance, statut (IMP/PAYEE/PARTIELLE) |
 | **Paiements** | Enregistrement, **numéro de reçu** séquentiel, mode (espèces, mobile money, banque, chèque), mise à jour de la facture |
 | **Reçu PDF** | Reçu officiel avec montant en lettres (montant en toutes lettres) et solde restant |
 | **Impression/Export** | Historique des paiements et factures en PDF + Excel avec totaux |
-| **Espace élève/parent** | Consultation des factures et paiements de l'étudiant |
+| **Espace élève/parent** | Consultation des factures et paiements de l'élève |
 
 ---
 
@@ -159,58 +163,19 @@ Chaque rôle dispose de **permissions fines** (`PERM_STUDENT_READ`, `PERM_PAYMEN
 
 ---
 
-## 10. Université — Système LMD
+## 10. Modules annexes (cycle Université)
 
-### 10.1 Structure universitaire
-- **Facultés / UFR** : organisation académique de premier niveau
-- **Départements** : rattachés à une faculté
-- **Domaines** : Sciences et Technologies, Droit, Économie, etc.
-- **Filières** : rattachées à un département + domaine, cycle (LICENCE/MASTER/DOCTORAT)
-- **Programmes** : version, diplôme, crédits requis, conditions d'admission
-- **Groupes / promotions** : groupe A/B, TP1/TP2 par filière et niveau
-- **Semestres** : S1 → S12, associés à une filière et année académique
+Quatre modules périphériques restent livrés et accessibles **lorsque le cycle
+« Université » est activé** dans *Paramètres → Cycles d'enseignement*. Ils ne dépendent
+d'aucune structure LMD (ni faculté, ni filière, ni UE/EC) : ils s'appuient sur l'élève et
+sur les permissions `LMD_READ` / `LMD_WRITE`.
 
-### 10.2 UE et EC (crédits ECTS)
-- **UE (Unité d'Enseignement)** : code, nom, coefficient, crédits ECTS, semestre, type (fondamentale/complémentaire/transversale/libre), obligatoire/optionnelle
-- **EC (Élément Constitutif)** : code, nom, coefficient, crédits, volumes horaires (CM/TD/TP), enseignant, semestre
-- **Inscription aux UE** : gestion des UE suivies par chaque étudiant
-
-### 10.3 Inscriptions universitaires
-- **Inscription LMD** : étudiant → filière, niveau (L1-L3/M1/M2), semestre, année académique, programme
-- **Statut d'inscription** : INSCRIT / ABANDON / DIPLÔMÉ / EXCLU (avec motif)
-- **Changement de niveau** : passage L1→L2, mise à jour du semestre
-- **Historique du parcours** : toutes les transitions conservées (niveau, semestre, statut)
-
-### 10.4 Notes et évaluations universitaires
-- **Notes UE** : par étudiant, semestre, session (1 normale / 2 rattrapage) — **meilleure note conservée**
-- **Évaluations EC** : multi-évaluations par EC — CC, TD, TP, Projet, Oral, Examen — par session
-- **Moyenne UE** : moyenne pondérée des EC
-- **Moyenne de semestre** : moyenne pondérée des UE
-- **Crédits ECTS** : acquis / échoués / totaux, compensation entre UE
-
-### 10.5 Résultats et délibération
-- **Résultat par semestre** : moyenne, crédits, décision (ADMIS / AJOURNE / REDOUBLE / PASSAGE_AVEC_DETTES), mention (Passable → Excellent), UE à repasser
-- **Délibération collective** : par filière + semestre, classement, verrouillage
-- **Règles académiques configurables** : seuil de validation, compensation, mentions (dans l'onglet Règles)
-
-### 10.6 Emploi du temps universitaire
-- Créneaux par EC, groupe, salle, enseignant, semestre
-- **Détection de conflits** : enseignant, salle, groupe sur le même créneau
-
-### 10.7 Présences universitaires
-- **Pointage** : par EC, date, type de séance (CM/TD/TP), groupe
-- Statuts : Présent / Absent / Retard / Excusé
-- **Historique** : consultation par étudiant
-
-### 10.8 Documents universitaires
-- **Relevé universitaire PDF** : UE/EC, notes, crédits, moyenne, décision, mention
-- **Relevé Excel** : export tableau
-- **Attestation de réussite PDF** avec QR code
-
-### 10.9 Espace étudiant universitaire (`/my-university`)
-- **Inscriptions** : filières, statuts, historique du parcours
-- **Résultats** : synthèse (moyenne, décision, mention, crédits) + tableau détaillé des UE
-- **Documents** : téléchargement Relevé PDF/Excel, Attestation PDF
+| Module | Route | Description | Rôles |
+|---|---|---|---|
+| **Stages** | `/stages` | Entreprises, conventions, encadrants, rapports, soutenances, évaluation | SUPER_ADMIN, DIRECTEUR, SECRETAIRE, ENSEIGNANT |
+| **Mémoires** | `/memoires` | Sujets, directeurs, jury, dates, documents, décision | SUPER_ADMIN, DIRECTEUR, SECRETAIRE, ENSEIGNANT |
+| **Alumni** | `/alumni` | Anciens apprenants : promotions, coordonnées, parcours | SUPER_ADMIN, DIRECTEUR, SECRETAIRE |
+| **Admission** | `/candidatures` | Candidatures : dossiers, statuts, sélection | SUPER_ADMIN, DIRECTEUR, SECRETAIRE |
 
 ---
 
@@ -235,9 +200,6 @@ Chaque rôle dispose de **permissions fines** (`PERM_STUDENT_READ`, `PERM_PAYMEN
 - **Mes classes** : liste des classes et matières enseignées
 - **Saisie des notes** : classe → évaluation → **saisie inline** des notes pour tous les élèves
 
-### 11.4 Espace universitaire étudiant (`/my-university`)
-Voir section 10.9.
-
 ---
 
 ## 12. Dashboard
@@ -248,10 +210,6 @@ Voir section 10.9.
 - **Graphiques** : revenus sur 6 mois, élèves par classe, répartition par genre
 - **Actualisation automatique** toutes les 5 minutes
 - **Activité récente** : journal d'audit
-
-### 12.2 Dashboard universitaire
-- **KPI** : étudiants, inscriptions actives, programmes, filières, UE, EC, enseignants, taux de réussite, crédits, ajournés, dettes
-- **Rapport universitaire** : effectifs par filière, répartition par niveau, réussite par filière (admis/ajournés/taux), synthèse (total, actifs, délibérations, dettes)
 
 ---
 
@@ -291,7 +249,6 @@ Recherche instantanée dans :
 - **Enseignants**
 - **Classes**
 - **Factures**
-- **Facultés, Départements, Filières, Programmes, UE, EC** (module université)
 
 Réservée aux rôles d'administration.
 
@@ -324,11 +281,11 @@ Réservée aux rôles d'administration.
 
 ```
 backend-springboot/          Spring Boot 3.2 / Java 17
-├── controller/              23 contrôleurs REST
+├── controller/              27 contrôleurs REST
 ├── service/                 40 services métier
-├── repository/              56 repositories JPA
-├── entity/                  55 entités
-├── enums/                   30 énumérations
+├── repository/              47 repositories JPA
+├── entity/                  47 entités
+├── enums/                   29 énumérations
 ├── security/                JWT, filtres, config
 ├── dto/                     request / response
 ├── pdf/                     SchoolDocumentTheme
@@ -336,7 +293,7 @@ backend-springboot/          Spring Boot 3.2 / Java 17
 └── utils/                   CodeGenerator, PasswordPolicy, AmountToWords…
 
 frontend-react/              React 18 / Vite / MUI 5
-├── pages/                   45 pages (scolarité, LMD, portails, admin)
+├── pages/                   45 pages (scolarité, modules annexes, portails, admin)
 ├── components/              DataTable, StatCard, PageHeader, StatusChip…
 ├── api/                     axios + endpoints centralisés
 ├── redux/                   auth, toast, theme
@@ -364,11 +321,13 @@ frontend-react/              React 18 / Vite / MUI 5
 | `/expenses` | Dépenses | DIRECTEUR, COMPTABLE |
 | `/library` | Bibliothèque | + SUPER_ADMIN |
 | `/hr` | RH | DIRECTEUR, COMPTABLE |
-| `/lmd` | Université LMD (8 onglets) | + ENSEIGNANT |
+| `/stages` | Stages *(cycle Université requis)* | SUPER_ADMIN, DIRECTEUR, SECRETAIRE, ENSEIGNANT |
+| `/candidatures` | Admission *(cycle Université requis)* | SUPER_ADMIN, DIRECTEUR, SECRETAIRE |
+| `/memoires` | Mémoires *(cycle Université requis)* | SUPER_ADMIN, DIRECTEUR, SECRETAIRE, ENSEIGNANT |
+| `/alumni` | Alumni *(cycle Université requis)* | SUPER_ADMIN, DIRECTEUR, SECRETAIRE |
 | `/reports` | Rapports | + COMPTABLE |
 | `/messages` `/announcements` | Communication | Tous |
 | `/my-school` | Espace élève | ELEVE |
-| `/my-university` | Espace universitaire | ELEVE |
 | `/my-children` | Espace parent | PARENT |
 | `/my-teaching` | Espace enseignant | ENSEIGNANT |
 | `/users` `/audit` | Administration | DIRECTEUR |

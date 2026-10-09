@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
  */
 @Entity
 @Table(name = "candidatures",
-        indexes = @Index(name = "idx_candidature_field", columnList = "field_id"))
+        indexes = @Index(name = "idx_candidature_field", columnList = "field_name"))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -40,9 +40,9 @@ public class Candidature {
     @Column(length = 30)
     private String phone;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "field_id")
-    private AcademicField field;
+    // Filière saisie en texte libre (découplage du module universitaire supprimé)
+    @Column(name = "field_name", length = 150)
+    private String fieldName;
 
     @Column(length = 20)
     private String level;

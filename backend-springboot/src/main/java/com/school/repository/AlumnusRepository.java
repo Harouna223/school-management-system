@@ -9,7 +9,7 @@ import java.util.List;
 @Repository
 public interface AlumnusRepository extends JpaRepository<Alumnus, Long> {
 
-    List<Alumnus> findByFieldId(Long fieldId);
+    List<Alumnus> findByFieldNameContainingIgnoreCase(String fieldName);
 
     List<Alumnus> findByLastNameContainingIgnoreCaseOrFirstNameContainingIgnoreCase(String lastName, String firstName);
 }

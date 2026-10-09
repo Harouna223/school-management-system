@@ -121,7 +121,8 @@ Au premier lancement :
 
 - le schéma SQL (`database/schema.sql`) initialise la base ;
 - Hibernate crée automatiquement les nouvelles tables (`settings`, `academic_years`,
-  `faculties`, LMD, etc.) via `ddl-auto: update` ;
+  `convocations`, `teacher_hourly_rates`, `teacher_work_hours`, `stages`, `memoires`,
+  `alumni`, `candidatures`…) via `ddl-auto: update` ;
 - `DataInitializer` crée le compte admin et les permissions.
 
 ### Accès initial

@@ -25,7 +25,6 @@ export const en = {
   'nav.teacherPayroll': 'Teacher payroll',
   'nav.library': 'Library',
   'nav.hr': 'Human Resources',
-  'nav.lmd': 'University (LMD)',
   'nav.messages': 'Messages',
   'nav.announcements': 'Announcements',
   'nav.children': 'My children',
