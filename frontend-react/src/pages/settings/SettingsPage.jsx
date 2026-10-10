@@ -67,6 +67,7 @@ export default function SettingsPage() {
     loadYears()
     loadMessageLogs()
     loadCycles()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const loadCycles = async () => {

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import {
-  Grid, Card, CardContent, Typography, Box, Tabs, Tab, Chip, Button,
-  Table, TableHead, TableRow, TableCell, TableBody, Divider,
+  Grid, Card, CardContent, Typography, Box, Tabs, Tab, Chip, Button, Avatar,
+  Table, TableContainer, TableHead, TableRow, TableCell, TableBody, Divider,
 } from '@mui/material'
 import {
   School as SchoolIcon,
@@ -22,6 +22,7 @@ import { useToast } from '../../hooks/useToast'
 import { extractError } from '../../api/axios'
 import { primaryRole } from '../../utils/auth'
 import { initials, formatDate, formatCurrency, DAYS_FR, DAY_KEYS } from '../../utils/format'
+import { getScheduleColors } from '../../utils/scheduleColors'
 
 const TERM_LABEL = { T1: '1er Trimestre', T2: '2e Trimestre', T3: '3e Trimestre' }
 const DECISION_COLORS = { ADMIS: 'success', AJOURNE: 'warning', REDOUBLE: 'error' }
@@ -100,15 +101,17 @@ export default function StudentPortalPage() {
           {profile && (
             <Card sx={{ mb: 3 }}>
               <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-                <Box
+                <Avatar
+                  src={profile.photo}
+                  alt={(profile.firstName || '') + ' ' + (profile.lastName || '')}
                   sx={{
-                    width: 56, height: 56, borderRadius: 3, display: 'flex', alignItems: 'center',
-                    justifyContent: 'center', background: 'linear-gradient(135deg, #2563eb, #1e3a8a)',
+                    width: 56, height: 56, borderRadius: 3,
+                    background: 'linear-gradient(135deg, #2563eb, #1e3a8a)',
                     color: '#fff', fontWeight: 800, fontSize: 20, flexShrink: 0,
                   }}
                 >
-                  {profile.photo ? null : initials(profile.firstName, profile.lastName)}
-                </Box>
+                  {initials(profile.firstName, profile.lastName)}
+                </Avatar>
                 <Box flex={1} minWidth={200}>
                   <Typography variant="h6">{profile.firstName} {profile.lastName}</Typography>
                   <Typography variant="body2" color="text.secondary">
@@ -121,7 +124,7 @@ export default function StudentPortalPage() {
 
           <Card>
             <CardContent>
-              <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }} variant="scrollable">
+              <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }} variant="scrollable" allowScrollButtonsMobile>
                 <Tab icon={<SchoolIcon />} iconPosition="start" label="Mes bulletins" />
                 <Tab icon={<GradesIcon />} iconPosition="start" label="Mes notes" />
                 <Tab icon={<ScheduleIcon />} iconPosition="start" label="Emploi du temps" />
@@ -171,30 +174,32 @@ export default function StudentPortalPage() {
                 grades.length === 0 ? (
                   <EmptyState message="Aucune note n'a encore été saisie." />
                 ) : (
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Matière</TableCell>
-                        <TableCell>Évaluation</TableCell>
-                        <TableCell>Trimestre</TableCell>
-                        <TableCell>Note</TableCell>
-                        <TableCell>Coef.</TableCell>
-                        <TableCell>Appréciation</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {grades.map((g) => (
-                        <TableRow key={g.id}>
-                          <TableCell fontWeight={600}>{g.subjectName}</TableCell>
-                          <TableCell>{g.examName}</TableCell>
-                          <TableCell>{TERM_LABEL[g.term] || g.term}</TableCell>
-                          <TableCell fontWeight={600}>{g.value} / {g.maxValue}</TableCell>
-                          <TableCell>{g.coefficient ?? '—'}</TableCell>
-                          <TableCell>{g.appreciation || '—'}</TableCell>
+                  <TableContainer sx={{ width: "100%", maxWidth: "100%" }}>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Matière</TableCell>
+                          <TableCell>Évaluation</TableCell>
+                          <TableCell>Trimestre</TableCell>
+                          <TableCell>Note</TableCell>
+                          <TableCell>Coef.</TableCell>
+                          <TableCell>Appréciation</TableCell>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHead>
+                      <TableBody>
+                        {grades.map((g) => (
+                          <TableRow key={g.id}>
+                            <TableCell fontWeight={600}>{g.subjectName}</TableCell>
+                            <TableCell>{g.examName}</TableCell>
+                            <TableCell>{TERM_LABEL[g.term] || g.term}</TableCell>
+                            <TableCell fontWeight={600}>{g.value} / {g.maxValue}</TableCell>
+                            <TableCell>{g.coefficient ?? '—'}</TableCell>
+                            <TableCell>{g.appreciation || '—'}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
                 )
               )}
 
@@ -212,17 +217,23 @@ export default function StudentPortalPage() {
                             {scheduleByDay[i].length === 0 ? (
                               <Typography variant="body2" color="text.secondary">—</Typography>
                             ) : (
-                              scheduleByDay[i].map((s) => (
-                                <Box key={s.id} mb={1}>
-                                  <Typography variant="body2" fontWeight={600}>
-                                    {s.startTime} – {s.endTime}
-                                  </Typography>
-                                  <Typography variant="body2" color="text.secondary">
-                                    {s.subjectName} · {s.teacherName}
-                                  </Typography>
-                                  <Typography variant="caption" color="text.disabled">{s.roomName}</Typography>
-                                </Box>
-                              ))
+                              scheduleByDay[i].map((s) => {
+                                const colors = getScheduleColors(s)
+                                return (
+                                  <Box
+                                    key={s.id}
+                                    sx={{ p: 1, mb: 1, borderRadius: 1.5, bgcolor: colors.background, color: colors.text, border: '1px solid', borderColor: colors.border }}
+                                  >
+                                    <Typography variant="body2" fontWeight={600}>
+                                      {s.startTime} – {s.endTime}
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ opacity: 0.86 }}>
+                                      {s.subjectName} · {s.teacherName}
+                                    </Typography>
+                                    <Typography variant="caption" sx={{ opacity: 0.72 }}>{s.roomName}</Typography>
+                                  </Box>
+                                )
+                              })
                             )}
                           </CardContent>
                         </Card>
@@ -237,24 +248,26 @@ export default function StudentPortalPage() {
                 attendances.length === 0 ? (
                   <EmptyState message="Aucune présence enregistrée." />
                 ) : (
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Date</TableCell>
-                        <TableCell>Statut</TableCell>
-                        <TableCell>Justification</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {attendances.slice(0, 60).map((a) => (
-                        <TableRow key={a.id}>
-                          <TableCell>{formatDate(a.date)}</TableCell>
-                          <TableCell><StatusChip status={a.status} /></TableCell>
-                          <TableCell>{a.justification || '—'}</TableCell>
+                  <TableContainer sx={{ width: "100%", maxWidth: "100%" }}>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Date</TableCell>
+                          <TableCell>Statut</TableCell>
+                          <TableCell>Justification</TableCell>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHead>
+                      <TableBody>
+                        {attendances.slice(0, 60).map((a) => (
+                          <TableRow key={a.id}>
+                            <TableCell>{formatDate(a.date)}</TableCell>
+                            <TableCell><StatusChip status={a.status} /></TableCell>
+                            <TableCell>{a.justification || '—'}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
                 )
               )}
 
@@ -263,32 +276,34 @@ export default function StudentPortalPage() {
                 invoices.length === 0 ? (
                   <EmptyState message="Aucune facture émise pour vous." />
                 ) : (
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>N°</TableCell>
-                        <TableCell>Type de frais</TableCell>
-                        <TableCell>Montant</TableCell>
-                        <TableCell>Payé</TableCell>
-                        <TableCell>Reste</TableCell>
-                        <TableCell>Échéance</TableCell>
-                        <TableCell>Statut</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {invoices.map((i) => (
-                        <TableRow key={i.id}>
-                          <TableCell>{i.invoiceNo}</TableCell>
-                          <TableCell>{i.feeTypeName}</TableCell>
-                          <TableCell>{formatCurrency(i.amount)}</TableCell>
-                          <TableCell>{formatCurrency(i.paidAmount)}</TableCell>
-                          <TableCell fontWeight={600}>{formatCurrency(i.remainingAmount)}</TableCell>
-                          <TableCell>{formatDate(i.dueDate)}</TableCell>
-                          <TableCell><StatusChip status={i.status} /></TableCell>
+                  <TableContainer sx={{ width: "100%", maxWidth: "100%" }}>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>N°</TableCell>
+                          <TableCell>Type de frais</TableCell>
+                          <TableCell>Montant</TableCell>
+                          <TableCell>Payé</TableCell>
+                          <TableCell>Reste</TableCell>
+                          <TableCell>Échéance</TableCell>
+                          <TableCell>Statut</TableCell>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHead>
+                      <TableBody>
+                        {invoices.map((i) => (
+                          <TableRow key={i.id}>
+                            <TableCell>{i.invoiceNo}</TableCell>
+                            <TableCell>{i.feeTypeName}</TableCell>
+                            <TableCell>{formatCurrency(i.amount)}</TableCell>
+                            <TableCell>{formatCurrency(i.paidAmount)}</TableCell>
+                            <TableCell fontWeight={600}>{formatCurrency(i.remainingAmount)}</TableCell>
+                            <TableCell>{formatDate(i.dueDate)}</TableCell>
+                            <TableCell><StatusChip status={i.status} /></TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
                 )
               )}
             </CardContent>

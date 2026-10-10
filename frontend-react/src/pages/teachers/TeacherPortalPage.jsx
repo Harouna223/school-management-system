@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import {
   Grid, Card, CardContent, Typography, Box, Tabs, Tab, Chip,
-  Table, TableHead, TableRow, TableCell, TableBody,
+  Table, TableContainer, TableHead, TableRow, TableCell, TableBody,
   TextField, MenuItem, Avatar, IconButton,
 } from '@mui/material'
 import {
@@ -21,6 +21,7 @@ import { myApi, examApi, studentApi, teacherHoursApi } from '../../api/endpoints
 import { extractError } from '../../api/axios'
 import { primaryRole } from '../../utils/auth'
 import { initials, formatGrade, formatCurrency, downloadBlob, DAYS_FR, DAY_KEYS } from '../../utils/format'
+import { getScheduleColors } from '../../utils/scheduleColors'
 
 const TERM_LABEL = { T1: '1er Trimestre', T2: '2e Trimestre', T3: '3e Trimestre' }
 const METHOD_LABEL = {
@@ -196,7 +197,7 @@ export default function TeacherPortalPage() {
 
           <Card>
             <CardContent>
-              <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}>
+              <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }} variant="scrollable" allowScrollButtonsMobile>
                 <Tab icon={<ScheduleIcon />} iconPosition="start" label="Mon emploi du temps" />
                 <Tab icon={<ClassesIcon />} iconPosition="start" label="Mes classes" />
                 <Tab icon={<GradesIcon />} iconPosition="start" label="Saisie des notes" />
@@ -217,17 +218,23 @@ export default function TeacherPortalPage() {
                             {scheduleByDay[i].length === 0 ? (
                               <Typography variant="body2" color="text.secondary">—</Typography>
                             ) : (
-                              scheduleByDay[i].map((s) => (
-                                <Box key={s.id} mb={1}>
-                                  <Typography variant="body2" fontWeight={600}>
-                                    {s.startTime} – {s.endTime}
-                                  </Typography>
-                                  <Typography variant="body2" color="text.secondary">
-                                    {s.subjectName} · {s.className}
-                                  </Typography>
-                                  <Typography variant="caption" color="text.disabled">{s.roomName}</Typography>
-                                </Box>
-                              ))
+                              scheduleByDay[i].map((s) => {
+                                const colors = getScheduleColors(s)
+                                return (
+                                  <Box
+                                    key={s.id}
+                                    sx={{ p: 1, mb: 1, borderRadius: 1.5, bgcolor: colors.background, color: colors.text, border: '1px solid', borderColor: colors.border }}
+                                  >
+                                    <Typography variant="body2" fontWeight={600}>
+                                      {s.startTime} – {s.endTime}
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ opacity: 0.86 }}>
+                                      {s.subjectName} · {s.className}
+                                    </Typography>
+                                    <Typography variant="caption" sx={{ opacity: 0.72 }}>{s.roomName}</Typography>
+                                  </Box>
+                                )
+                              })
                             )}
                           </CardContent>
                         </Card>
@@ -263,31 +270,33 @@ export default function TeacherPortalPage() {
                     {students.length === 0 ? (
                       <EmptyState message="Aucun élève dans cette classe." />
                     ) : (
-                      <Table size="small">
-                        <TableHead>
-                          <TableRow>
-                            <TableCell>Élève</TableCell>
-                            <TableCell>Matricule</TableCell>
-                            <TableCell>Statut</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {students.map((s) => (
-                            <TableRow key={s.id}>
-                              <TableCell>
-                                <Box display="flex" alignItems="center" gap={1.5}>
-                                  <Avatar src={s.photo} sx={{ width: 32, height: 32 }}>
-                                    {initials(s.firstName, s.lastName)}
-                                  </Avatar>
-                                  <Typography fontWeight={600}>{s.firstName} {s.lastName}</Typography>
-                                </Box>
-                              </TableCell>
-                              <TableCell>{s.matricule}</TableCell>
-                              <TableCell><StatusChip status={s.status} /></TableCell>
+                      <TableContainer sx={{ width: "100%", maxWidth: "100%" }}>
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow>
+                              <TableCell>Élève</TableCell>
+                              <TableCell>Matricule</TableCell>
+                              <TableCell>Statut</TableCell>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                          </TableHead>
+                          <TableBody>
+                            {students.map((s) => (
+                              <TableRow key={s.id}>
+                                <TableCell>
+                                  <Box display="flex" alignItems="center" gap={1.5}>
+                                    <Avatar src={s.photo} sx={{ width: 32, height: 32 }}>
+                                      {initials(s.firstName, s.lastName)}
+                                    </Avatar>
+                                    <Typography fontWeight={600}>{s.firstName} {s.lastName}</Typography>
+                                  </Box>
+                                </TableCell>
+                                <TableCell>{s.matricule}</TableCell>
+                                <TableCell><StatusChip status={s.status} /></TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
                     )}
                   </>
                 )
@@ -333,48 +342,50 @@ export default function TeacherPortalPage() {
                   ) : gradeRows.length === 0 && students.length === 0 ? (
                     <EmptyState message="Aucun élève dans cette classe." />
                   ) : (
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Élève</TableCell>
-                          <TableCell>Matricule</TableCell>
-                          <TableCell>Note /20</TableCell>
-                          <TableCell>Statut</TableCell>
-                          <TableCell align="right">Action</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {students.map((s) => {
-                          const g = gradeRows.find((r) => r.studentId === s.id)
-                          const raw = draftGrades[s.id] ?? ''
-                          return (
-                            <TableRow key={s.id}>
-                              <TableCell fontWeight={600}>{s.firstName} {s.lastName}</TableCell>
-                              <TableCell>{s.matricule}</TableCell>
-                              <TableCell>
-                                <TextField
-                                  size="small" type="number" inputProps={{ min: 0, max: 20, step: 0.25 }}
-                                  placeholder={g ? String(g.value) : '—'}
-                                  value={raw}
-                                  onChange={(e) => setDraftGrades((d) => ({ ...d, [s.id]: e.target.value }))}
-                                  sx={{ width: 90 }}
-                                />
-                              </TableCell>
-                              <TableCell>
-                                {g ? <Chip size="small" color={g.value >= 10 ? 'success' : 'error'} label={g.value >= 10 ? 'Acquis' : 'Non acquis'} /> : <Typography variant="caption" color="text.secondary">Non saisie</Typography>}
-                              </TableCell>
-                              <TableCell align="right">
-                                <IconButton size="small" color="primary" disabled={raw === ''}
-                                  onClick={() => saveInlineGrade(s.id, `${s.firstName} ${s.lastName}`)}
-                                  title="Enregistrer la note">
-                                  <SaveIcon fontSize="small" />
-                                </IconButton>
-                              </TableCell>
-                            </TableRow>
-                          )
-                        })}
-                      </TableBody>
-                    </Table>
+                    <TableContainer sx={{ width: "100%", maxWidth: "100%" }}>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Élève</TableCell>
+                            <TableCell>Matricule</TableCell>
+                            <TableCell>Note /20</TableCell>
+                            <TableCell>Statut</TableCell>
+                            <TableCell align="right">Action</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {students.map((s) => {
+                            const g = gradeRows.find((r) => r.studentId === s.id)
+                            const raw = draftGrades[s.id] ?? ''
+                            return (
+                              <TableRow key={s.id}>
+                                <TableCell fontWeight={600}>{s.firstName} {s.lastName}</TableCell>
+                                <TableCell>{s.matricule}</TableCell>
+                                <TableCell>
+                                  <TextField
+                                    size="small" type="number" inputProps={{ min: 0, max: 20, step: 0.25 }}
+                                    placeholder={g ? String(g.value) : '—'}
+                                    value={raw}
+                                    onChange={(e) => setDraftGrades((d) => ({ ...d, [s.id]: e.target.value }))}
+                                    sx={{ width: 90 }}
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {g ? <Chip size="small" color={g.value >= 10 ? 'success' : 'error'} label={g.value >= 10 ? 'Acquis' : 'Non acquis'} /> : <Typography variant="caption" color="text.secondary">Non saisie</Typography>}
+                                </TableCell>
+                                <TableCell align="right">
+                                  <IconButton size="small" color="primary" disabled={raw === ''}
+                                    onClick={() => saveInlineGrade(s.id, `${s.firstName} ${s.lastName}`)}
+                                    title="Enregistrer la note">
+                                    <SaveIcon fontSize="small" />
+                                  </IconButton>
+                                </TableCell>
+                              </TableRow>
+                            )
+                          })}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
                   )}
                 </>
               )}
@@ -399,19 +410,19 @@ export default function TeacherPortalPage() {
                             {r.teacherName} — {payMonth}
                           </Typography>
                           <Grid container spacing={2}>
-                            <Grid item xs={6} sm={3}>
+                            <Grid item xs={12} sm={6} md={3}>
                               <Typography variant="caption" color="text.secondary">Heures enseignées</Typography>
                               <Typography variant="h6" fontWeight={800}>{r.totalHours} h</Typography>
                             </Grid>
-                            <Grid item xs={6} sm={3}>
+                            <Grid item xs={12} sm={6} md={3}>
                               <Typography variant="caption" color="text.secondary">Tarif horaire</Typography>
                               <Typography variant="h6" fontWeight={800}>{formatCurrency(r.hourlyRate)}</Typography>
                             </Grid>
-                            <Grid item xs={6} sm={2}>
+                            <Grid item xs={12} sm={6} md={3}>
                               <Typography variant="caption" color="text.secondary">Salaire dû</Typography>
                               <Typography variant="h6" fontWeight={800}>{formatCurrency(r.totalAmount)}</Typography>
                             </Grid>
-                            <Grid item xs={6} sm={2}>
+                            <Grid item xs={12} sm={6} md={3}>
                               <Typography variant="caption" color="text.secondary">Déjà payé</Typography>
                               <Typography variant="h6" fontWeight={800}>{formatCurrency(r.amountPaid)}</Typography>
                             </Grid>
@@ -436,42 +447,44 @@ export default function TeacherPortalPage() {
                   {myTxs.length === 0 ? (
                     <EmptyState message="Aucun paiement enregistré." />
                   ) : (
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>N° reçu</TableCell>
-                          <TableCell>Mois</TableCell>
-                          <TableCell>Montant</TableCell>
-                          <TableCell>Mode</TableCell>
-                          <TableCell>Date</TableCell>
-                          <TableCell align="right">Reçu</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {myTxs.map((t) => (
-                          <TableRow key={t.id}>
-                            <TableCell>{t.receiptNo}</TableCell>
-                            <TableCell>{t.monthDate || ''}</TableCell>
-                            <TableCell>{formatCurrency(t.amount)}</TableCell>
-                            <TableCell>{METHOD_LABEL[t.method] || t.method}</TableCell>
-                            <TableCell>{(t.paymentDate || '').slice(0, 10)}</TableCell>
-                            <TableCell align="right">
-                              <IconButton size="small" color="primary" title="Télécharger le reçu PDF"
-                                onClick={async () => {
-                                  try {
-                                    const res = await teacherHoursApi.myReceipt(t.id)
-                                    downloadBlob(res.data, `recu-${t.receiptNo}.pdf`)
-                                  } catch (err) {
-                                    toastError(extractError(err))
-                                  }
-                                }}>
-                                <ReceiptIcon fontSize="small" />
-                              </IconButton>
-                            </TableCell>
+                    <TableContainer sx={{ width: "100%", maxWidth: "100%" }}>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>N° reçu</TableCell>
+                            <TableCell>Mois</TableCell>
+                            <TableCell>Montant</TableCell>
+                            <TableCell>Mode</TableCell>
+                            <TableCell>Date</TableCell>
+                            <TableCell align="right">Reçu</TableCell>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHead>
+                        <TableBody>
+                          {myTxs.map((t) => (
+                            <TableRow key={t.id}>
+                              <TableCell>{t.receiptNo}</TableCell>
+                              <TableCell>{t.monthDate || ''}</TableCell>
+                              <TableCell>{formatCurrency(t.amount)}</TableCell>
+                              <TableCell>{METHOD_LABEL[t.method] || t.method}</TableCell>
+                              <TableCell>{(t.paymentDate || '').slice(0, 10)}</TableCell>
+                              <TableCell align="right">
+                                <IconButton size="small" color="primary" title="Télécharger le reçu PDF"
+                                  onClick={async () => {
+                                    try {
+                                      const res = await teacherHoursApi.myReceipt(t.id)
+                                      downloadBlob(res.data, `recu-${t.receiptNo}.pdf`)
+                                    } catch (err) {
+                                      toastError(extractError(err))
+                                    }
+                                  }}>
+                                  <ReceiptIcon fontSize="small" />
+                                </IconButton>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
                   )}
                 </>
               )}

@@ -27,6 +27,7 @@ import { useToast } from '../../hooks/useToast'
 import { scheduleApi, classApi, subjectApi, teacherApi } from '../../api/endpoints'
 import { extractError } from '../../api/axios'
 import { DAYS_FR, DAY_KEYS } from '../../utils/format'
+import { getScheduleColors } from '../../utils/scheduleColors'
 
 const TIMES = ['07:30', '08:00', '08:30', '09:30', '10:30', '11:30', '13:00', '14:00', '15:00', '16:00']
 
@@ -170,42 +171,45 @@ export default function SchedulesPage() {
             {grid.map((row) => (
               <TableRow key={row.day} hover>
                 <TableCell sx={{ fontWeight: 600 }}>{row.day}</TableCell>
-                {row.slots.map((slot, i) => (
-                  <TableCell key={i} sx={{ p: 0.8, verticalAlign: 'top' }}>
-                    {slot ? (
-                      <Box
-                        sx={{
-                          bgcolor: '#fce7f3',
-                          color: '#9d174d',
-                          borderRadius: '10px',
-                          p: 1,
-                          minHeight: 52,
-                          border: '1px solid',
-                          borderColor: '#f472b6',
-                          transition: 'transform 160ms ease, box-shadow 160ms ease',
-                          '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 6px 14px rgba(236,72,153,0.35)' },
-                        }}
-                      >
-                        <Box display="flex" alignItems="center" justifyContent="space-between" gap={0.5} mb={0.5}>
-                          <Chip
-                            size="small"
-                            label={`${String(slot.startTime).slice(0, 5)} – ${String(slot.endTime).slice(0, 5)}`}
-                            sx={{ fontSize: 9.5, height: 18, bgcolor: 'rgba(255,255,255,0.55)', color: '#9d174d', fontWeight: 700, fontFamily: 'monospace' }}
-                          />
-                          <Chip
-                            size="small"
-                            label="Suppr."
-                            sx={{ fontSize: 10, height: 20, bgcolor: 'rgba(255,255,255,0.45)', color: '#9d174d', cursor: 'pointer' }}
-                            onClick={() => handleDelete(slot)}
-                          />
+                {row.slots.map((slot, i) => {
+                  const colors = slot ? getScheduleColors(slot) : null
+                  return (
+                    <TableCell key={i} sx={{ p: 0.8, verticalAlign: 'top' }}>
+                      {slot ? (
+                        <Box
+                          sx={{
+                            bgcolor: colors.background,
+                            color: colors.text,
+                            borderRadius: '10px',
+                            p: 1,
+                            minHeight: 52,
+                            border: '1px solid',
+                            borderColor: colors.border,
+                            transition: 'transform 160ms ease, box-shadow 160ms ease',
+                            '&:hover': { transform: 'translateY(-2px)', boxShadow: `0 6px 14px ${colors.shadow}` },
+                          }}
+                        >
+                          <Box display="flex" alignItems="center" justifyContent="space-between" gap={0.5} mb={0.5}>
+                            <Chip
+                              size="small"
+                              label={`${String(slot.startTime).slice(0, 5)} – ${String(slot.endTime).slice(0, 5)}`}
+                              sx={{ fontSize: 9.5, height: 18, bgcolor: 'rgba(255,255,255,0.55)', color: colors.text, fontWeight: 700, fontFamily: 'monospace' }}
+                            />
+                            <Chip
+                              size="small"
+                              label="Suppr."
+                              sx={{ fontSize: 10, height: 20, bgcolor: 'rgba(255,255,255,0.45)', color: colors.text, cursor: 'pointer' }}
+                              onClick={() => handleDelete(slot)}
+                            />
+                          </Box>
+                          <Typography fontWeight={700} fontSize={11.5} noWrap>{slot.subjectName}</Typography>
+                          <Typography fontSize={10.5} noWrap>{slot.teacherName}</Typography>
+                          <Typography fontSize={10.5} noWrap>{slot.className}{slot.roomName ? ` • ${slot.roomName}` : ''}</Typography>
                         </Box>
-                        <Typography fontWeight={700} fontSize={11.5} noWrap>{slot.subjectName}</Typography>
-                        <Typography fontSize={10.5} noWrap>{slot.teacherName}</Typography>
-                        <Typography fontSize={10.5} noWrap>{slot.className}{slot.roomName ? ` • ${slot.roomName}` : ''}</Typography>
-                      </Box>
-                    ) : null}
-                  </TableCell>
-                ))}
+                      ) : null}
+                    </TableCell>
+                  )
+                })}
               </TableRow>
             ))}
           </TableBody>

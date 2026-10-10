@@ -275,7 +275,7 @@ export default function ParentDashboard() {
                   </Box>
                 </Box>
 
-                <Box display="grid" gridTemplateColumns="1fr 1fr" gap={1.4}>
+                <Box display="grid" gridTemplateColumns={{ xs: "1fr", sm: "1fr 1fr" }} gap={1.4}>
                   <MiniMetric
                     icon={<AttendanceIcon />}
                     color={row.absences > 0 ? 'error' : 'success'}
@@ -298,7 +298,7 @@ export default function ParentDashboard() {
                   variant="outlined"
                   endIcon={<ArrowIcon sx={{ fontSize: 16 }} />}
                   onClick={() => openChild(row.child)}
-                  sx={{ borderRadius: '10px' }}
+                  sx={{ borderRadius: '10px', whiteSpace: 'normal', lineHeight: 1.2 }}
                 >
                   Ouvrir l'espace de {row.child.firstName}
                 </Button>
@@ -327,7 +327,7 @@ export default function ParentDashboard() {
               <ResponsiveContainer width="100%" height={240}>
                 <BarChart data={comparisonData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
-                  <XAxis dataKey="name" tick={{ fontSize: 11.5, fill: axisColor }} axisLine={false} tickLine={false} />
+                  <XAxis dataKey="name" interval="preserveStartEnd" angle={-25} textAnchor="end" height={56} tickMargin={10} tick={{ fontSize: 10.5, fill: axisColor }} axisLine={false} tickLine={false} />
                   <YAxis domain={[0, 20]} tick={{ fontSize: 11.5, fill: axisColor }} axisLine={false} tickLine={false} width={36} />
                   <Tooltip
                     formatter={(v) => [`${Number(v).toFixed(2)} / 20`, 'Moyenne']}

@@ -135,7 +135,7 @@ const [history, setHistory] = useState({ bulletins: [], grades: [] })
         if (s.photo) setPreview(s.photo)
       })
     }
-  }, [id])
+  }, [id, isEdit])
 
   const handlePhoto = (e) => {
     const file = e.target.files?.[0]

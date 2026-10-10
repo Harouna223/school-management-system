@@ -13,7 +13,8 @@ import {
   DialogContent,
   DialogActions,
   IconButton,
-  Avatar
+  Avatar,
+  TablePagination
 } from '@mui/material'
 import { Add, Delete, Event, Place, Person } from '@mui/icons-material'
 import PageHeader from '../../components/PageHeader'
@@ -44,15 +45,17 @@ export default function ConvocationsPage() {
   const [location, setLocation] = useState('')
   const [filter, setFilter] = useState('')
   const [page, setPage] = useState(0)
-  const [size] = useState(10)
+  const [size, setSize] = useState(10)
+  const [total, setTotal] = useState(0)
 
   const load = async () => {
     setLoading(true)
     try {
-      const params = {}
+      const params = { page, size }
       if (filter) params.studentId = filter
       const { data } = await convocationApi.search(params)
       setRows(data.data.content || [])
+      setTotal(data.data.totalElements || 0)
     } catch (err) {
       toastError(extractError(err))
     } finally {
@@ -184,6 +187,16 @@ export default function ConvocationsPage() {
           </Grid>
         )}
       </Grid>
+
+      <TablePagination
+        component="div"
+        count={total}
+        page={page}
+        rowsPerPage={size}
+        rowsPerPageOptions={[5, 10, 25]}
+        onPageChange={(_, p) => setPage(p)}
+        onRowsPerPageChange={(e) => { setSize(Number(e.target.value)); setPage(0) }}
+      />
 
       {/* Dialogue création */}
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>

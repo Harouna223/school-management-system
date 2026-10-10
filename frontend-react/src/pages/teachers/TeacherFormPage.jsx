@@ -52,7 +52,7 @@ export default function TeacherFormPage() {
         if (t.photo) setPreview(t.photo)
       })
     }
-  }, [id])
+  }, [id, isEdit])
 
   const handlePhoto = (e) => {
     const file = e.target.files?.[0]

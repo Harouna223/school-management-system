@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import {
-  Grid, Card, CardContent, CardActionArea, Typography, Box, Chip, Divider,
+  Grid, Card, CardContent, CardActionArea, Typography, Box, Chip, Divider, Avatar,
 } from '@mui/material'
 import {
   MenuBook as GradesIcon,
@@ -27,6 +27,7 @@ import StatusChip from '../../components/StatusChip'
 import EmptyState from '../../components/EmptyState'
 import { myApi } from '../../api/endpoints'
 import { initials, formatDate, formatCurrency, DAYS_FR, DAY_KEYS } from '../../utils/format'
+import { getScheduleColors } from '../../utils/scheduleColors'
 
 const TERM_LABEL = { T1: '1er Trimestre', T2: '2e Trimestre', T3: '3e Trimestre' }
 
@@ -244,7 +245,7 @@ export default function StudentDashboard() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: axisColor }} axisLine={false} tickLine={false} />
+                  <XAxis dataKey="name" tick={{ fontSize: 10.5, fill: axisColor }} tickMargin={8} tickFormatter={(value) => String(value).replace("1er Trimestre", "T1").replace("2e Trimestre", "T2").replace("3e Trimestre", "T3")} axisLine={false} tickLine={false} />
                   <YAxis domain={[0, 20]} tick={{ fontSize: 11.5, fill: axisColor }} axisLine={false} tickLine={false} width={36} />
                   <Tooltip
                     formatter={(v) => [`${Number(v).toFixed(2)} / 20`, 'Moyenne']}
@@ -277,36 +278,39 @@ export default function StudentDashboard() {
               <EmptyState message="Aucun cours aujourd'hui." />
             ) : (
               <Box display="flex" flexDirection="column" gap={1.2}>
-                {todaySchedule.map((s) => (
-                  <Box
-                    key={s.id}
-                    display="flex"
-                    alignItems="center"
-                    gap={1.5}
-                    p={1.4}
-                    borderRadius="12px"
-                    border="1px solid"
-                    borderColor="divider"
-                  >
+                {todaySchedule.map((s) => {
+                  const colors = getScheduleColors(s)
+                  return (
                     <Box
-                      sx={{
-                        minWidth: 62, textAlign: 'center', borderRadius: '10px', py: 0.6,
-                        bgcolor: 'primary.light', color: 'primary.dark', fontWeight: 800, fontSize: 12,
-                      }}
+                      key={s.id}
+                      display="flex"
+                      alignItems="center"
+                      gap={1.5}
+                      p={1.4}
+                      borderRadius="12px"
+                      border="1px solid"
+                      sx={{ bgcolor: colors.background, color: colors.text, borderColor: colors.border }}
                     >
-                      {s.startTime?.slice(0, 5)}
-                    </Box>
-                    <Box minWidth={0} flex={1}>
-                      <Typography variant="body2" fontWeight={700} noWrap>{s.subjectName}</Typography>
-                      <Typography variant="caption" color="text.secondary" noWrap display="block">
-                        {s.teacherName}{s.roomName ? ` · ${s.roomName}` : ''}
+                      <Box
+                        sx={{
+                          minWidth: 62, textAlign: 'center', borderRadius: '10px', py: 0.6,
+                          bgcolor: 'rgba(255,255,255,0.58)', color: colors.text, fontWeight: 800, fontSize: 12,
+                        }}
+                      >
+                        {s.startTime?.slice(0, 5)}
+                      </Box>
+                      <Box minWidth={0} flex={1}>
+                        <Typography variant="body2" fontWeight={700} noWrap>{s.subjectName}</Typography>
+                        <Typography variant="caption" sx={{ opacity: 0.78 }} noWrap display="block">
+                          {s.teacherName}{s.roomName ? ` · ${s.roomName}` : ''}
+                        </Typography>
+                      </Box>
+                      <Typography variant="caption" sx={{ opacity: 0.68 }}>
+                        {s.startTime?.slice(0, 5)}–{s.endTime?.slice(0, 5)}
                       </Typography>
                     </Box>
-                    <Typography variant="caption" color="text.disabled">
-                      {s.startTime?.slice(0, 5)}–{s.endTime?.slice(0, 5)}
-                    </Typography>
-                  </Box>
-                ))}
+                  )
+                })}
               </Box>
             )}
           </Card>
@@ -429,15 +433,17 @@ export default function StudentDashboard() {
         <Card className="animate-fade-in-up" sx={{ mt: 3, borderRadius: '16px' }}>
           <CardActionArea onClick={() => navigate('/profile')}>
             <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-              <Box
+              <Avatar
+                src={profile.photo}
+                alt={(profile.firstName || '') + ' ' + (profile.lastName || '')}
                 sx={{
-                  width: 52, height: 52, borderRadius: '16px', display: 'flex', alignItems: 'center',
-                  justifyContent: 'center', background: 'linear-gradient(135deg, #2563eb, #1e3a8a)',
+                  width: 52, height: 52, borderRadius: '16px',
+                  background: 'linear-gradient(135deg, #2563eb, #1e3a8a)',
                   color: '#fff', fontWeight: 800, fontSize: 18, flexShrink: 0,
                 }}
               >
                 {initials(profile.firstName, profile.lastName)}
-              </Box>
+              </Avatar>
               <Box flex={1} minWidth={200}>
                 <Typography variant="subtitle1" fontWeight={700}>
                   {profile.firstName} {profile.lastName}

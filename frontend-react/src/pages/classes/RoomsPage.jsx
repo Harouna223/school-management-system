@@ -34,6 +34,7 @@ export default function RoomsPage() {
     }
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load() }, [])
 
   const openNew = () => { setEditing(null); setForm(empty); setDialogOpen(true) }

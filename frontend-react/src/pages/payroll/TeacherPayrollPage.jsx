@@ -145,10 +145,15 @@ export default function TeacherPayrollPage({ initialTab = 'monthly' }) {
     } catch (err) { toastError(extractError(err)) }
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (tab === 'rates') loadRates() }, [tab])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (tab === 'history') loadHistory(0) }, [tab, historyFilters])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { loadDay() }, [entryForm.teacherId, entryDate])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (tab === 'monthly') loadMonthly() }, [tab, month])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (tab === 'payments') loadTxs() }, [tab, txFilters])
 
   // ---------- Actions ----------
