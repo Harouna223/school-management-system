@@ -3,17 +3,14 @@ package com.school.service;
 import com.school.dto.response.AttendanceResponse;
 import com.school.dto.response.BulletinResponse;
 import com.school.dto.response.InvoiceResponse;
-import com.school.dto.response.LmdReleveResponse;
 import com.school.dto.response.MyGradeResponse;
 import com.school.dto.response.MyTeacherClassResponse;
 import com.school.dto.response.ScheduleResponse;
 import com.school.dto.response.StudentResponse;
 import com.school.dto.response.TeacherResponse;
 import com.school.entity.Attendance;
-import com.school.entity.EnrollmentHistory;
 import com.school.entity.Grade;
 import com.school.entity.Invoice;
-import com.school.entity.LmdEnrollment;
 import com.school.entity.Schedule;
 import com.school.entity.Student;
 import com.school.entity.Teacher;
@@ -21,10 +18,8 @@ import com.school.enums.Term;
 import com.school.exception.BusinessException;
 import com.school.repository.AttendanceRepository;
 import com.school.repository.BulletinRepository;
-import com.school.repository.EnrollmentHistoryRepository;
 import com.school.repository.GradeRepository;
 import com.school.repository.InvoiceRepository;
-import com.school.repository.LmdEnrollmentRepository;
 import com.school.repository.ScheduleRepository;
 import com.school.repository.StudentRepository;
 import com.school.repository.SubjectAssignmentRepository;
@@ -52,9 +47,6 @@ public class MySpaceService {
     private final AttendanceRepository attendanceRepository;
     private final InvoiceRepository invoiceRepository;
     private final SubjectAssignmentRepository subjectAssignmentRepository;
-    private final LmdEnrollmentRepository lmdEnrollmentRepository;
-    private final LmdService lmdService;
-    private final EnrollmentHistoryRepository enrollmentHistoryRepository;
 
     private Student currentStudent() {
         Long userId = SecurityUtils.currentUserId();
@@ -71,24 +63,6 @@ public class MySpaceService {
     @Transactional(readOnly = true)
     public StudentResponse myProfile() {
         return StudentResponse.from(currentStudent());
-    }
-
-    /** Inscriptions LMD de l'étudiant connecté (espace universitaire). */
-    @Transactional(readOnly = true)
-    public List<LmdEnrollment> myUniversityEnrollments() {
-        return lmdEnrollmentRepository.findByStudentIdOrderByIdDesc(currentStudent().getId());
-    }
-
-    /** Relevé universitaire détaillé (UE/notes/crédits) de l'étudiant connecté. */
-    @Transactional(readOnly = true)
-    public LmdReleveResponse myUniversityReleve(Long fieldId, String semester, int session) {
-        return lmdService.buildReleve(currentStudent().getId(), fieldId, semester, session);
-    }
-
-    /** Historique académique universitaire de l'étudiant connecté. */
-    @Transactional(readOnly = true)
-    public List<EnrollmentHistory> myUniversityHistory() {
-        return enrollmentHistoryRepository.findByStudentIdOrderByCreatedAtDesc(currentStudent().getId());
     }
 
     @Transactional(readOnly = true)

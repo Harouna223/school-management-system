@@ -26,7 +26,7 @@ import {
 } from '@mui/icons-material'
 import PageHeader from '../../components/PageHeader'
 import FileAvatar from '../../components/FileAvatar'
-import { studentApi, attendanceApi, paymentApi, examApi, lmdApi } from '../../api/endpoints'
+import { studentApi, attendanceApi, paymentApi, examApi } from '../../api/endpoints'
 import { formatDate, formatCurrency } from '../../utils/format'
 
 const CYCLE_LABELS = {
@@ -52,7 +52,6 @@ export default function StudentDetailPage() {
   const [attendances, setAttendances] = useState([])
   const [invoices, setInvoices] = useState([])
   const [payments, setPayments] = useState([])
-  const [enrollments, setEnrollments] = useState([])
 
   useEffect(() => {
     if (!id) return
@@ -63,7 +62,6 @@ export default function StudentDetailPage() {
       attendanceApi.byStudent(id).then((r) => setAttendances(r.data.data || [])).catch(() => {}),
       paymentApi.invoicesByStudent(id).then((r) => setInvoices(r.data.data || [])).catch(() => {}),
       paymentApi.byStudent(id).then((r) => setPayments(r.data.data || [])).catch(() => {}),
-      lmdApi.enrollments({ studentId: id }).then((r) => setEnrollments(r.data.data || [])).catch(() => {}),
     ]).catch(() => {}).finally(() => setLoading(false))
   }, [id])
 
@@ -167,37 +165,6 @@ export default function StudentDetailPage() {
               )}
             </Card>
           </Grid>
-          {enrollments.length > 0 && (
-            <Grid item xs={12}>
-              <Card sx={{ p: 2.5, borderRadius: '14px' }}>
-                <Typography variant="subtitle1" fontWeight={700} mb={2}>Parcours universitaire (LMD)</Typography>
-                <TableContainer>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Filière</TableCell>
-                        <TableCell>Niveau</TableCell>
-                        <TableCell>Semestre</TableCell>
-                        <TableCell>Année</TableCell>
-                        <TableCell>Statut</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {enrollments.map((e) => (
-                        <TableRow key={e.id} hover>
-                          <TableCell>{e.field?.name || '—'}</TableCell>
-                          <TableCell>{e.level || '—'}</TableCell>
-                          <TableCell>{e.currentSemester}</TableCell>
-                          <TableCell>{e.academicYear || '—'}</TableCell>
-                          <TableCell><Chip size="small" label={e.active ? 'Actif' : 'Inactif'} color={e.active ? 'success' : 'default'} /></TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </Card>
-            </Grid>
-          )}
         </Grid>
       )}
 

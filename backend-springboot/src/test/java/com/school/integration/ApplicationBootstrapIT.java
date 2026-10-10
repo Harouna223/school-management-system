@@ -15,8 +15,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Test de fumee : verifie que le contexte Spring Boot demarre COMPLETEMENT sur
- * un vrai MySQL, que le schema est cree par Hibernate et que l'initialisation
- * des roles/permissions (DataInitializer) s'execute.
+ * un vrai MySQL, que le schema est applique par Flyway (source de verite,
+ * Hibernate se contentant de valider) et que l'initialisation des
+ * roles/permissions (DataInitializer) s'execute.
  *
  * <p>C'est le test qui prouve que la chaine complete fonctionne — sans lui,
  * rien d'autre n'est verifie dans un vrai contexte.</p>
@@ -43,21 +44,24 @@ class ApplicationBootstrapIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("les roles metier (dont ETUDIANT) et leurs permissions sont synchronises")
+    @DisplayName("les roles metier et leurs permissions sont synchronises")
     void rolesEtPermissionsSynchronises() {
         assertThat(roleRepository.findByName("SUPER_ADMIN")).isPresent();
         assertThat(roleRepository.findByName("ELEVE")).isPresent();
-        // Role cree par la migration d'audit : necessaire a l'espace universitaire.
-        assertThat(roleRepository.findByName("ETUDIANT")).isPresent();
+        // Le cursus universitaire/LMD a ete retire du produit : le role ETUDIANT
+        // ne doit plus etre recree par DataInitializer (garde-fou anti-regression).
+        assertThat(roleRepository.findByName("ETUDIANT")).isEmpty();
         assertThat(permissionRepository.count()).isGreaterThan(20);
     }
 
     @Test
     @DisplayName("un role expose ses permissions fines")
     void roleExposeSesPermissions() {
-        Role etudiant = roleRepository.findByName("ETUDIANT").orElseThrow();
+        Role admin = roleRepository.findByName("SUPER_ADMIN").orElseThrow();
 
-        assertThat(etudiant.getPermissions()).isNotEmpty();
-        assertThat(etudiant.getPermissions()).anyMatch(p -> "LMD_READ".equals(p.getName()));
+        assertThat(admin.getPermissions()).isNotEmpty();
+        // LMD_READ subsiste volontairement : elle protege encore les modules
+        // annexes Stages, Memoires, Alumni et Admission.
+        assertThat(admin.getPermissions()).anyMatch(p -> "LMD_READ".equals(p.getName()));
     }
 }

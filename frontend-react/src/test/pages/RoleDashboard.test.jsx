@@ -13,7 +13,6 @@ describe('resolveDashboardRole', () => {
     ['PARENT', 'PARENT'],
     ['ENSEIGNANT', 'ENSEIGNANT'],
     ['ELEVE', 'ELEVE'],
-    ['ETUDIANT', 'ETUDIANT'],
   ])('associe %s à son tableau de bord personnel', (role, expected) => {
     expect(resolveDashboardRole([role])).toBe(expected)
   })
@@ -24,10 +23,11 @@ describe('resolveDashboardRole', () => {
   })
 
   it('respecte l’ordre de priorité des rôles du menu latéral', () => {
-    // ROLE_PRIORITY : ... ENSEIGNANT > PARENT > ETUDIANT > ELEVE
+    // ROLE_PRIORITY : ... ENSEIGNANT > PARENT > ELEVE
     expect(resolveDashboardRole(['ELEVE', 'PARENT'])).toBe('PARENT')
     expect(resolveDashboardRole(['PARENT', 'ENSEIGNANT'])).toBe('ENSEIGNANT')
-    expect(resolveDashboardRole(['ELEVE', 'ETUDIANT'])).toBe('ETUDIANT')
+    // Un rôle inconnu ne prend jamais le pas sur un rôle reconnu.
+    expect(resolveDashboardRole(['ELEVE', 'ROLE_INCONNU'])).toBe('ELEVE')
   })
 
   it('ne renvoie aucun tableau de bord pour un compte sans rôle connu', () => {

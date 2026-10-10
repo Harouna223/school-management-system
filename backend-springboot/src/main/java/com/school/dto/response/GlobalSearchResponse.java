@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 
 /**
- * Résultat de la recherche globale multi-modules.
+ * Résultat de la recherche globale des modules scolaires.
  */
 @Data
 @Builder
@@ -29,36 +29,7 @@ public class GlobalSearchResponse {
     private List<InvoiceSearchHit> invoices = List.of();
 
     @Builder.Default
-    private List<UniversityHit> faculties = List.of();
-
-    @Builder.Default
-    private List<UniversityHit> departments = List.of();
-
-    @Builder.Default
-    private List<UniversityHit> fields = List.of();
-
-    @Builder.Default
-    private List<UniversityHit> programs = List.of();
-
-    @Builder.Default
-    private List<UniversityHit> ues = List.of();
-
-    @Builder.Default
-    private List<UniversityHit> ecs = List.of();
-
-    @Builder.Default
-    private List<UniversityHit> convocations = List.of();
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class UniversityHit {
-        private Long id;
-        private String name;
-        private String code;
-        private String subInfo;
-    }
+    private List<ConvocationSearchHit> convocations = List.of();
 
     @Data
     @Builder
@@ -104,5 +75,16 @@ public class GlobalSearchResponse {
         private String studentName;
         private String feeTypeName;
         private String status;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ConvocationSearchHit {
+        private Long id;
+        private String name;
+        private String code;
+        private String subInfo;
     }
 }

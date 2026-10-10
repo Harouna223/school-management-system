@@ -12,7 +12,7 @@ import java.util.List;
 @Repository
 public interface CandidatureRepository extends JpaRepository<Candidature, Long> {
 
-    Page<Candidature> findByFieldId(Long fieldId, Pageable pageable);
+    Page<Candidature> findByFieldNameContainingIgnoreCase(String fieldName, Pageable pageable);
 
     Page<Candidature> findByStatus(CandidatureStatus status, Pageable pageable);
 

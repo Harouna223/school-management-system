@@ -1,6 +1,5 @@
 package com.school.service;
 
-import com.school.dto.response.LmdReleveResponse;
 import com.school.dto.response.MyGradeResponse;
 import com.school.dto.response.ScheduleResponse;
 import com.school.entity.Attendance;
@@ -16,10 +15,8 @@ import com.school.enums.Term;
 import com.school.exception.BusinessException;
 import com.school.repository.AttendanceRepository;
 import com.school.repository.BulletinRepository;
-import com.school.repository.EnrollmentHistoryRepository;
 import com.school.repository.GradeRepository;
 import com.school.repository.InvoiceRepository;
-import com.school.repository.LmdEnrollmentRepository;
 import com.school.repository.ScheduleRepository;
 import com.school.repository.StudentRepository;
 import com.school.repository.SubjectAssignmentRepository;
@@ -79,9 +76,6 @@ class MySpaceServiceTest {
     @Mock private AttendanceRepository attendanceRepository;
     @Mock private InvoiceRepository invoiceRepository;
     @Mock private SubjectAssignmentRepository subjectAssignmentRepository;
-    @Mock private LmdEnrollmentRepository lmdEnrollmentRepository;
-    @Mock private LmdService lmdService;
-    @Mock private EnrollmentHistoryRepository enrollmentHistoryRepository;
 
     @InjectMocks private MySpaceService service;
 
@@ -252,32 +246,6 @@ class MySpaceServiceTest {
 
         // Sans classe, on ne doit pas interroger le repository avec un identifiant nul.
         verify(scheduleRepository, never()).findBySchoolClassId(anyLong());
-    }
-
-    // ------------------------------------------------------------------
-    // Portée universitaire (LMD)
-    // ------------------------------------------------------------------
-
-    @Test
-    @DisplayName("les endpoints LMD utilisent l'identifiant de l'élève connecté")
-    void porteeLmdSurLEleveConnecte() {
-        Student eleve = eleve(6L, 1L);
-        connecte(1L);
-        when(studentRepository.findByUserId(1L)).thenReturn(Optional.of(eleve));
-        when(lmdEnrollmentRepository.findByStudentIdOrderByIdDesc(6L)).thenReturn(List.of());
-        when(enrollmentHistoryRepository.findByStudentIdOrderByCreatedAtDesc(6L)).thenReturn(List.of());
-        when(lmdService.buildReleve(eq(6L), any(), anyString(), anyInt()))
-                .thenReturn(LmdReleveResponse.builder().build());
-
-        service.myUniversityEnrollments();
-        service.myUniversityHistory();
-        service.myUniversityReleve(2L, "S1", 1);
-
-        verify(lmdEnrollmentRepository).findByStudentIdOrderByIdDesc(6L);
-        verify(enrollmentHistoryRepository).findByStudentIdOrderByCreatedAtDesc(6L);
-        // ⚠️ Le `fieldId` vient bien de l'appelant (c'est un choix de filtre), mais
-        // l'identifiant ÉLÈVE est celui du jeton — le contraire serait une fuite.
-        verify(lmdService).buildReleve(6L, 2L, "S1", 1);
     }
 
     // ------------------------------------------------------------------

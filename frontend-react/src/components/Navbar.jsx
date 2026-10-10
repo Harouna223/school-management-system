@@ -62,7 +62,6 @@ const PAGE_META = {
   '/teacher-payroll': { title: 'nav.teacherPayroll', group: 'nav.group.finance' },
   '/library': { title: 'nav.library', group: 'nav.group.services' },
   '/hr': { title: 'nav.hr', group: 'nav.group.services' },
-  '/lmd': { title: 'nav.lmd', group: 'nav.group.services' },
   '/messages': { title: 'nav.messages', group: 'nav.group.services' },
   '/announcements': { title: 'nav.announcements', group: 'nav.group.services' },
   '/my-children': { title: 'nav.children', group: 'nav.group.spaces' },
@@ -102,7 +101,10 @@ export default function Navbar({ onMenuClick, collapsed, onCollapseToggle }) {
   const [search, setSearch] = useState('')
   const [results, setResults] = useState([])
   const [searchOpen, setSearchOpen] = useState(false)
+  const [mobileSearchAnchor, setMobileSearchAnchor] = useState(null)
   const searchInputRef = useRef(null)
+  const mobileSearchInputRef = useRef(null)
+  const mobileSearchButtonRef = useRef(null)
   const debounceRef = useRef(null)
 
   const pageMeta =
@@ -132,7 +134,7 @@ export default function Navbar({ onMenuClick, collapsed, onCollapseToggle }) {
     }
   }, [])
 
-  /* Recherche globale multi-modules : élèves, enseignants, classes, factures */
+  /* Recherche globale multi-modules : élèves, enseignants, classes, factures, convocations */
   useEffect(() => {
     clearTimeout(debounceRef.current)
     if (search.trim().length < 2) {
@@ -155,24 +157,6 @@ export default function Navbar({ onMenuClick, collapsed, onCollapseToggle }) {
         ;(data.data?.invoices || []).forEach((i) => hits.push({
           type: 'invoice', id: i.id, label: i.invoiceNo, sublabel: `${i.studentName || ''} — ${i.feeTypeName || ''}`.trim(), group: 'Factures',
         }))
-        ;(data.data?.faculties || []).forEach((f) => hits.push({
-          type: 'faculty', id: f.id, label: f.name, sublabel: `${f.code || ''} — ${f.subInfo || ''}`.trim(), group: 'Facultés',
-        }))
-        ;(data.data?.departments || []).forEach((d) => hits.push({
-          type: 'department', id: d.id, label: d.name, sublabel: `${d.code || ''} — ${d.subInfo || ''}`.trim(), group: 'Départements',
-        }))
-        ;(data.data?.fields || []).forEach((f) => hits.push({
-          type: 'field', id: f.id, label: f.name, sublabel: `${f.code || ''} — ${f.subInfo || ''}`.trim(), group: 'Filières',
-        }))
-        ;(data.data?.programs || []).forEach((p) => hits.push({
-          type: 'program', id: p.id, label: p.name, sublabel: `${p.code || ''} — ${p.subInfo || ''}`.trim(), group: 'Programmes',
-        }))
-        ;(data.data?.ues || []).forEach((u) => hits.push({
-          type: 'ue', id: u.id, label: u.name, sublabel: `${u.code || ''} — ${u.subInfo || ''}`.trim(), group: 'Unités d\'enseignement',
-        }))
-        ;(data.data?.ecs || []).forEach((e) => hits.push({
-          type: 'ec', id: e.id, label: e.name, sublabel: `${e.code || ''} — ${e.subInfo || ''}`.trim(), group: 'Éléments constitutifs',
-        }))
         ;(data.data?.convocations || []).forEach((c) => hits.push({
           type: 'convocation', id: c.id, label: c.name, sublabel: `${c.code || ''} — ${c.subInfo || ''}`.trim(), group: 'Convocations',
         }))
@@ -190,7 +174,12 @@ export default function Navbar({ onMenuClick, collapsed, onCollapseToggle }) {
     const onKey = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
-        searchInputRef.current?.focus()
+        if (window.matchMedia('(max-width:599px)').matches) {
+          setMobileSearchAnchor(mobileSearchButtonRef.current)
+          setTimeout(() => mobileSearchInputRef.current?.focus(), 0)
+        } else {
+          searchInputRef.current?.focus()
+        }
       }
     }
     window.addEventListener('keydown', onKey)
@@ -213,14 +202,6 @@ export default function Navbar({ onMenuClick, collapsed, onCollapseToggle }) {
         break
       case 'invoice':
         navigate(`/payments?tab=invoices`)
-        break
-      case 'faculty':
-      case 'department':
-      case 'field':
-      case 'program':
-      case 'ue':
-      case 'ec':
-        navigate(`/lmd`)
         break
       case 'convocation':
         navigate(`/convocations`)
@@ -264,8 +245,8 @@ export default function Navbar({ onMenuClick, collapsed, onCollapseToggle }) {
         zIndex: (t) => t.zIndex.drawer - 1,
       }}
     >
-      <Toolbar sx={{ gap: 1, minHeight: 64, px: { xs: 1.5, md: 3 } }}>
-        <IconButton edge="start" onClick={onMenuClick} sx={{ display: { lg: 'none' } }}>
+      <Toolbar sx={{ gap: { xs: 0.5, sm: 1 }, minHeight: 64, px: { xs: 1, sm: 1.5, md: 3 } }}>
+        <IconButton edge="start" onClick={onMenuClick} sx={{ display: { lg: 'none' }, width: { xs: 36, sm: 40 }, height: { xs: 36, sm: 40 }, p: 0.5, flexShrink: 0 }}>
           <MenuIcon />
         </IconButton>
         {!collapsed ? (
@@ -291,7 +272,7 @@ export default function Navbar({ onMenuClick, collapsed, onCollapseToggle }) {
         )}
 
         {/* Breadcrumb */}
-        <Box sx={{ mr: 1, display: { xs: 'none', sm: 'block' }, minWidth: 0 }}>
+        <Box sx={{ mr: 1, display: { xs: 'none', lg: 'block' }, minWidth: 0 }}>
           <Box display="flex" alignItems="center" gap={0.8}>
             <Typography
               variant="caption"
@@ -329,7 +310,9 @@ export default function Navbar({ onMenuClick, collapsed, onCollapseToggle }) {
           onChange={(_, v) => v && typeof v !== 'string' && goToSearchHit(v)}
           noOptionsText={t('topbar.noStudent')}
           sx={{
-            width: { xs: 130, sm: 230, md: 300 },
+            display: { xs: 'none', sm: 'block' },
+            width: { xs: 0, sm: 160, md: 180, lg: 220 },
+            flexShrink: 0,
             '& .MuiOutlinedInput-root': {
               background: (t) => (t.palette.mode === 'dark' ? 'rgba(30,41,59,0.6)' : '#f1f5f9'),
               borderRadius: '12px',
@@ -395,14 +378,67 @@ export default function Navbar({ onMenuClick, collapsed, onCollapseToggle }) {
           )}
         />
 
+        <IconButton
+          ref={mobileSearchButtonRef}
+          onClick={(event) => setMobileSearchAnchor(event.currentTarget)}
+          aria-label={t('topbar.search')}
+          sx={{ display: { xs: 'inline-flex', sm: 'none' }, width: 36, height: 36, p: 0.5, flexShrink: 0, border: '1px solid', borderColor: 'divider', borderRadius: '10px' }}
+        >
+          <SearchIcon sx={{ fontSize: 20 }} />
+        </IconButton>
+        <Menu
+          anchorEl={mobileSearchAnchor}
+          open={Boolean(mobileSearchAnchor)}
+          onClose={() => {
+            setMobileSearchAnchor(null)
+            setSearch('')
+            setResults([])
+            setSearchOpen(false)
+          }}
+          slotProps={{ paper: { sx: { width: 'calc(100vw - 24px)', maxWidth: 'calc(100vw - 24px)', p: 1 } } }}
+        >
+          <Box sx={{ width: '100%' }}>
+            <Autocomplete
+              freeSolo
+              fullWidth
+              autoHighlight
+              size="small"
+              options={results}
+              open={searchOpen}
+              onClose={() => setSearchOpen(false)}
+              getOptionLabel={(opt) => (typeof opt === 'string' ? opt : opt.label)}
+              groupBy={(opt) => (typeof opt === 'string' ? '' : opt.group)}
+              filterOptions={(options) => options}
+              inputValue={search}
+              onInputChange={(_, value) => setSearch(value)}
+              onChange={(_, value) => {
+                if (value && typeof value !== 'string') {
+                  goToSearchHit(value)
+                  setMobileSearchAnchor(null)
+                }
+              }}
+              noOptionsText={t('topbar.noStudent')}
+              sx={{ width: '100%' }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  inputRef={mobileSearchInputRef}
+                  autoFocus
+                  placeholder={t('topbar.search')}
+                />
+              )}
+            />
+          </Box>
+        </Menu>
+
         <Tooltip title={mode === 'dark' ? t('topbar.lightMode') : t('topbar.darkMode')}>
-          <IconButton onClick={toggleMode} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '10px' }}>
+          <IconButton onClick={toggleMode} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '10px', width: { xs: 36, sm: 40 }, height: { xs: 36, sm: 40 }, p: 0.5, flexShrink: 0 }}>
             {mode === 'dark' ? <LightMode sx={{ fontSize: 20 }} /> : <DarkMode sx={{ fontSize: 20 }} />}
           </IconButton>
         </Tooltip>
 
         <Tooltip title={lang === 'fr' ? 'English' : 'Français'}>
-          <IconButton onClick={() => setLang(lang === 'fr' ? 'en' : 'fr')} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '10px' }}>
+          <IconButton onClick={() => setLang(lang === 'fr' ? 'en' : 'fr')} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '10px', width: { xs: 36, sm: 40 }, height: { xs: 36, sm: 40 }, p: 0.5, flexShrink: 0 }}>
             <Typography variant="body2" fontWeight={800} sx={{ fontSize: 13 }}>
               {lang === 'fr' ? 'EN' : 'FR'}
             </Typography>
@@ -410,7 +446,7 @@ export default function Navbar({ onMenuClick, collapsed, onCollapseToggle }) {
         </Tooltip>
 
         <Tooltip title={t('topbar.messages')}>
-          <IconButton onClick={() => navigate('/messages')} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '10px' }}>
+          <IconButton onClick={() => navigate('/messages')} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '10px', width: { xs: 36, sm: 40 }, height: { xs: 36, sm: 40 }, p: 0.5, flexShrink: 0 }}>
             <Badge badgeContent={unreadMessages} color="error">
               <MailIcon sx={{ fontSize: 20 }} />
             </Badge>
@@ -418,7 +454,7 @@ export default function Navbar({ onMenuClick, collapsed, onCollapseToggle }) {
         </Tooltip>
 
         <Tooltip title={t('topbar.notifications')}>
-          <IconButton onClick={openNotifs} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '10px' }}>
+          <IconButton onClick={openNotifs} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '10px', width: { xs: 36, sm: 40 }, height: { xs: 36, sm: 40 }, p: 0.5, flexShrink: 0 }}>
             <Badge badgeContent={unread} color="error">
               <NotificationsIcon sx={{ fontSize: 20 }} />
             </Badge>
@@ -429,11 +465,11 @@ export default function Navbar({ onMenuClick, collapsed, onCollapseToggle }) {
           anchorEl={notifAnchor}
           open={Boolean(notifAnchor)}
           onClose={() => setNotifAnchor(null)}
-          slotProps={{ paper: { sx: { width: 380, maxHeight: 460, p: 1 } } }}
+          slotProps={{ paper: { sx: { width: { xs: 'calc(100vw - 24px)', sm: 380 }, maxWidth: 'calc(100vw - 24px)', maxHeight: 460, p: 1 } } }}
         >
-          <Box px={1.5} py={1} display="flex" alignItems="center" justifyContent="space-between">
-            <Box>
-              <Typography variant="subtitle2" fontWeight={800}>
+          <Box px={1.5} py={1} display="flex" alignItems="center" justifyContent="space-between" gap={1}>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography variant="subtitle2" fontWeight={800} sx={{ overflowWrap: 'anywhere' }}>
                 {t('topbar.notifications')}
               </Typography>
               <Typography variant="caption" color="text.secondary">
@@ -463,16 +499,16 @@ export default function Navbar({ onMenuClick, collapsed, onCollapseToggle }) {
                 bgcolor: (t) => (t.palette.mode === 'dark' ? 'rgba(59,130,246,0.08)' : 'rgba(37,99,235,0.05)'),
               }}
             >
-              <Box>
+              <Box sx={{ width: '100%', minWidth: 0 }}>
                 <Box display="flex" alignItems="center" justifyContent="space-between" gap={1}>
-                  <Typography variant="subtitle2" fontWeight={700}>{n.title}</Typography>
+                  <Typography variant="subtitle2" fontWeight={700} sx={{ minWidth: 0, overflowWrap: 'anywhere' }}>{n.title}</Typography>
                   {n.createdAt && (
-                    <Typography variant="caption" color="text.disabled" noWrap>
+                    <Typography variant="caption" color="text.disabled" noWrap sx={{ flexShrink: 0 }}>
                       {formatDateTime(n.createdAt)}
                     </Typography>
                   )}
                 </Box>
-                <Typography variant="caption" color="text.secondary" display="block">
+                <Typography variant="caption" color="text.secondary" display="block" sx={{ overflowWrap: 'anywhere' }}>
                   {n.message}
                 </Typography>
               </Box>
@@ -488,9 +524,11 @@ export default function Navbar({ onMenuClick, collapsed, onCollapseToggle }) {
           sx={{
             cursor: 'pointer',
             borderRadius: '12px',
-            p: 0.5,
-            pl: 0.6,
-            pr: 1,
+            p: { xs: 0.25, sm: 0.5 },
+            pl: { xs: 0.25, sm: 0.6 },
+            pr: { xs: 0.25, sm: 1 },
+            gap: { xs: 0, sm: 1.2 },
+            flexShrink: 0,
             border: '1px solid',
             borderColor: 'divider',
             transition: 'background 160ms ease, border-color 160ms ease',

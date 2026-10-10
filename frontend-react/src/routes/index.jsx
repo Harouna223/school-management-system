@@ -29,7 +29,6 @@ const GradesPage = lazy(() => import('../pages/grades/GradesPage'))
 const ExamsPage = lazy(() => import('../pages/exams/ExamsPage'))
 const ExamTypesPage = lazy(() => import('../pages/exams/ExamTypesPage'))
 const ConvocationsPage = lazy(() => import('../pages/convocations/ConvocationsPage'))
-const UniversityExamsPage = lazy(() => import('../pages/university/UniversityExamsPage'))
 const StagesPage = lazy(() => import('../pages/university/StagesPage'))
 const CandidaturesPage = lazy(() => import('../pages/university/CandidaturesPage'))
 const MemoiresPage = lazy(() => import('../pages/university/MemoiresPage'))
@@ -50,8 +49,6 @@ const AuditPage = lazy(() => import('../pages/audit/AuditPage'))
 const SettingsPage = lazy(() => import('../pages/settings/SettingsPage'))
 const ReportsPage = lazy(() => import('../pages/reports/ReportsPage'))
 const ProfilePage = lazy(() => import('../pages/ProfilePage'))
-const LmdPage = lazy(() => import('../pages/lmd/LmdPage'))
-const UniversityPortalPage = lazy(() => import('../pages/university/UniversityPortalPage'))
 
 /**
  * Arbre de routage de l'application.
@@ -97,7 +94,6 @@ export default function AppRoutes() {
               <Route path="/exams" element={<RoleRoute roles={['DIRECTEUR', 'SECRETAIRE']}><ExamsPage /></RoleRoute>} />
               <Route path="/exam-types" element={<RoleRoute roles={['DIRECTEUR', 'SECRETAIRE']}><ExamTypesPage /></RoleRoute>} />
               <Route path="/convocations" element={<RoleRoute roles={['DIRECTEUR', 'SECRETAIRE']}><ConvocationsPage /></RoleRoute>} />
-              <Route path="/university-exams" element={<RoleRoute roles={['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE', 'ENSEIGNANT']}><UniversityExamsPage /></RoleRoute>} />
               <Route path="/stages" element={<RoleRoute roles={['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE', 'ENSEIGNANT']}><StagesPage /></RoleRoute>} />
               <Route path="/candidatures" element={<RoleRoute roles={['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE']}><CandidaturesPage /></RoleRoute>} />
               <Route path="/memoires" element={<RoleRoute roles={['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE', 'ENSEIGNANT']}><MemoiresPage /></RoleRoute>} />
@@ -112,13 +108,11 @@ export default function AppRoutes() {
               {/* Services */}
               <Route path="/library" element={<RoleRoute roles={['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE']}><LibraryPage /></RoleRoute>} />
               <Route path="/hr" element={<RoleRoute roles={['SUPER_ADMIN', 'DIRECTEUR', 'COMPTABLE']}><HrPage /></RoleRoute>} />
-              <Route path="/lmd" element={<RoleRoute roles={['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE', 'ENSEIGNANT']}><LmdPage /></RoleRoute>} />
               <Route path="/reports" element={<RoleRoute roles={['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE', 'COMPTABLE', 'ENSEIGNANT']}><ReportsPage /></RoleRoute>} />
               <Route path="/messages" element={<MessagesPage />} />
               <Route path="/announcements" element={<AnnouncementsPage />} />
               <Route path="/my-children" element={<RoleRoute roles={['PARENT']}><ParentPortalPage /></RoleRoute>} />
               <Route path="/my-school" element={<RoleRoute roles={['ELEVE']}><StudentPortalPage /></RoleRoute>} />
-              <Route path="/my-university" element={<RoleRoute roles={['ETUDIANT']}><UniversityPortalPage /></RoleRoute>} />
               <Route path="/my-teaching" element={<RoleRoute roles={['ENSEIGNANT']}><TeacherPortalPage /></RoleRoute>} />
 
               {/* Administration */}

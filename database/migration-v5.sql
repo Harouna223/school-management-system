@@ -1,6 +1,6 @@
 -- ============================================================
 -- SCHOOL MANAGEMENT SYSTEM - MIGRATION v5
--- Phase 9 : Convocations scolaires et universitaires
+-- Convocations et stages
 -- ============================================================
 
 USE school_management;
@@ -26,30 +26,7 @@ CREATE TABLE IF NOT EXISTS convocations (
 ) ENGINE=InnoDB;
 
 -- ------------------------------------------------------------------
--- Phase 10 : Calendrier des examens universitaires
--- ------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS university_exams (
-  id BIGINT NOT NULL AUTO_INCREMENT,
-  course_unit_id BIGINT NOT NULL,
-  room_id BIGINT NULL,
-  supervisor_id BIGINT NULL,
-  exam_date DATE NOT NULL,
-  start_time TIME NOT NULL,
-  end_time TIME NOT NULL,
-  session INT NOT NULL DEFAULT 1,
-  group_name VARCHAR(50),
-  semester VARCHAR(20),
-  notes VARCHAR(255),
-  PRIMARY KEY (id),
-  KEY idx_univ_exam_ec (course_unit_id),
-  KEY idx_univ_exam_date (exam_date),
-  CONSTRAINT fk_univ_exam_ec FOREIGN KEY (course_unit_id) REFERENCES course_units (id) ON DELETE CASCADE,
-  CONSTRAINT fk_univ_exam_room FOREIGN KEY (room_id) REFERENCES rooms (id) ON DELETE SET NULL,
-  CONSTRAINT fk_univ_exam_supervisor FOREIGN KEY (supervisor_id) REFERENCES teachers (id) ON DELETE SET NULL
-) ENGINE=InnoDB;
-
--- ------------------------------------------------------------------
--- Phase 11 : Stages universitaires
+-- Stages
 -- ------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS stages (
   id BIGINT NOT NULL AUTO_INCREMENT,

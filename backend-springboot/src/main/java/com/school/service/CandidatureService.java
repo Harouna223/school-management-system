@@ -4,8 +4,6 @@ import com.school.entity.Candidature;
 import com.school.enums.CandidatureStatus;
 import com.school.exception.ResourceNotFoundException;
 import com.school.repository.CandidatureRepository;
-import com.school.repository.AcademicFieldRepository;
-import com.school.entity.AcademicField;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -25,19 +23,16 @@ import java.util.concurrent.atomic.AtomicLong;
 public class CandidatureService {
 
     private final CandidatureRepository candidatureRepository;
-    private final AcademicFieldRepository fieldRepository;
     private final AuditService auditService;
 
     private static final AtomicLong SEQUENCE = new AtomicLong(System.currentTimeMillis() % 100000);
 
     @Transactional
     public Candidature create(Candidature candidature, HttpServletRequest httpRequest) {
-        if (candidature.getField() == null || candidature.getField().getId() == null) {
+        if (candidature.getFieldName() == null || candidature.getFieldName().isBlank()) {
             throw new com.school.exception.BusinessException("La filière est obligatoire");
         }
-        AcademicField field = fieldRepository.findById(candidature.getField().getId())
-                .orElseThrow(() -> ResourceNotFoundException.of("Filière", candidature.getField().getId()));
-        candidature.setField(field);
+        candidature.setFieldName(candidature.getFieldName().trim());
         candidature.setReference("CAND-" + String.format("%06d", SEQUENCE.incrementAndGet()));
         if (candidature.getStatus() == null) {
             candidature.setStatus(CandidatureStatus.EN_ATTENTE);
@@ -60,10 +55,12 @@ public class CandidatureService {
     }
 
     @Transactional(readOnly = true)
-    public Page<Candidature> list(Long fieldId, CandidatureStatus status, int page, int size) {
+    public Page<Candidature> list(String fieldName, CandidatureStatus status, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         if (status != null) return candidatureRepository.findByStatus(status, pageable);
-        if (fieldId != null) return candidatureRepository.findByFieldId(fieldId, pageable);
+        if (fieldName != null && !fieldName.isBlank()) {
+            return candidatureRepository.findByFieldNameContainingIgnoreCase(fieldName.trim(), pageable);
+        }
         return candidatureRepository.findAll(pageable);
     }
 

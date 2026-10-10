@@ -8,9 +8,9 @@ const mockUser = (roles, permissions) => ({
 
 describe('primaryRole', () => {
   it('retourne le rôle le plus élevé', () => {
-    const user = mockUser(['ELEVE', 'ETUDIANT'])
+    const user = mockUser(['ELEVE', 'PARENT'])
     localStorage.setItem('user', JSON.stringify(user))
-    expect(primaryRole()).toBe('ETUDIANT')
+    expect(primaryRole()).toBe('PARENT')
   })
 
   it('retourne SUPER_ADMIN pour un admin', () => {

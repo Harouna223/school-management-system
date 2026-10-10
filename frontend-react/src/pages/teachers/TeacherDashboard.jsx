@@ -24,6 +24,7 @@ import EmptyState from '../../components/EmptyState'
 import FileAvatar from '../../components/FileAvatar'
 import { myApi, teacherHoursApi } from '../../api/endpoints'
 import { initials, formatDate, formatCurrency, DAYS_FR, DAY_KEYS } from '../../utils/format'
+import { getScheduleColors } from '../../utils/scheduleColors'
 
 const MONTH_LABEL = (value) => {
   if (!value) return '—'
@@ -198,38 +199,38 @@ export default function TeacherDashboard() {
               <EmptyState message="Aucun cours aujourd'hui." />
             ) : (
               <Box display="flex" flexDirection="column" gap={1.2}>
-                {todaySchedule.map((s) => (
-                  <Box
-                    key={s.id}
-                    display="flex"
-                    alignItems="center"
-                    gap={1.5}
-                    p={1.4}
-                    borderRadius="12px"
-                    border="1px solid"
-                    borderColor="divider"
-                  >
+                {todaySchedule.map((s) => {
+                  const colors = getScheduleColors(s)
+                  return (
                     <Box
-                      sx={{
-                        minWidth: 62, textAlign: 'center', borderRadius: '10px', py: 0.6,
-                        bgcolor: 'primary.light', color: 'primary.dark', fontWeight: 800, fontSize: 12,
-                      }}
+                      key={s.id}
+                      display="flex"
+                      alignItems="center"
+                      gap={1.5}
+                      p={1.4}
+                      borderRadius="12px"
+                      border="1px solid"
+                      sx={{ bgcolor: colors.background, color: colors.text, borderColor: colors.border }}
                     >
-                      {s.startTime?.slice(0, 5)}
+                      <Box
+                        sx={{
+                          minWidth: 62, px: 0.5, textAlign: 'center', whiteSpace: 'nowrap', borderRadius: '10px', py: 0.6,
+                          bgcolor: 'rgba(255,255,255,0.58)', color: colors.text, fontWeight: 800, fontSize: 12,
+                        }}
+                      >
+                        {s.startTime?.slice(0, 5)}–{s.endTime?.slice(0, 5)}
+                      </Box>
+                      <Box minWidth={0} flex={1}>
+                        <Typography variant="body2" fontWeight={700} noWrap>
+                          {s.subjectName} · {s.className}
+                        </Typography>
+                        <Typography variant="caption" sx={{ opacity: 0.78 }} noWrap display="block">
+                          {s.roomName || 'Salle non précisée'}
+                        </Typography>
+                      </Box>
                     </Box>
-                    <Box minWidth={0} flex={1}>
-                      <Typography variant="body2" fontWeight={700} noWrap>
-                        {s.subjectName} · {s.className}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary" noWrap display="block">
-                        {s.roomName || 'Salle non précisée'}
-                      </Typography>
-                    </Box>
-                    <Typography variant="caption" color="text.disabled">
-                      {s.startTime?.slice(0, 5)}–{s.endTime?.slice(0, 5)}
-                    </Typography>
-                  </Box>
-                ))}
+                  )
+                })}
               </Box>
             )}
           </Card>
@@ -257,20 +258,21 @@ export default function TeacherDashboard() {
                   display="flex"
                   alignItems="center"
                   gap={1.5}
+                  flexWrap="wrap"
                   p={1.6}
                   borderRadius="14px"
                   border="1px solid"
                   borderColor="divider"
                   mb={2}
                 >
-                  <Box flex={1}>
+                  <Box flex={1} minWidth={130}>
                     <Typography variant="caption" color="text.secondary" sx={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                       Salaire dû
                     </Typography>
                     <Typography variant="h5" fontWeight={800}>{formatCurrency(payRow.totalAmount)}</Typography>
                   </Box>
-                  <Divider orientation="vertical" flexItem />
-                  <Box flex={1}>
+                  <Divider orientation="vertical" flexItem sx={{ display: { xs: "none", sm: "block" } }} />
+                  <Box flex={1} minWidth={130}>
                     <Typography variant="caption" color="text.secondary" sx={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                       Déjà perçu
                     </Typography>
@@ -278,7 +280,7 @@ export default function TeacherDashboard() {
                   </Box>
                 </Box>
 
-                <Box display="grid" gridTemplateColumns="1fr 1fr" gap={1.4}>
+                <Box display="grid" gridTemplateColumns={{ xs: "1fr", sm: "1fr 1fr" }} gap={1.4}>
                   <MiniMetric icon={<HoursIcon />} color="secondary" label="Heures" value={`${Number(payRow.totalHours).toFixed(1)} h`} />
                   <MiniMetric icon={<PaidIcon />} color="primary" label="Tarif horaire" value={formatCurrency(payRow.hourlyRate)} />
                 </Box>
@@ -334,7 +336,7 @@ export default function TeacherDashboard() {
                           <Typography variant="body2" fontWeight={700} noWrap>{c.className}</Typography>
                           <Box display="flex" gap={0.6} flexWrap="wrap" mt={0.5}>
                             {subjects.map((s) => (
-                              <Chip key={s.assignmentId} size="small" variant="outlined" label={s.subjectName} sx={{ height: 20, fontSize: 10.5 }} />
+                              <Chip key={s.assignmentId} size="small" variant="outlined" label={s.subjectName} sx={{ height: 20, fontSize: 10.5, maxWidth: "100%", "& .MuiChip-label": { overflow: "hidden", textOverflow: "ellipsis" } }} />
                             ))}
                           </Box>
                         </Box>
@@ -385,7 +387,12 @@ export default function TeacherDashboard() {
                           {t.receiptNo} · {METHOD_LABEL[t.method] || t.method} · {formatDate(t.paymentDate)}
                         </Typography>
                       </Box>
-                      <Typography variant="caption" color="text.disabled">
+                      <Typography
+                        variant="caption"
+                        color="text.disabled"
+                        noWrap
+                        sx={{ maxWidth: { xs: 72, sm: 'none' }, flexShrink: 0 }}
+                      >
                         {MONTH_LABEL((t.monthDate || '').slice(0, 7))}
                       </Typography>
                     </Box>

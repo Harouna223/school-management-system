@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 
 /**
  * Élément de timeline du parcours académique d'un enfant.
- * Fusionne l'historique scolaire (StudentHistory) et universitaire (EnrollmentHistory).
+ * Alimenté par l'historique scolaire (StudentHistory).
  */
 @Data
 @Builder

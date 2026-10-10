@@ -166,8 +166,6 @@ vi.mock('../../api/endpoints', () => {
   return {
     dashboardApi: {
       stats: () => ok({}),
-      universityStats: () => ok({}),
-      universityReport: () => ok({}),
       auditLogs: () => ok({ content: [] }),
     },
     myApi: {

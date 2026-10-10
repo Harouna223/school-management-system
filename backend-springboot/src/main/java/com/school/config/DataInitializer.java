@@ -1,20 +1,15 @@
 package com.school.config;
 
-import com.school.entity.AcademicRule;
-import com.school.entity.LmdEnrollment;
 import com.school.entity.Permission;
 import com.school.entity.Role;
 import com.school.entity.Setting;
 import com.school.entity.User;
 import com.school.entity.Level;
 import com.school.enums.EducationCycle;
-import com.school.repository.AcademicRuleRepository;
 import com.school.repository.LevelRepository;
-import com.school.repository.LmdEnrollmentRepository;
 import com.school.repository.PermissionRepository;
 import com.school.repository.RoleRepository;
 import com.school.repository.SettingRepository;
-import com.school.repository.StudentRepository;
 import com.school.repository.UserRepository;
 import com.school.service.SettingService;
 import lombok.RequiredArgsConstructor;
@@ -51,9 +46,6 @@ public class DataInitializer implements CommandLineRunner {
     private final SettingService settingService;
     private final PasswordEncoder passwordEncoder;
     private final LevelRepository levelRepository;
-    private final AcademicRuleRepository academicRuleRepository;
-    private final LmdEnrollmentRepository lmdEnrollmentRepository;
-    private final StudentRepository studentRepository;
 
     @Value("${app.admin.username:admin}")
     private String adminUsername;
@@ -118,10 +110,6 @@ public class DataInitializer implements CommandLineRunner {
         ROLE_PERMISSIONS.put("ELEVE", Set.of(
                 "GRADE_READ", "ATTENDANCE_READ", "PAYMENT_READ", "SCHEDULE_READ",
                 "COMMUNICATION_READ"));
-        // Étudiant universitaire : accès LMD en lecture + son propre espace
-        ROLE_PERMISSIONS.put("ETUDIANT", Set.of(
-                "LMD_READ", "STUDENT_READ", "GRADE_READ", "ATTENDANCE_READ",
-                "PAYMENT_READ", "SCHEDULE_READ", "COMMUNICATION_READ"));
     }
 
     @Override
@@ -130,67 +118,6 @@ public class DataInitializer implements CommandLineRunner {
         initializeAdmin();
         seedSettings();
         seedLevelCycles();
-        seedAcademicRules();
-        migrateEtudiantRole();
-    }
-
-    /**
-     * Migration idempotente : tout utilisateur lié à un étudiant ayant au moins
-     * une inscription LMD reçoit le rôle ETUDIANT. Ne retire jamais ELEVE.
-     */
-    private void migrateEtudiantRole() {
-        List<com.school.entity.LmdEnrollment> enrollments = lmdEnrollmentRepository.findAll();
-        Set<Long> studentIds = enrollments.stream()
-                .map(e -> e.getStudent().getId())
-                .collect(Collectors.toSet());
-        Optional<Role> etudiantRole = roleRepository.findByName("ETUDIANT");
-        if (etudiantRole.isEmpty()) {
-            return;
-        }
-        int migrated = 0;
-        for (Long studentId : studentIds) {
-            com.school.entity.Student student = studentRepository.findById(studentId).orElse(null);
-            if (student == null || student.getUser() == null) continue;
-            User user = student.getUser();
-            if (user.getRoles().stream().noneMatch(r -> r.getName().equals("ETUDIANT"))) {
-                user.getRoles().add(etudiantRole.get());
-                userRepository.save(user);
-                migrated++;
-            }
-        }
-        if (migrated > 0) {
-            log.info("Rôle ETUDIANT attribué à {} compte(s) universitaire(s)", migrated);
-        }
-    }
-
-    /**
-     * Règles académiques par défaut (cycle UNIVERSITE) si absentes.
-     * Idempotent : les règles existantes ne sont pas écrasées.
-     */
-    private void seedAcademicRules() {
-        Map<String, String> defaults = Map.ofEntries(
-                Map.entry("validation_threshold", "10"),
-                Map.entry("compensation_enabled", "true"),
-                Map.entry("mention_passable", "10"),
-                Map.entry("mention_assez_bien", "12"),
-                Map.entry("mention_bien", "14"),
-                Map.entry("mention_tres_bien", "16"),
-                Map.entry("mention_excellent", "18"));
-        int created = 0;
-        for (Map.Entry<String, String> entry : defaults.entrySet()) {
-            if (academicRuleRepository.findByCycleAndRuleKey("UNIVERSITE", entry.getKey()).isEmpty()) {
-                academicRuleRepository.save(AcademicRule.builder()
-                        .cycle("UNIVERSITE")
-                        .ruleKey(entry.getKey())
-                        .ruleValue(entry.getValue())
-                        .description("Règle LMD : " + entry.getKey())
-                        .build());
-                created++;
-            }
-        }
-        if (created > 0) {
-            log.info("Règles académiques par défaut créées : {}", created);
-        }
     }
 
     /**

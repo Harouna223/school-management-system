@@ -2,19 +2,15 @@ package com.school.service;
 
 import com.school.dto.response.AcademicTimelineEntry;
 import com.school.dto.response.BulletinResponse;
-import com.school.entity.EnrollmentHistory;
 import com.school.entity.Parent;
 import com.school.entity.Student;
 import com.school.entity.StudentHistory;
 import com.school.entity.User;
-import com.school.enums.EnrollmentStatus;
 import com.school.enums.StudentHistoryAction;
 import com.school.exception.BusinessException;
 import com.school.repository.AttendanceRepository;
 import com.school.repository.BulletinRepository;
-import com.school.repository.EnrollmentHistoryRepository;
 import com.school.repository.GradeRepository;
-import com.school.repository.LmdEnrollmentRepository;
 import com.school.repository.ParentRepository;
 import com.school.repository.StudentHistoryRepository;
 import com.school.repository.StudentRepository;
@@ -52,12 +48,6 @@ class ParentServiceTest {
     @Mock
     private StudentHistoryRepository studentHistoryRepository;
     @Mock
-    private EnrollmentHistoryRepository enrollmentHistoryRepository;
-    @Mock
-    private LmdEnrollmentRepository lmdEnrollmentRepository;
-    @Mock
-    private LmdService lmdService;
-    @Mock
     private GradeService gradeService;
 
     private ParentService service;
@@ -65,8 +55,7 @@ class ParentServiceTest {
     @BeforeEach
     void setUp() {
         service = new ParentService(parentRepository, studentRepository, bulletinRepository,
-                attendanceRepository, gradeRepository, studentHistoryRepository,
-                enrollmentHistoryRepository, lmdEnrollmentRepository, lmdService, gradeService);
+                attendanceRepository, gradeRepository, studentHistoryRepository, gradeService);
     }
 
     private User user(Long id) {
@@ -115,7 +104,7 @@ class ParentServiceTest {
     }
 
     @Test
-    void childTimelineMergesSchoolAndUniversity() {
+    void childTimelineReturnsSchoolEntriesOnly() {
         Parent parent = parent(10L, 1L);
         Student ownChild = child(20L, parent);
         when(parentRepository.findByUserIdOrderByIdAsc(1L)).thenReturn(List.of(parent));
@@ -124,25 +113,18 @@ class ParentServiceTest {
         StudentHistory school = StudentHistory.builder()
                 .id(1L).student(ownChild).action(StudentHistoryAction.TRANSFER)
                 .fromClass("6ème").toClass("5ème").createdAt(LocalDateTime.of(2023, 9, 1, 10, 0)).build();
-        EnrollmentHistory university = EnrollmentHistory.builder()
-                .id(2L).student(ownChild).fromLevel("L1").toLevel("L2")
-                .academicYear("2025-2026").enrollmentStatus(EnrollmentStatus.INSCRIT)
-                .createdAt(LocalDateTime.of(2025, 9, 1, 10, 0)).build();
 
         when(studentHistoryRepository.findByStudentIdOrderByCreatedAtDesc(20L)).thenReturn(List.of(school));
-        when(enrollmentHistoryRepository.findByStudentIdOrderByCreatedAtDesc(20L)).thenReturn(List.of(university));
 
         try (MockedStatic<com.school.utils.SecurityUtils> utils =
                      mockStatic(com.school.utils.SecurityUtils.class)) {
             utils.when(com.school.utils.SecurityUtils::currentUserId).thenReturn(1L);
             List<AcademicTimelineEntry> timeline = service.childTimeline(20L);
-            assertThat(timeline).hasSize(2);
-            // Tri décroissant : université (2025) en premier, école (2023) ensuite
-            assertThat(timeline.get(0).getContext()).isEqualTo("UNIVERSITY");
-            assertThat(timeline.get(1).getContext()).isEqualTo("SCHOOL");
-            assertThat(timeline.get(0).getAction()).isEqualTo("ENROLLMENT_INSCRIT");
-            assertThat(timeline.get(0).getFromLabel()).isEqualTo("L1");
-            assertThat(timeline.get(0).getToLabel()).isEqualTo("L2");
+            assertThat(timeline).hasSize(1);
+            assertThat(timeline.get(0).getContext()).isEqualTo("SCHOOL");
+            assertThat(timeline.get(0).getAction()).isEqualTo("TRANSFER");
+            assertThat(timeline.get(0).getFromLabel()).isEqualTo("6ème");
+            assertThat(timeline.get(0).getToLabel()).isEqualTo("5ème");
         }
     }
 

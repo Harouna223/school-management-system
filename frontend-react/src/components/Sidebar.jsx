@@ -7,7 +7,6 @@ import {
   Dashboard as DashboardIcon,
   People as StudentsIcon,
   School as TeachersIcon,
-  AccountBalance as UniversityIcon,
   Class as ClassesIcon,
   MenuBook as SubjectsIcon,
   CalendarMonth as ScheduleIcon,
@@ -29,7 +28,6 @@ import {
   Settings as SettingsIcon,
   ChevronLeft,
   ChevronRight,
-  AccountTree as LmdIcon,
   Assessment as ReportsIcon,
   Assignment as AssignmentIcon,
   EditNote as EditNoteIcon,
@@ -88,7 +86,6 @@ const NAV_GROUPS = [
       { key: 'exams', label: 'nav.exams', icon: <ExamsIcon />, to: '/exams', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE'], requires: 'school' },
       { key: 'exam-types', label: 'nav.examTypes', icon: <EditNoteIcon />, to: '/exam-types', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE'], requires: 'school' },
       { key: 'convocations', label: 'nav.convocations', icon: <ConvocationIcon />, to: '/convocations', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE'] },
-      { key: 'university-exams', label: 'nav.universityExams', icon: <ExamsIcon />, to: '/university-exams', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE', 'ENSEIGNANT'], requires: 'university' },
       { key: 'stages', label: 'nav.stages', icon: <AssignmentIcon />, to: '/stages', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE', 'ENSEIGNANT'], requires: 'university' },
       { key: 'candidatures', label: 'nav.candidatures', icon: <AssignmentIcon />, to: '/candidatures', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE'], requires: 'university' },
       { key: 'memoires', label: 'nav.memoires', icon: <EditNoteIcon />, to: '/memoires', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE', 'ENSEIGNANT'], requires: 'university' },
@@ -110,7 +107,6 @@ const NAV_GROUPS = [
     items: [
       { key: 'library', label: 'nav.library', icon: <LibraryIcon />, to: '/library', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE'] },
       { key: 'hr', label: 'nav.hr', icon: <HrIcon />, to: '/hr', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'COMPTABLE'] },
-      { key: 'lmd', label: 'nav.lmd', icon: <LmdIcon />, to: '/lmd', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE', 'ENSEIGNANT'], requires: 'university' },
       { key: 'messages', label: 'nav.messages', icon: <MessagesIcon />, to: '/messages', roles: 'all' },
       { key: 'announcements', label: 'nav.announcements', icon: <AnnouncementsIcon />, to: '/announcements', roles: 'all' },
     ],
@@ -120,9 +116,6 @@ const NAV_GROUPS = [
     items: [
       { key: 'children', label: 'nav.children', icon: <ChildrenIcon />, to: '/my-children', roles: ['PARENT'], requires: 'school' },
       { key: 'my-school', label: 'nav.my-school', icon: <StudentsIcon />, to: '/my-school', roles: ['ELEVE'], requires: 'school' },
-      // Espace universitaire réservé au rôle ETUDIANT (harmonisation des rôles) :
-      // un élève du scolaire (ELEVE) ne voit plus un espace qu'il n'a pas.
-      { key: 'my-university', label: 'nav.my-university', icon: <UniversityIcon />, to: '/my-university', roles: ['ETUDIANT'], requires: 'university' },
       { key: 'my-teaching', label: 'nav.my-teaching', icon: <TeachersIcon />, to: '/my-teaching', roles: ['ENSEIGNANT'], requires: 'school' },
     ],
   },
@@ -136,7 +129,6 @@ const ROLE_LABELS = {
   ENSEIGNANT: 'role.ENSEIGNANT',
   PARENT: 'role.PARENT',
   ELEVE: 'role.ELEVE',
-  ETUDIANT: 'role.ETUDIANT',
 }
 
 /**

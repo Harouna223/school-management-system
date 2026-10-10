@@ -71,11 +71,17 @@ public class GradeService {
 
         BigDecimal maxValue = request.getMaxValue() != null ? request.getMaxValue()
                 : BigDecimal.valueOf(20);
-        if (request.getValue().compareTo(maxValue) > 0) {
-            throw new BusinessException("La note ne peut pas dépasser " + maxValue);
+        if (maxValue.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessException("Le barème doit être supérieur à zéro");
+        }
+        if (request.getValue() == null) {
+            throw new BusinessException("La note est obligatoire");
         }
         if (request.getValue().compareTo(BigDecimal.ZERO) < 0) {
             throw new BusinessException("La note ne peut pas être négative");
+        }
+        if (request.getValue().compareTo(maxValue) > 0) {
+            throw new BusinessException("La note ne peut pas dépasser " + maxValue);
         }
 
         Grade grade = gradeRepository.findByStudentIdAndExamId(student.getId(), exam.getId())
@@ -85,6 +91,7 @@ public class GradeService {
                         .maxValue(maxValue)
                         .build());
         grade.setValue(request.getValue());
+        grade.setMaxValue(maxValue);
         grade.setAppreciation(request.getAppreciation());
 
         Grade saved = gradeRepository.save(grade);
@@ -109,7 +116,13 @@ public class GradeService {
         for (Grade g : grades) {
             BigDecimal weight = BigDecimal.valueOf(g.getExam().getCoefficient())
                     .multiply(BigDecimal.valueOf(g.getExam().getSubject().getCoefficient()));
-            totalWeighted = totalWeighted.add(g.getValue().multiply(weight));
+            BigDecimal maxValue = g.getMaxValue() != null ? g.getMaxValue() : BigDecimal.valueOf(20);
+            if (maxValue.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new BusinessException("Le barème d'une note doit être supérieur à zéro");
+            }
+            BigDecimal normalizedValue = g.getValue().multiply(BigDecimal.valueOf(20))
+                    .divide(maxValue, 8, RoundingMode.HALF_UP);
+            totalWeighted = totalWeighted.add(normalizedValue.multiply(weight));
             totalWeight = totalWeight.add(weight);
         }
         return totalWeight.compareTo(BigDecimal.ZERO) == 0 ? null

@@ -119,9 +119,15 @@ docker compose -f docker/docker-compose.yml ps
 Attendre que `school-backend` devienne `healthy` (1 à 2 min au premier démarrage).
 Au premier lancement :
 
-- le schéma SQL (`database/schema.sql`) initialise la base ;
-- Hibernate crée automatiquement les nouvelles tables (`settings`, `academic_years`,
-  `faculties`, LMD, etc.) via `ddl-auto: update` ;
+- **Flyway** applique automatiquement les migrations de schéma au démarrage depuis
+  `backend-springboot/src/main/resources/db/migration` (`V1__baseline.sql`) ; Hibernate
+  reste en `ddl-auto: validate` et ne crée plus les tables lui-même ;
+- si la base existe déjà sans historique Flyway, `baseline-on-migrate: true` enregistre
+  la version `1` comme baseline **sans rejouer** `V1` (aucune table recréée sur une base
+  déjà en production), puis les migrations suivantes s'appliquent normalement ;
+- ces migrations créent notamment les tables `settings`, `academic_years`, `convocations`,
+  `teacher_hourly_rates`, `teacher_work_hours`, `stages`, `memoires`, `alumni`,
+  `candidatures`… ;
 - `DataInitializer` crée le compte admin et les permissions.
 
 ### Accès initial
@@ -289,8 +295,11 @@ docker compose -f docker/docker-compose.yml up -d --build
 docker compose -f docker/docker-compose.yml ps
 ```
 
-> Hibernate applique automatiquement les évolutions de schéma (`ddl-auto: update`).
-> Pour les très grosses évolutions, faire une sauvegarde SQL complète avant.
+> **Flyway** est la source de vérité du schéma : les évolutions sont appliquées
+> automatiquement au démarrage depuis `db/migration` (`ddl-auto: validate` côté Hibernate,
+> `baseline-on-migrate` pour une base existante). Toute évolution = un nouveau fichier
+> `Vn__description.sql`. Pour les très grosses évolutions, faire une sauvegarde SQL
+> complète avant.
 
 ---
 

@@ -16,10 +16,10 @@ spring:
     show-sql: false
     # D10 — open-in-view (PHASE 7 : bascule a false effectuee).
     # La cible stricte est maintenant la valeur par defaut : les connexions sont
-    # liberees en fin de transaction et les N+1 reels sont exposes. Le seul
-    # endpoint qui echouait en sérialisation hors transaction (/api/lmd/fields,
-    # entité AcademicField + relations LAZY) est couvert par @EntityGraph dans
-    # AcademicFieldRepository. Pilotage conservable via la variable OPEN_IN_VIEW.
+    # liberees en fin de transaction et les N+1 reels sont exposes. Les endpoints
+    # qui echouaient en serialisation hors transaction sont couverts par des
+    # @EntityGraph dans les repositories concernes.
+    # Pilotage conservable via la variable OPEN_IN_VIEW.
     open-in-view: ${OPEN_IN_VIEW:false}
   mail:
     host: ${MAIL_HOST:smtp.gmail.com}

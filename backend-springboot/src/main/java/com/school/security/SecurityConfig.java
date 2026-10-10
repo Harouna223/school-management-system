@@ -52,14 +52,14 @@ public class SecurityConfig {
                         // Endpoints publics (connexion uniquement)
                         .requestMatchers("/api/auth/login", "/api/auth/refresh", "/api/auth/logout",
                                 "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html",
-                                "/actuator/health", "/actuator/health/**",
-                                // Vérification d'authenticité d'une attestation universitaire :
-                                // destinée à un tiers (QR code) ; n'expose que les données d'un
-                                // jeton signé valide, jamais un accès aux données de l'étudiant.
-                                "/api/lmd/attestation/verify").permitAll()
+                                "/actuator/health", "/actuator/health/**").permitAll()
                         // Création de compte : réservée aux gestionnaires d'utilisateurs
                         .requestMatchers("/api/auth/register")
                         .hasAnyAuthority("PERM_USER_WRITE")
+                        // Les journaux contiennent des données personnelles : cette règle
+                        // précise doit précéder la règle générale des communications.
+                        .requestMatchers(HttpMethod.GET, "/api/communication/message-logs/**")
+                        .hasAnyAuthority("PERM_USER_READ", "ROLE_SUPER_ADMIN", "ROLE_ADMIN")
                         // Accès par permission sur les modules (READ / WRITE)
                         .requestMatchers(HttpMethod.GET, "/api/students/**").hasAnyAuthority("PERM_STUDENT_READ")
                         .requestMatchers("/api/students/**").hasAnyAuthority("PERM_STUDENT_WRITE")
@@ -94,9 +94,6 @@ public class SecurityConfig {
                         .requestMatchers("/api/library/**").hasAnyAuthority("PERM_LIBRARY_WRITE")
                         .requestMatchers(HttpMethod.GET, "/api/communication/**").hasAnyAuthority("PERM_COMMUNICATION_READ")
                         .requestMatchers("/api/communication/**").hasAnyAuthority("PERM_COMMUNICATION_WRITE")
-                        // Logs de messages : réservés aux gestionnaires d'utilisateurs (contiennent des données personnelles)
-                        .requestMatchers(HttpMethod.GET, "/api/communication/message-logs/**")
-                        .hasAnyAuthority("PERM_USER_READ")
                         // Recherche globale : réservée aux rôles d'administration (expose données personnelles et financières)
                         .requestMatchers(HttpMethod.GET, "/api/search/**")
                         .hasAnyAuthority("PERM_REPORT_READ", "PERM_USER_READ")
@@ -106,15 +103,10 @@ public class SecurityConfig {
                         // écriture par l'administration
                         .requestMatchers(HttpMethod.GET, "/api/convocations/**").authenticated()
                         .requestMatchers("/api/convocations/**").hasAnyAuthority("PERM_STUDENT_WRITE")
-                        .requestMatchers(HttpMethod.GET, "/api/lmd/**").hasAnyAuthority("PERM_LMD_READ")
-                        .requestMatchers("/api/lmd/**").hasAnyAuthority("PERM_LMD_WRITE")
-                        // Examens universitaires : mêmes règles que le module LMD
-                        .requestMatchers(HttpMethod.GET, "/api/university-exams/**").hasAnyAuthority("PERM_LMD_READ")
-                        .requestMatchers("/api/university-exams/**").hasAnyAuthority("PERM_LMD_WRITE")
-                        // Stages universitaires : mêmes règles que le module LMD
+                        // Stages : mêmes règles d'autorisation que les autres modules annexes
                         .requestMatchers(HttpMethod.GET, "/api/stages/**").hasAnyAuthority("PERM_LMD_READ")
                         .requestMatchers("/api/stages/**").hasAnyAuthority("PERM_LMD_WRITE")
-                        // Admission, mémoires, alumni : mêmes règles que le module LMD
+                        // Admission, mémoires, alumni : mêmes règles que les autres modules annexes
                         .requestMatchers(HttpMethod.GET, "/api/candidatures/**").hasAnyAuthority("PERM_LMD_READ")
                         .requestMatchers("/api/candidatures/**").hasAnyAuthority("PERM_LMD_WRITE")
                         .requestMatchers(HttpMethod.GET, "/api/memoires/**").hasAnyAuthority("PERM_LMD_READ")
@@ -126,6 +118,10 @@ public class SecurityConfig {
                         .hasAnyAuthority("PERM_USER_READ", "ROLE_SUPER_ADMIN", "ROLE_ADMIN")
                         .requestMatchers("/api/users/**", "/api/roles/**", "/api/audit/**")
                         .hasAnyAuthority("PERM_USER_WRITE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN")
+                        // Les statistiques globales contiennent notamment des données financières.
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/dashboard/stats")
+                        .hasAnyAuthority("PERM_REPORT_READ", "ROLE_SUPER_ADMIN", "ROLE_ADMIN")
                         // Journal d'audit : lecture réservée aux rôles autorisés
                         .requestMatchers(HttpMethod.GET, "/api/dashboard/audit-logs/**")
                         .hasAnyAuthority("PERM_USER_READ")

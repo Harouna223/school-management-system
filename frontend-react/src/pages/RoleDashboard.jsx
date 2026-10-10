@@ -18,7 +18,7 @@ export const ADMIN_ROLES = ['SUPER_ADMIN', 'DIRECTEUR', 'COMPTABLE', 'SECRETAIRE
  * multi-rôles voit ainsi le tableau de bord correspondant à son rôle principal.
  *
  * @param {string[]} roles Rôles de l'utilisateur connecté
- * @returns {'ADMIN'|'ENSEIGNANT'|'PARENT'|'ETUDIANT'|'ELEVE'|'NONE'}
+ * @returns {'ADMIN'|'ENSEIGNANT'|'PARENT'|'ELEVE'|'NONE'}
  */
 export function resolveDashboardRole(roles = []) {
   const primary = ROLE_PRIORITY.find((role) => roles.includes(role))
@@ -32,7 +32,6 @@ export function resolveDashboardRole(roles = []) {
  *  - parent   → synthèse multi-enfants
  *  - élève    → synthèse de la scolarité
  *  - enseignant → classes, charge horaire et rémunération
- *  - étudiant → redirigé vers son espace universitaire (pas de tableau de bord dédié)
  */
 export default function RoleDashboard() {
   const user = useSelector((state) => state.auth.user)
@@ -47,8 +46,6 @@ export default function RoleDashboard() {
       return <TeacherDashboard />
     case 'ELEVE':
       return <StudentDashboard />
-    case 'ETUDIANT':
-      return <Navigate to="/my-university" replace />
     default:
       return <Navigate to="/profile" replace />
   }
