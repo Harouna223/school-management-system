@@ -1,6 +1,5 @@
 package com.school.dto.request;
 
-import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -24,7 +23,6 @@ public class GradeRequest {
 
     @NotNull(message = "La note est obligatoire")
     @DecimalMin(value = "0.0", message = "La note minimale est 0")
-    @DecimalMax(value = "20.0", message = "La note maximale est 20")
     private BigDecimal value;
 
     private BigDecimal maxValue;
