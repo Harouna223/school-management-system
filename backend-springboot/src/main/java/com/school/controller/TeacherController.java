@@ -15,9 +15,11 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import jakarta.validation.constraints.Min;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -28,6 +30,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/teachers")
 @RequiredArgsConstructor
+@Validated
 @Tag(name = "Enseignants", description = "Gestion des enseignants")
 public class TeacherController {
 
@@ -39,7 +42,7 @@ public class TeacherController {
     public ResponseEntity<ApiResponse<PageResponse<TeacherResponse>>> search(
             @RequestParam(required = false) String search,
             @RequestParam(required = false) TeacherStatus status,
-            @RequestParam(defaultValue = "0") int page,
+            @Min(value = 0, message = "Le numéro de page ne peut pas être négatif") @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         return ok("Recherche réussie", teacherService.search(search, status, page, size));
     }

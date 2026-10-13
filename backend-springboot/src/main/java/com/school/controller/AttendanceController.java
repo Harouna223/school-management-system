@@ -40,6 +40,9 @@ public class AttendanceController {
     @Operation(summary = "Présences d'une classe pour une date")
     public ResponseEntity<ApiResponse<List<AttendanceResponse>>> byClassAndDate(
             @PathVariable Long classId, @RequestParam LocalDate date) {
+        // Liste nominative d'une classe : réservée au personnel (un parent
+        // consulte les présences de son enfant via /student/{id}).
+        accessControlService.assertStaffOnly("le pointage d'une classe");
         return ok("Présences", attendanceService.listByClassAndDate(classId, date));
     }
 
@@ -87,6 +90,7 @@ public class AttendanceController {
             @RequestParam Long classId,
             @RequestParam(required = false) LocalDate from,
             @RequestParam(required = false) LocalDate to) {
+        accessControlService.assertStaffOnly("le rapport de présences d'une classe");
         return ok("Rapport de présences", attendanceService.classReport(classId, from, to));
     }
 
@@ -96,6 +100,7 @@ public class AttendanceController {
                              @RequestParam Long classId,
                              @RequestParam(required = false) LocalDate from,
                              @RequestParam(required = false) LocalDate to) throws IOException {
+        accessControlService.assertStaffOnly("l'export du rapport de présences");
         List<AttendanceReportRow> rows = attendanceService.classReport(classId, from, to);
         List<String[]> data = rows.stream()
                 .map(r -> new String[]{r.getMatricule(), r.getLastName(), r.getFirstName(),
@@ -114,6 +119,7 @@ public class AttendanceController {
                                 @RequestParam Long classId,
                                 @RequestParam(required = false) LocalDate from,
                                 @RequestParam(required = false) LocalDate to) throws IOException {
+        accessControlService.assertStaffOnly("l'export du rapport de présences");
         List<AttendanceReportRow> rows = attendanceService.classReport(classId, from, to);
         List<String[]> data = rows.stream()
                 .map(r -> new String[]{r.getMatricule(), r.getLastName(), r.getFirstName(),
@@ -133,6 +139,7 @@ public class AttendanceController {
     @Operation(summary = "Présences des enseignants pour une date")
     public ResponseEntity<ApiResponse<List<TeacherAttendanceResponse>>> teachersByDate(
             @RequestParam LocalDate date) {
+        accessControlService.assertStaffOnly("les présences des enseignants");
         return ok("Présences des enseignants", attendanceService.listTeachersByDate(date));
     }
 

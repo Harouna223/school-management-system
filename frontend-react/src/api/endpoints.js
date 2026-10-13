@@ -183,7 +183,8 @@ export const myApi = {
  */
 export const examApi = {
   search: (params) => api.get('/exams', { params }),
-  byClass: (classId) => api.get(`/exams/class/${classId}`),
+  byClass: (classId, yearId) =>
+    api.get(`/exams/class/${classId}`, { params: yearId ? { yearId } : undefined }),
   get: (id) => api.get(`/exams/${id}`),
   create: (data) => api.post('/exams', data),
   update: (id, data) => api.put(`/exams/${id}`, data),
@@ -192,17 +193,22 @@ export const examApi = {
   gradesByExam: (examId) => api.get(`/exams/${examId}/grades`),
   saveGrade: (data) => api.post('/exams/grades', data),
   gradesByStudent: (studentId) => api.get(`/exams/student/${studentId}/grades`),
-  average: (studentId, term) => api.get(`/exams/student/${studentId}/average`, { params: { term } }),
-  ranking: (classId, term) => api.get(`/exams/class/${classId}/ranking`, { params: { term } }),
-  generateBulletins: (classId, term) =>
-    api.post(`/exams/class/${classId}/bulletins`, null, { params: { term } }),
-  deliberate: (classId, term) =>
-    api.post(`/exams/class/${classId}/deliberation`, null, { params: { term } }),
-  deliberationPv: (classId, term) =>
-    api.get(`/exams/class/${classId}/deliberation/pv`, { params: { term }, responseType: 'blob' }),
+  average: (studentId, term, yearId) =>
+    api.get(`/exams/student/${studentId}/average`, { params: { term, yearId } }),
+  ranking: (classId, term, yearId) =>
+    api.get(`/exams/class/${classId}/ranking`, { params: { term, yearId } }),
+  generateBulletins: (classId, term, yearId) =>
+    api.post(`/exams/class/${classId}/bulletins`, null, { params: { term, yearId } }),
+  deliberate: (classId, term, yearId) =>
+    api.post(`/exams/class/${classId}/deliberation`, null, { params: { term, yearId } }),
+  deliberationPv: (classId, term, yearId) =>
+    api.get(`/exams/class/${classId}/deliberation/pv`,
+      { params: { term, yearId }, responseType: 'blob' }),
   bulletinsByStudent: (studentId) => api.get(`/exams/student/${studentId}/bulletins`),
   bulletinPdf: (bulletinId) => api.get(`/exams/bulletins/${bulletinId}/pdf`, { responseType: 'blob' }),
-  classBulletinsPdf: (classId, term) => api.get(`/exams/class/${classId}/bulletins/pdf`, { params: { term }, responseType: 'blob' }),
+  classBulletinsPdf: (classId, term, yearId) =>
+    api.get(`/exams/class/${classId}/bulletins/pdf`,
+      { params: { term, yearId }, responseType: 'blob' }),
 }
 
 /**

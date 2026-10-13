@@ -24,8 +24,10 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.constraints.Min;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -42,6 +44,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/teacher-hours")
 @RequiredArgsConstructor
+@Validated
 @Tag(name = "Heures & Paie des enseignants",
         description = "Tarifs horaires, heures enseignées, salaires mensuels, paiements et reçus")
 public class TeacherPayrollController {
@@ -88,7 +91,7 @@ public class TeacherPayrollController {
             @RequestParam(required = false) LocalDate from,
             @RequestParam(required = false) LocalDate to,
             @RequestParam(required = false) Long academicYearId,
-            @RequestParam(defaultValue = "0") int page,
+            @Min(value = 0, message = "Le numéro de page ne peut pas être négatif") @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         return ok("Historique des heures",
                 hoursService.search(teacherId, subjectId, classId, from, to, academicYearId, page, size));
@@ -127,7 +130,10 @@ public class TeacherPayrollController {
     // ---------- Calcul mensuel ----------
 
     @GetMapping("/monthly")
-    @Operation(summary = "Tableau de calcul des salaires pour un mois (heures × tarif)")
+    @Operation(summary = "Tableau de calcul des salaires pour un mois (heures × tarif)",
+            description = "Salaires de tous les professeurs : réservé à la paie / la direction. "
+                    + "Un enseignant consulte son propre espace via /my/monthly")
+    @PreAuthorize("hasAnyAuthority('PERM_HOURS_PAY','PERM_HOURS_WRITE')")
     public ResponseEntity<ApiResponse<List<TeacherPayrollRowResponse>>> monthly(
             @RequestParam LocalDate month,
             @RequestParam(required = false) Long teacherId,
@@ -146,7 +152,10 @@ public class TeacherPayrollController {
     }
 
     @GetMapping("/transactions")
-    @Operation(summary = "Historique des paiements")
+    @Operation(summary = "Historique des paiements",
+            description = "Paiements de tous les professeurs : réservé à la paie / la direction. "
+                    + "Un enseignant consulte ses propres paiements via /my/transactions")
+    @PreAuthorize("hasAnyAuthority('PERM_HOURS_PAY','PERM_HOURS_WRITE')")
     public ResponseEntity<ApiResponse<List<TeacherPaymentTransactionResponse>>> transactions(
             @RequestParam(required = false) Long teacherId,
             @RequestParam(required = false) LocalDate month,
@@ -157,7 +166,24 @@ public class TeacherPayrollController {
                 ? com.school.enums.PaymentMethod.valueOf(method) : null;
         return ok("Historique des paiements",
                 payrollService.transactions(teacherId, month != null ? month.withDayOfMonth(1) : null,
-                        paymentMethod, from, to));
+                        paymentMethod, from, normalizeUpperBound(to)));
+    }
+
+    /**
+     * Rend la borne haute INCLUSIVE.
+     *
+     * <p>La requête du dépôt utilise {@code paymentDate < :to} (borne exclusive).
+     * Une borne saisie « 2026-09-30T00:00 » excluait donc TOUTE la journée du 30 :
+     * l'historique perdait le dernier jour de la période. Un {@code to} sans heure
+     * est repoussé au lendemain à minuit ; un {@code to} horodaté est inclus à la
+     * nanoseconde près.</p>
+     */
+    private LocalDateTime normalizeUpperBound(LocalDateTime to) {
+        if (to == null) {
+            return null;
+        }
+        boolean sansHeure = to.toLocalTime().equals(java.time.LocalTime.MIDNIGHT);
+        return sansHeure ? to.plusDays(1) : to.plusNanos(1);
     }
 
     // ---------- Reçu PDF ----------
@@ -193,7 +219,9 @@ public class TeacherPayrollController {
     // ---------- Rapports ----------
 
     @GetMapping("/report/monthly")
-    @Operation(summary = "État mensuel des paiements des enseignants (PDF)")
+    @Operation(summary = "État mensuel des paiements des enseignants (PDF)",
+            description = "Document nominatif de tous les professeurs : réservé à la paie / la direction")
+    @PreAuthorize("hasAnyAuthority('PERM_HOURS_PAY','PERM_HOURS_WRITE')")
     public void monthlyReport(HttpServletResponse response,
                               @RequestParam LocalDate month,
                               @RequestParam(required = false) Long teacherId) throws IOException {

@@ -9,8 +9,10 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -22,6 +24,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/convocations")
 @RequiredArgsConstructor
+@Validated
 @Tag(name = "Convocations", description = "Convocations scolaires et universitaires")
 public class ConvocationController {
 
@@ -39,7 +42,7 @@ public class ConvocationController {
     @Operation(summary = "Liste paginée des convocations")
     public ResponseEntity<ApiResponse<com.school.dto.response.PageResponse<ConvocationResponse>>> list(
             @RequestParam(required = false) Long studentId,
-            @RequestParam(defaultValue = "0") int page,
+            @Min(value = 0, message = "Le numéro de page ne peut pas être négatif") @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         if (studentId != null) {
             accessControlService.assertCanAccessStudentData(studentId);

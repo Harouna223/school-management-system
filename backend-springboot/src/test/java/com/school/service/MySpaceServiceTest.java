@@ -22,6 +22,7 @@ import com.school.repository.StudentRepository;
 import com.school.repository.SubjectAssignmentRepository;
 import com.school.repository.TeacherRepository;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -76,8 +77,18 @@ class MySpaceServiceTest {
     @Mock private AttendanceRepository attendanceRepository;
     @Mock private InvoiceRepository invoiceRepository;
     @Mock private SubjectAssignmentRepository subjectAssignmentRepository;
+    @Mock private AcademicCalendarService academicCalendarService;
 
     @InjectMocks private MySpaceService service;
+
+    @BeforeEach
+    void anneeScolaireCourante() {
+        // Les notes de l'espace personnel sont désormais bornées à l'année
+        // scolaire courante (résolue via la table academic_years).
+        when(academicCalendarService.findYearFor(any()))
+                .thenReturn(java.util.Optional.of(
+                        com.school.entity.AcademicYear.builder().id(1L).label("2026-2027").build()));
+    }
 
     @AfterEach
     void clearSecurityContext() {
@@ -162,14 +173,14 @@ class MySpaceServiceTest {
         service.myInvoices();
         service.myBulletins();
 
-        verify(gradeRepository).findByStudentId(6L);
+        verify(gradeRepository).findByStudentIdAndYear(6L, "2026-2027");
         verify(attendanceRepository).findByStudentId(6L);
         verify(invoiceRepository).findByStudentId(6L);
         verify(bulletinRepository).findByStudentIdOrderByAcademicYearDescTermDesc(6L);
         // Aucune de ces méthodes ne doit être interrogée pour un AUTRE élève que le
         // connecté : c'est la garantie de non-fuite, et elle est plus forte qu'un
         // `never()` sur un identifiant quelconque (qui matcherait aussi 6).
-        verify(gradeRepository, never()).findByStudentId(7L);
+        verify(gradeRepository, never()).findByStudentIdAndYear(7L, "2026-2027");
         verify(attendanceRepository, never()).findByStudentId(7L);
         verify(invoiceRepository, never()).findByStudentId(7L);
         verify(bulletinRepository, never()).findByStudentIdOrderByAcademicYearDescTermDesc(7L);
@@ -181,7 +192,7 @@ class MySpaceServiceTest {
         Student eleve = eleve(6L, 1L);
         connecte(1L);
         when(studentRepository.findByUserId(1L)).thenReturn(Optional.of(eleve));
-        when(gradeRepository.findByStudentId(6L)).thenReturn(List.of(
+        when(gradeRepository.findByStudentIdAndYear(6L, "2026-2027")).thenReturn(List.of(
                 note(1L, Term.T1, LocalDate.of(2026, 1, 10)),
                 note(2L, Term.T2, LocalDate.of(2026, 4, 20)),
                 note(3L, Term.T1, LocalDate.of(2026, 2, 15))));
@@ -199,7 +210,7 @@ class MySpaceServiceTest {
         Student eleve = eleve(6L, 1L);
         connecte(1L);
         when(studentRepository.findByUserId(1L)).thenReturn(Optional.of(eleve));
-        when(gradeRepository.findByStudentId(6L)).thenReturn(List.of(
+        when(gradeRepository.findByStudentIdAndYear(6L, "2026-2027")).thenReturn(List.of(
                 note(1L, Term.T1, LocalDate.of(2026, 1, 10)),
                 note(2L, Term.T2, LocalDate.of(2026, 4, 20)),
                 note(3L, Term.T3, LocalDate.of(2026, 6, 5))));

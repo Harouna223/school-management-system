@@ -56,6 +56,23 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
                          @Param("status") InvoiceStatus status,
                          Pageable pageable);
 
+    /**
+     * Variante « périmètre » pour les listings accessibles aux parents et aux
+     * élèves : {@code unrestricted = true} pour le personnel, sinon les
+     * identifiants autorisés (liste vide = aucun résultat).
+     */
+    @Query("""
+            SELECT i FROM Invoice i
+            WHERE (:unrestricted = true OR i.student.id IN :studentIds)
+              AND (:studentId IS NULL OR i.student.id = :studentId)
+              AND (:status IS NULL OR i.status = :status)
+            """)
+    Page<Invoice> searchScoped(@Param("unrestricted") boolean unrestricted,
+                               @Param("studentIds") java.util.Collection<Long> studentIds,
+                               @Param("studentId") Long studentId,
+                               @Param("status") InvoiceStatus status,
+                               Pageable pageable);
+
     @Query("""
             SELECT i FROM Invoice i
             WHERE LOWER(i.invoiceNo) LIKE LOWER(CONCAT('%', :q, '%'))

@@ -16,6 +16,9 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
 
     List<Attendance> findBySchoolClassIdAndDate(Long classId, LocalDate date);
 
+    /** Vrai si au moins une présence (donc un historique) existe pour cette classe. */
+    boolean existsBySchoolClassId(Long classId);
+
     List<Attendance> findBySchoolClassIdAndDateBetween(Long classId, LocalDate from, LocalDate to);
 
     List<Attendance> findByStudentId(Long studentId);

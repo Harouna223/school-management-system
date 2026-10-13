@@ -8,8 +8,10 @@ import com.school.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -23,6 +25,7 @@ import java.util.Set;
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
+@Validated
 @Tag(name = "Utilisateurs", description = "Administration des comptes et rôles")
 public class UserController {
 
@@ -32,7 +35,7 @@ public class UserController {
     @Operation(summary = "Liste des utilisateurs")
     public ResponseEntity<ApiResponse<PageResponse<UserResponse>>> search(
             @RequestParam(required = false) String search,
-            @RequestParam(defaultValue = "0") int page,
+            @Min(value = 0, message = "Le numéro de page ne peut pas être négatif") @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         return ok("Utilisateurs", userService.search(search, page, size));
     }
@@ -57,11 +60,18 @@ public class UserController {
     }
 
 @PatchMapping("/{id}/enabled")
-    @Operation(summary = "Activer / désactiver un compte")
+    @Operation(summary = "Activer / désactiver un compte",
+            description = "Le corps doit contenir explicitement {\"enabled\": true|false}")
     public ResponseEntity<ApiResponse<UserResponse>> toggleEnabled(@PathVariable Long id,
-                                                                   @RequestBody(required = false) Map<String, Boolean> body,
+                                                                   @RequestBody Map<String, Boolean> body,
                                                                    HttpServletRequest httpRequest) {
-        boolean enabled = body != null ? body.getOrDefault("enabled", true) : true;
+        Boolean enabled = body.get("enabled");
+        if (enabled == null) {
+            // Auparavant la valeur par défaut était « true » : un corps vide ou
+            // mal formé RÉACTIVAIT le compte et effaçait son verrouillage.
+            throw new com.school.exception.BusinessException(
+                    "Le champ « enabled » est obligatoire (true pour activer, false pour désactiver)");
+        }
         return ok("Compte mis à jour",
                 userService.toggleEnabled(id, enabled, httpRequest));
     }

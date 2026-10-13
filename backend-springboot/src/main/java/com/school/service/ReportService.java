@@ -346,7 +346,7 @@ public class ReportService {
                             ? student.getBirthDate().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "—"},
                     {"Lieu de naissance", student.getBirthPlace() != null ? student.getBirthPlace() : "—"},
                     {"Classe", student.getClassName()},
-                    {"Année scolaire", com.school.utils.CodeGenerator.currentAcademicYear()},
+                    {"Année scolaire", documentTheme.academicYear()},
                     {"Parent / Tuteur", student.getParent() != null
                             ? student.getParent().getFirstName() + " " + student.getParent().getLastName() : "—"},
             });
@@ -755,7 +755,7 @@ public class ReportService {
                 sans(9f, DARK_TEXT), 48f, h - 358.8f);
         leftWrappedAt(cb, "est inscrit(e) dans la classe de "
                         + (student.getClassName() != null ? student.getClassName() : "—")
-                        + " pour l'année scolaire " + com.school.utils.CodeGenerator.currentAcademicYear() + ".",
+                        + " pour l'année scolaire " + documentTheme.academicYear() + ".",
                 sans(9.5f, DARK_TEXT), 48f, h - 375.8f, 235f, 0f);
 
         // --- Cadre + photo de l'élève (droite) ---

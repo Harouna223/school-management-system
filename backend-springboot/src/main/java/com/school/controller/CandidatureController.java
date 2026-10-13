@@ -8,8 +8,10 @@ import com.school.service.CandidatureService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -20,6 +22,7 @@ import java.time.LocalDateTime;
 @RestController
 @RequestMapping("/api/candidatures")
 @RequiredArgsConstructor
+@Validated
 @Tag(name = "Admission", description = "Candidatures d'admission")
 public class CandidatureController {
 
@@ -30,7 +33,7 @@ public class CandidatureController {
     public ResponseEntity<ApiResponse<PageResponse<Candidature>>> list(
             @RequestParam(required = false) String fieldName,
             @RequestParam(required = false) CandidatureStatus status,
-            @RequestParam(defaultValue = "0") int page,
+            @Min(value = 0, message = "Le numéro de page ne peut pas être négatif") @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         return ok("Candidatures", PageResponse.from(candidatureService.list(fieldName, status, page, size), x -> x));
     }

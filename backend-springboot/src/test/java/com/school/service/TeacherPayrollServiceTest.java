@@ -63,6 +63,8 @@ class TeacherPayrollServiceTest {
     private AuditService auditService;
     @Mock
     private NotificationService notificationService;
+    @Mock
+    private NumberSequenceService numberSequenceService;
 
     private TeacherPayrollService service;
 
@@ -71,7 +73,7 @@ class TeacherPayrollServiceTest {
         service = new TeacherPayrollService(paymentRepository, transactionRepository,
                 workHourRepository, closureRepository, teacherRepository,
                 expenseRepository, expenseCategoryRepository, academicYearRepository,
-                auditService, notificationService);
+                numberSequenceService, auditService, notificationService);
     }
 
     private Teacher teacher() {
@@ -147,8 +149,11 @@ class TeacherPayrollServiceTest {
     private void givenMonthlyContext(BigDecimal totalAmount, BigDecimal rate,
                                      BigDecimal hours, BigDecimal alreadyPaid) {
         when(teacherRepository.findById(1L)).thenReturn(Optional.of(teacher()));
-        when(paymentRepository.findByTeacherIdAndMonthDate(1L, LocalDate.of(2026, 9, 1)))
-                .thenReturn(Optional.of(payment(totalAmount, rate)));
+        TeacherMonthlyPayment bulletin = payment(totalAmount, rate);
+        // Le paiement lit désormais le bulletin AVEC VERROU pessimiste (anti
+        // double paiement concurrent) : c'est cette lecture qui doit être simulée.
+        when(paymentRepository.findWithLockingByTeacherIdAndMonthDate(1L, LocalDate.of(2026, 9, 1)))
+                .thenReturn(Optional.of(bulletin));
         monthHours(hours, totalAmount, rate);
         lenient().when(transactionRepository.sumAmountOf(10L)).thenReturn(alreadyPaid);
         lenient().when(paymentRepository.save(any(TeacherMonthlyPayment.class)))
@@ -183,7 +188,7 @@ class TeacherPayrollServiceTest {
     void paymentWithoutRecordedHoursIsRejected() {
         // Aucune heure saisie → calcul impossible, paiement refusé
         when(teacherRepository.findById(1L)).thenReturn(Optional.of(teacher()));
-        when(paymentRepository.findByTeacherIdAndMonthDate(1L, LocalDate.of(2026, 9, 1)))
+        when(paymentRepository.findWithLockingByTeacherIdAndMonthDate(1L, LocalDate.of(2026, 9, 1)))
                 .thenReturn(Optional.of(payment(BigDecimal.ZERO, BigDecimal.ZERO)));
         when(workHourRepository.sumByMonth(any(), any(), any())).thenReturn(List.of());
         lenient().when(workHourRepository.findTop1ByTeacherIdAndDateBetweenOrderByIdDesc(
@@ -220,7 +225,8 @@ class TeacherPayrollServiceTest {
         // Tests 5 et 6 : 200 000 dus ; 100 000 → PARTIAL ; + 100 000 → PAYÉ
         TeacherMonthlyPayment stored = payment(new BigDecimal("200000"), new BigDecimal("2000"));
         when(teacherRepository.findById(1L)).thenReturn(Optional.of(teacher()));
-        when(paymentRepository.findByTeacherIdAndMonthDate(1L, LocalDate.of(2026, 9, 1)))
+        // Lecture verrouillée (anti double paiement concurrent).
+        when(paymentRepository.findWithLockingByTeacherIdAndMonthDate(1L, LocalDate.of(2026, 9, 1)))
                 .thenReturn(Optional.of(stored));
         monthHours(new BigDecimal("100"), new BigDecimal("200000"), new BigDecimal("2000"));
         when(paymentRepository.save(any(TeacherMonthlyPayment.class)))
@@ -230,7 +236,9 @@ class TeacherPayrollServiceTest {
         when(transactionRepository.sumAmountOf(10L))
                 .thenReturn(BigDecimal.ZERO, new BigDecimal("100000"),
                         new BigDecimal("100000"), new BigDecimal("200000"));
-        when(transactionRepository.count()).thenReturn(0L, 1L);
+        // Les numéros de reçu viennent désormais d'un compteur persisté.
+        when(numberSequenceService.next(NumberSequenceService.TEACHER_RECEIPT))
+                .thenReturn(1L, 2L);
         when(transactionRepository.save(any(com.school.entity.TeacherPaymentTransaction.class)))
                 .thenAnswer(inv -> {
                     com.school.entity.TeacherPaymentTransaction tx = inv.getArgument(0);

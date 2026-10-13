@@ -50,6 +50,17 @@ public class Payroll {
     @Column(name = "paid_at")
     private LocalDateTime paidAt;
 
+    /**
+     * Dépense comptable générée lors du paiement du bulletin.
+     *
+     * <p>Sans ce lien, les salaires versés depuis le module RH n'apparaissaient
+     * dans AUCUNE dépense : les totaux du tableau de bord et le rapport financier
+     * sous-estimaient les charges salariales, alors que la paie à l'heure
+     * (module heures) créait bien sa dépense.</p>
+     */
+    @Column(name = "expense_id")
+    private Long expenseId;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 

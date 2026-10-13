@@ -8,10 +8,10 @@ import { PictureAsPdf, Assignment, Leaderboard, EmojiEvents, Gavel, Save } from 
 import PageHeader from '../../components/PageHeader'
 import FilterCard from '../../components/FilterCard'
 import { useToast } from '../../hooks/useToast'
-import { examApi, classApi, studentApi } from '../../api/endpoints'
+import { examApi, classApi, studentApi, academicYearApi } from '../../api/endpoints'
 import { extractError } from '../../api/axios'
 import { downloadResponse } from '../../services/exportService'
-import { formatGrade, initials } from '../../utils/format'
+import { formatGrade, toGradeOver20, initials } from '../../utils/format'
 
 const RANK_COLORS = ['#f59e0b', '#94a3b8', '#b45309']
 
@@ -25,11 +25,17 @@ function decisionLabel(decision) {
   return { ADMIS: 'Admis', AJOURNE: 'Ajourné', REDOUBLE: 'Redouble' }[decision] || '—'
 }
 
-function gradeTone(value) {
-  if (value == null) return { color: 'default', label: '—' }
-  if (value >= 14) return { color: 'primary', label: 'Excellent' }
-  if (value >= 10) return { color: 'success', label: 'Acquis' }
-  if (value >= 8) return { color: 'warning', label: 'Insuffisant' }
+/**
+ * Tonus d'une note, exprimée sur son barème réel.
+ * Le barème est ramené sur 20 avant comparaison : une note de 8/10 est un
+ * « Acquis » (16/20) et non un « Insuffisant ».
+ */
+function gradeTone(value, maxValue = 20) {
+  const sur20 = toGradeOver20(value, maxValue)
+  if (sur20 == null) return { color: 'default', label: '—' }
+  if (sur20 >= 14) return { color: 'primary', label: 'Excellent' }
+  if (sur20 >= 10) return { color: 'success', label: 'Acquis' }
+  if (sur20 >= 8) return { color: 'warning', label: 'Insuffisant' }
   return { color: 'error', label: 'Non acquis' }
 }
 
@@ -52,15 +58,28 @@ export default function GradesPage() {
   const [classStudents, setClassStudents] = useState([])
   const [deliberations, setDeliberations] = useState([])
   const [deliberating, setDeliberating] = useState(false)
+  // Année scolaire : les moyennes, classements et bulletins sont désormais
+  // bornés à une année précise (Term seul mélangeait toutes les années).
+  const [years, setYears] = useState([])
+  const [yearId, setYearId] = useState('')
 
   useEffect(() => {
     classApi.all().then((r) => setClasses(r.data.data)).catch(() => {})
+    academicYearApi.all()
+      .then((r) => {
+        const list = r.data.data || []
+        setYears(list)
+        const current = list.find((y) => y.current)
+        if (current) setYearId(String(current.id))
+      })
+      .catch(() => {})
   }, [])
 
   useEffect(() => {
     if (!classId) return
-    examApi.byClass(classId).then((r) => setExams(r.data.data || [])).catch(() => {})
-    examApi.ranking(classId, term).then((r) => setRanking(r.data.data || [])).catch(() => {})
+    const year = yearId ? Number(yearId) : undefined
+    examApi.byClass(classId, year).then((r) => setExams(r.data.data || [])).catch(() => {})
+    examApi.ranking(classId, term, year).then((r) => setRanking(r.data.data || [])).catch(() => {})
     studentApi.search({ classId, page: 0, size: 500 })
       .then((r) => setClassStudents(r.data.data.content || []))
       .catch(() => {})
@@ -68,7 +87,11 @@ export default function GradesPage() {
     setDialogOpen(false)
     setGradeRows([])
     setDraftGrades({})
-  }, [classId, term])
+    // Les délibérations affichées appartiennent à un couple (classe, trimestre,
+    // année) : sans cette remise à zéro, les décisions du T1 restaient affichées
+    // en T2 et le bouton « Procès-verbal » restait actif pour le mauvais PV.
+    setDeliberations([])
+  }, [classId, term, yearId])
 
   const loadGrades = async () => {
     if (!selectedExam) return
@@ -85,12 +108,20 @@ export default function GradesPage() {
 
   const gradeByStudent = (studentId) => gradeRows.find((g) => g.studentId === studentId)
 
+  /** Barème de l'évaluation : celui déjà utilisé pour une note, sinon 20. */
+  const baremeEvaluation = () => {
+    const existante = gradeRows.find((g) => g.maxValue != null)
+    return existante ? Number(existante.maxValue) : 20
+  }
+
   const saveInlineGrade = async (student) => {
     const raw = draftGrades[student.id]
     if (raw === undefined || raw === '') return
     const value = Number(raw)
-    if (Number.isNaN(value) || value < 0 || value > 20) {
-      toastError('La note doit être comprise entre 0 et 20')
+    const bareme = baremeEvaluation()
+    // Bornes calculées sur le BARÈME de l'évaluation (une note /100 est légitime).
+    if (!Number.isFinite(value) || value < 0 || value > bareme) {
+      toastError(`La note doit être comprise entre 0 et ${bareme}`)
       return
     }
     try {
@@ -98,11 +129,12 @@ export default function GradesPage() {
         studentId: student.id,
         examId: Number(selectedExam),
         value,
-        appreciation: value >= 10 ? 'Acquis' : 'Non acquis',
+        maxValue: bareme,
+        appreciation: toGradeOver20(value, bareme) >= 10 ? 'Acquis' : 'Non acquis',
       })
-      success(`Note de ${student.firstName} ${student.lastName} enregistrée (${formatGrade(value)})`)
+      success(`Note de ${student.firstName} ${student.lastName} enregistrée (${formatGrade(value, bareme)})`)
       loadGrades()
-      examApi.ranking(classId, term).then((r) => setRanking(r.data.data || [])).catch(() => {})
+      examApi.ranking(classId, term, yearId ? Number(yearId) : undefined).then((r) => setRanking(r.data.data || [])).catch(() => {})
     } catch (err) {
       toastError(extractError(err))
     }
@@ -125,7 +157,7 @@ export default function GradesPage() {
       setDialogOpen(false)
       setGradeValue('')
       loadGrades()
-      examApi.ranking(classId, term).then((r) => setRanking(r.data.data || [])).catch(() => {})
+      examApi.ranking(classId, term, yearId ? Number(yearId) : undefined).then((r) => setRanking(r.data.data || [])).catch(() => {})
     } catch (err) {
       toastError(extractError(err))
     }
@@ -134,7 +166,7 @@ export default function GradesPage() {
   const generateBulletins = async () => {
     if (!classId) return
     try {
-      await examApi.generateBulletins(classId, term)
+      await examApi.generateBulletins(classId, term, yearId ? Number(yearId) : undefined)
       success(`Bulletins du ${term} générés pour la classe`)
     } catch (err) {
       toastError(extractError(err))
@@ -145,7 +177,7 @@ export default function GradesPage() {
     if (!classId) return
     setDeliberating(true)
     try {
-      const { data } = await examApi.deliberate(classId, term)
+      const { data } = await examApi.deliberate(classId, term, yearId ? Number(yearId) : undefined)
       setDeliberations((data.data || []).slice()
         .sort((a, b) => (a.rank ?? Number.MAX_SAFE_INTEGER) - (b.rank ?? Number.MAX_SAFE_INTEGER)))
       success(`Délibération ${term} effectuée (${data.data.length} bulletins)`)
@@ -159,7 +191,7 @@ export default function GradesPage() {
   const downloadPv = async () => {
     if (!classId) return
     try {
-      const res = await examApi.deliberationPv(classId, term)
+      const res = await examApi.deliberationPv(classId, term, yearId ? Number(yearId) : undefined)
       await downloadResponse(res, `pv-deliberation-${term}.pdf`)
     } catch (err) {
       toastError(extractError(err))
@@ -179,7 +211,7 @@ export default function GradesPage() {
   const downloadAllBulletins = async () => {
     if (!classId) return
     try {
-      const res = await examApi.classBulletinsPdf(classId, term)
+      const res = await examApi.classBulletinsPdf(classId, term, yearId ? Number(yearId) : undefined)
       await downloadResponse(res, `bulletins-${term}-classe.pdf`)
       success('Tous les bulletins téléchargés dans un seul PDF')
     } catch (err) {
@@ -204,6 +236,16 @@ export default function GradesPage() {
               <MenuItem value="T1">Trimestre 1</MenuItem>
               <MenuItem value="T2">Trimestre 2</MenuItem>
               <MenuItem value="T3">Trimestre 3</MenuItem>
+            </TextField>
+          </Grid>
+          <Grid item xs={12} md={2}>
+            <TextField select fullWidth size="small" label="Année scolaire" value={yearId}
+              onChange={(e) => setYearId(e.target.value)}
+              helperText={years.length === 0 ? 'Aucune année configurée' : undefined}>
+              <MenuItem value="">Année courante</MenuItem>
+              {years.map((y) => (
+                <MenuItem key={y.id} value={String(y.id)}>{y.label}{y.current ? ' (courante)' : ''}</MenuItem>
+              ))}
             </TextField>
           </Grid>
           <Grid item xs={12} md={4}>

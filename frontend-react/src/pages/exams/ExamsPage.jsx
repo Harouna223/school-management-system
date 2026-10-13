@@ -8,7 +8,7 @@ import ConfirmDialog from '../../components/ConfirmDialog'
 import StatusChip from '../../components/StatusChip'
 import FilterCard from '../../components/FilterCard'
 import { useToast } from '../../hooks/useToast'
-import { examApi, classApi, subjectApi } from '../../api/endpoints'
+import { examApi, classApi, subjectApi, academicYearApi } from '../../api/endpoints'
 import { extractError } from '../../api/axios'
 import { formatDate } from '../../utils/format'
 
@@ -30,6 +30,7 @@ export default function ExamsPage() {
   const [total, setTotal] = useState(0)
   const [classFilter, setClassFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [years, setYears] = useState([])
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState(null)
   const [toDelete, setToDelete] = useState(null)
@@ -48,9 +49,16 @@ export default function ExamsPage() {
     }
   }
 
+  /** Libellé de l'année scolaire courante (configurée dans Paramètres). */
+  const currentYearLabel = () => {
+    const current = years.find((y) => y.current)
+    return current ? current.label : ''
+  }
+
   useEffect(() => {
     classApi.all().then((r) => setClasses(r.data.data)).catch(() => {})
     subjectApi.all().then((r) => setSubjects(r.data.data)).catch(() => {})
+    academicYearApi.all().then((r) => setYears(r.data.data || [])).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -64,7 +72,11 @@ export default function ExamsPage() {
       classId: Number(values.classId),
       subjectId: Number(values.subjectId),
       coefficient: Number(values.coefficient),
-      academicYear: values.academicYear || `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
+      // L'année scolaire vient désormais de la table academic_years : l'ancien
+      // calcul `${année civile}-${année civile + 1}` étiquetait les évaluations
+      // d'une année inexistante de janvier à août, ce qui faussait ensuite les
+      // moyennes et rendait les bulletins de l'année en cours introuvables.
+      academicYear: values.academicYear || currentYearLabel(),
       status: values.status || 'PLANNED',
     }
     try {
@@ -222,6 +234,16 @@ export default function ExamsPage() {
                   </Grid>
                   <Grid item xs={12} sm={4}>
                     <TextField fullWidth type="number" label="Coefficient" name="coefficient" value={values.coefficient} onChange={handleChange} />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField select fullWidth label="Année scolaire" name="academicYear"
+                      value={values.academicYear} onChange={handleChange}
+                      helperText={years.length === 0 ? 'Aucune année configurée (Paramètres → Années scolaires)' : undefined}>
+                      <MenuItem value="">Année courante</MenuItem>
+                      {years.map((y) => (
+                        <MenuItem key={y.id} value={y.label}>{y.label}{y.current ? ' (courante)' : ''}</MenuItem>
+                      ))}
+                    </TextField>
                   </Grid>
                 </Grid>
               </DialogContent>

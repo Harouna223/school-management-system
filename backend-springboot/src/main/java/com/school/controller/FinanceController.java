@@ -16,8 +16,10 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.constraints.Min;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -29,6 +31,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/finance")
 @RequiredArgsConstructor
+@Validated
 @Tag(name = "Comptabilité", description = "Dépenses, types de frais, rapports")
 public class FinanceController {
 
@@ -41,7 +44,7 @@ public class FinanceController {
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) LocalDate from,
             @RequestParam(required = false) LocalDate to,
-            @RequestParam(defaultValue = "0") int page,
+            @Min(value = 0, message = "Le numéro de page ne peut pas être négatif") @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         return ok("Dépenses", financeService.searchExpenses(categoryId, from, to, page, size));
     }

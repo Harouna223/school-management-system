@@ -87,8 +87,11 @@ public class DashboardService {
                 .totalSubjects(subjectRepository.count())
                 .studentsPerClassAvg(totalStudents == 0 ? 0D :
                         (double) totalStudents / Math.max(1, totalClasses))
+                // OVERDUE inclus : sinon le compteur chutait à ~0 après le passage
+                // automatique en retard (1 h 30).
                 .unpaidInvoices(invoiceRepository.countByStatus(com.school.enums.InvoiceStatus.UNPAID)
-                        + invoiceRepository.countByStatus(com.school.enums.InvoiceStatus.PARTIAL))
+                        + invoiceRepository.countByStatus(com.school.enums.InvoiceStatus.PARTIAL)
+                        + invoiceRepository.countByStatus(com.school.enums.InvoiceStatus.OVERDUE))
                 .totalPaymentsCount(paymentRepository.count())
                 .monthlyRevenue(monthlyRevenue)
                 .monthlyExpenses(monthlyExpenses)

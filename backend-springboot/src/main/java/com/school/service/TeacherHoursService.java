@@ -201,15 +201,10 @@ public class TeacherHoursService {
 
         Long subjectId = request.getSubjectId();
         Long classId = request.getClassId();
-        Long duplicateKeySubject = subjectId != null ? subjectId : -1L;
-        Long duplicateKeyClass = classId != null ? classId : -1L;
-        workHourRepository
-                .findByTeacherIdAndDateAndSubjectIdAndSchoolClassId(
-                        teacher.getId(), date, duplicateKeySubject, duplicateKeyClass)
-                .ifPresent(existing -> {
-                    throw new BusinessException("Une saisie existe déjà pour ce professeur, cette date, "
-                            + "cette matière et cette classe : modifiez-la au lieu d'en créer une nouvelle.");
-                });
+        // Détection NULL-safe : matière et classe sont facultatives, et une
+        // sentinelle -1 ne peut pas représenter « absent » en SQL (les NULL ne
+        // sont jamais égaux) — deux saisies identiques passaient donc.
+        assertNoDuplicate(teacher.getId(), date, subjectId, classId, null);
 
         // Contrôle des heures excessives : max 24 h cumulées par jour
         BigDecimal already = workHourRepository.sumHoursOfTeacherOnDate(teacher.getId(), date);
@@ -248,6 +243,10 @@ public class TeacherHoursService {
         TeacherWorkHour workHour = workHourRepository.findById(id)
                 .orElseThrow(() -> ResourceNotFoundException.of("Saisie d'heures", id));
         assertEditable(workHour.getDate());
+        // Le mois CIBLE est contrôlé lui aussi : sans cela, on pouvait déplacer une
+        // saisie d'un mois ouvert vers un mois CLÔTURÉ et réécrire un salaire déjà
+        // arrêté (le contrôle portait uniquement sur l'ancienne date).
+        assertEditable(request.getDate());
 
         Teacher teacher = teacherService.findById(request.getTeacherId());
         workHour.setTeacher(teacher);
@@ -260,16 +259,19 @@ public class TeacherHoursService {
         workHour.setObservation(request.getObservation());
         workHour.validate();
 
-        Long subjectKey = workHour.getSubject() != null ? workHour.getSubject().getId() : -1L;
-        Long classKey = workHour.getSchoolClass() != null ? workHour.getSchoolClass().getId() : -1L;
-        workHourRepository
-                .findByTeacherIdAndDateAndSubjectIdAndSchoolClassId(
-                        teacher.getId(), workHour.getDate(), subjectKey, classKey)
-                .filter(existing -> !existing.getId().equals(id))
-                .ifPresent(existing -> {
-                    throw new BusinessException("Une autre saisie existe déjà pour ce professeur, "
-                            + "cette date, cette matière et cette classe.");
-                });
+        Long subjectKey = workHour.getSubject() != null ? workHour.getSubject().getId() : null;
+        Long classKey = workHour.getSchoolClass() != null ? workHour.getSchoolClass().getId() : null;
+        assertNoDuplicate(teacher.getId(), workHour.getDate(), subjectKey, classKey, id);
+
+        // Plafond 24 h/jour revérifié à la correction, en excluant la ligne courante
+        // (sinon l'ancienne valeur était comptée deux fois).
+        BigDecimal already = workHourRepository
+                .sumHoursOfTeacherOnDateExcluding(teacher.getId(), workHour.getDate(), id);
+        if (already.add(workHour.getHours()).compareTo(BigDecimal.valueOf(24)) > 0) {
+            throw new BusinessException("Heures excessives : après correction, le total du "
+                    + workHour.getDate() + " serait de " + already.add(workHour.getHours())
+                    + " h (maximum 24 h). " + already + " h sont déjà saisies sur d'autres lignes.");
+        }
 
         // Le tarif appliqué est celui valide à la date de la saisie
         workHour.setHourlyRateApplied(resolveRate(teacher.getId(), workHour.getDate()));
@@ -278,6 +280,29 @@ public class TeacherHoursService {
                 teacher.getFullName() + " : correction → " + saved.getHours() + " h le " + saved.getDate(),
                 httpRequest);
         return TeacherWorkHourResponse.from(saved);
+    }
+
+    /**
+     * Refuse un doublon (enseignant + date + matière + classe), en ignorant
+     * éventuellement la saisie en cours de modification.
+     *
+     * @param excludeId identifiant à ne pas considérer comme doublon ({@code null} à la création)
+     */
+    private void assertNoDuplicate(Long teacherId, LocalDate date, Long subjectId, Long classId,
+                                   Long excludeId) {
+        List<TeacherWorkHour> existing = workHourRepository
+                .findDuplicates(teacherId, date, subjectId, classId).stream()
+                .filter(e -> excludeId == null || !e.getId().equals(excludeId))
+                .toList();
+        if (existing.isEmpty()) {
+            return;
+        }
+        if (excludeId == null) {
+            throw new BusinessException("Une saisie existe déjà pour ce professeur, cette date, "
+                    + "cette matière et cette classe : modifiez-la au lieu d'en créer une nouvelle.");
+        }
+        throw new BusinessException("Une autre saisie existe déjà pour ce professeur, "
+                + "cette date, cette matière et cette classe.");
     }
 }
 

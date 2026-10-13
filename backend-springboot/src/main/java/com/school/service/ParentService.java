@@ -43,8 +43,10 @@ public class ParentService {
 
     @Transactional(readOnly = true)
     public List<StudentResponse> myChildren() {
-        Parent parent = currentParent();
-        return studentRepository.findByParentId(parent.getId()).stream()
+        // Tous les dossiers parent du compte : un parent qui a inscrit ses
+        // enfants séparément doit voir l'ensemble de ses enfants.
+        List<Long> parentIds = currentParentIds();
+        return studentRepository.findByParentIdIn(parentIds).stream()
                 .map(StudentResponse::from)
                 .toList();
     }
@@ -115,20 +117,25 @@ public class ParentService {
         return ownedStudent(studentId);
     }
 
-    private Parent currentParent() {
-        Long userId = SecurityUtils.currentUserId();
-        return parentRepository.findByUserIdOrderByIdAsc(userId).stream()
-                .findFirst()
-                .orElseThrow(() -> new BusinessException("Aucun dossier parent lié à ce compte"));
-    }
-
     private Student ownedStudent(Long studentId) {
-        Parent parent = currentParent();
+        // Un compte peut être lié à plusieurs dossiers parent : l'enfant peut
+        // appartenir à n'importe lequel d'entre eux.
+        List<Long> parentIds = currentParentIds();
         Student student = studentRepository.findById(studentId)
                 .orElseThrow(() -> ResourceNotFoundException.of("Élève", studentId));
-        if (student.getParent() == null || !student.getParent().getId().equals(parent.getId())) {
+        if (student.getParent() == null || !parentIds.contains(student.getParent().getId())) {
             throw new BusinessException("Cet élève n'est pas lié à votre compte");
         }
         return student;
+    }
+
+    private List<Long> currentParentIds() {
+        Long userId = SecurityUtils.currentUserId();
+        List<Long> ids = parentRepository.findByUserIdOrderByIdAsc(userId).stream()
+                .map(Parent::getId).toList();
+        if (ids.isEmpty()) {
+            throw new BusinessException("Aucun dossier parent lié à ce compte");
+        }
+        return ids;
     }
 }

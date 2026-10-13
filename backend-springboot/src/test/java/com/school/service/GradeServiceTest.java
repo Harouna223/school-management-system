@@ -53,6 +53,8 @@ class GradeServiceTest {
     private SmsService smsService;
     @Mock
     private AccessControlService accessControlService;
+    @Mock
+    private AcademicCalendarService academicCalendarService;
 
     private GradeService service;
 
@@ -60,7 +62,14 @@ class GradeServiceTest {
     void setUp() {
         service = new GradeService(gradeRepository, studentRepository, bulletinRepository,
                 notificationRepository, examService, auditService, reportService,
-                whatsappService, emailService, smsService, accessControlService);
+                whatsappService, emailService, smsService, accessControlService,
+                academicCalendarService);
+        // L'année scolaire est résolue via la table academic_years : les tests qui
+        // en dépendent la stubbent explicitement, les autres restent inchangés.
+        org.mockito.Mockito.lenient().when(academicCalendarService.resolveYear(any(), any(), any()))
+                .thenReturn(com.school.entity.AcademicYear.builder().id(1L).label("2026-2027").build());
+        org.mockito.Mockito.lenient().when(academicCalendarService.requireYearFor(any()))
+                .thenReturn(com.school.entity.AcademicYear.builder().id(1L).label("2026-2027").build());
     }
 
     private GradeRequest request(String value, String maxValue) {
@@ -72,11 +81,27 @@ class GradeServiceTest {
                 .build();
     }
 
+    /** Classe partagée par l'élève et l'évaluation : la saisie d'une note exige
+     *  désormais que l'élève appartienne à la classe de l'évaluation. */
+    private com.school.entity.SchoolClass classe(Long id) {
+        return com.school.entity.SchoolClass.builder().id(id).name("6e A").code("6A").build();
+    }
+
+    private Exam evaluation() {
+        return Exam.builder().id(1L).name("Évaluation").schoolClass(classe(3L))
+                .subject(Subject.builder().id(5L).name("Matière").coefficient(1).build())
+                .build();
+    }
+
+    private Student eleveNotable() {
+        return Student.builder().id(10L).firstName("Test").lastName("Student")
+                .matricule("ST-10").schoolClass(classe(3L)).build();
+    }
+
     @Test
     void negativeGradeIsRejected() {
-        when(examService.findById(1L)).thenReturn(Exam.builder().id(1L).build());
-        when(studentRepository.findById(10L))
-                .thenReturn(java.util.Optional.of(Student.builder().id(10L).build()));
+        when(examService.findById(1L)).thenReturn(evaluation());
+        when(studentRepository.findById(10L)).thenReturn(java.util.Optional.of(eleveNotable()));
 
         assertThatThrownBy(() -> service.save(request("-1", null), null))
                 .isInstanceOf(BusinessException.class)
@@ -85,9 +110,8 @@ class GradeServiceTest {
 
     @Test
     void gradeAboveTwentyIsRejected() {
-        when(examService.findById(1L)).thenReturn(Exam.builder().id(1L).build());
-        when(studentRepository.findById(10L))
-                .thenReturn(java.util.Optional.of(Student.builder().id(10L).build()));
+        when(examService.findById(1L)).thenReturn(evaluation());
+        when(studentRepository.findById(10L)).thenReturn(java.util.Optional.of(eleveNotable()));
 
         assertThatThrownBy(() -> service.save(request("21", null), null))
                 .isInstanceOf(BusinessException.class)
@@ -96,13 +120,26 @@ class GradeServiceTest {
 
     @Test
     void gradeAboveCustomMaxIsRejected() {
-        when(examService.findById(1L)).thenReturn(Exam.builder().id(1L).build());
-        when(studentRepository.findById(10L))
-                .thenReturn(java.util.Optional.of(Student.builder().id(10L).build()));
+        when(examService.findById(1L)).thenReturn(evaluation());
+        when(studentRepository.findById(10L)).thenReturn(java.util.Optional.of(eleveNotable()));
 
         assertThatThrownBy(() -> service.save(request("15", "10"), null))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("ne peut pas dépasser");
+    }
+
+    @Test
+    @DisplayName("un élève d'une AUTRE classe que l'évaluation est refusé")
+    void eleveDuneAutreClasseRefuse() {
+        Exam evaluation = evaluation();
+        Student autreClasse = Student.builder().id(10L).firstName("Awa").lastName("Diop")
+                .schoolClass(classe(9L)).build();
+        when(examService.findById(1L)).thenReturn(evaluation);
+        when(studentRepository.findById(10L)).thenReturn(java.util.Optional.of(autreClasse));
+
+        assertThatThrownBy(() -> service.save(request("12", null), null))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("n'appartient pas à la classe de l'évaluation");
     }
 
     // ============================================================ moyennes normalisées
@@ -129,7 +166,7 @@ class GradeServiceTest {
     @DisplayName("la moyenne ramène chaque note sur 20 quelle que soit son échelle")
     void moyenneNormaliseeEntreEchellesDifferentes() {
         // 15/20 -> 15.00  ;  40/50 -> 16.00  ; coefficients 1 et 1 => moyenne 15.50
-        when(gradeRepository.findByStudentIdAndTerm(10L, Term.T1)).thenReturn(List.of(
+        when(gradeRepository.findByStudentIdAndTermAndYear(10L, Term.T1, "2026-2027")).thenReturn(List.of(
                 grade(new BigDecimal("15"), "20", 1, 1),
                 grade(new BigDecimal("40"), "50", 1, 1)
         ));
@@ -143,7 +180,7 @@ class GradeServiceTest {
     @DisplayName("la moyenne pondère par les coefficients APRES normalisation")
     void moyennePondereApresNormalisation() {
         // 10/20 (coef 2) + 18/20 (coef 1) => (10*2 + 18) / 3 = 12.67
-        when(gradeRepository.findByStudentIdAndTerm(10L, Term.T1)).thenReturn(List.of(
+        when(gradeRepository.findByStudentIdAndTermAndYear(10L, Term.T1, "2026-2027")).thenReturn(List.of(
                 grade(new BigDecimal("10"), "20", 2, 1),
                 grade(new BigDecimal("18"), "20", 1, 1)
         ));
@@ -156,15 +193,28 @@ class GradeServiceTest {
     @Test
     @DisplayName("aucune note => moyenne null (jamais 0)")
     void moyenneNulleSansNotes() {
-        when(gradeRepository.findByStudentIdAndTerm(10L, Term.T1)).thenReturn(List.of());
+        when(gradeRepository.findByStudentIdAndTermAndYear(10L, Term.T1, "2026-2027")).thenReturn(List.of());
 
         assertThat(service.averageForStudent(10L, Term.T1)).isNull();
     }
 
     @Test
+    @DisplayName("seules les notes de L'ANNÉE demandée comptent (plus de mélange pluriannuel)")
+    void moyenneBorneeALAnneeScolaire() {
+        when(academicCalendarService.resolveYear(null, null, null))
+                .thenReturn(com.school.entity.AcademicYear.builder().id(2L).label("2025-2026").build());
+        when(gradeRepository.findByStudentIdAndTermAndYear(10L, Term.T1, "2025-2026"))
+                .thenReturn(List.of(grade(new BigDecimal("9"), "20", 1, 1)));
+
+        assertThat(service.averageForStudent(10L, Term.T1, null)).isEqualByComparingTo("9.00");
+        org.mockito.Mockito.verify(gradeRepository)
+                .findByStudentIdAndTermAndYear(10L, Term.T1, "2025-2026");
+    }
+
+    @Test
     @DisplayName("une maxValue maximale de l'échelle est conservée à la norme 20 par défaut")
     void maxValueDefautA20QuandAbsent() {
-        when(gradeRepository.findByStudentIdAndTerm(10L, Term.T1)).thenReturn(List.of(
+        when(gradeRepository.findByStudentIdAndTermAndYear(10L, Term.T1, "2026-2027")).thenReturn(List.of(
                 grade(new BigDecimal("12"), "20", 1, 1)
         ));
 
@@ -176,14 +226,12 @@ class GradeServiceTest {
     @Test
     @DisplayName("ré-enregistrer une note met à jour son échelle (maxValue)")
     void resauvegardeMetAJourMaxValue() {
-        when(examService.findById(1L)).thenReturn(Exam.builder().id(1L).build());
-        when(studentRepository.findById(10L))
-                .thenReturn(Optional.of(Student.builder().id(10L).build()));
+        when(examService.findById(1L)).thenReturn(evaluation());
+        when(studentRepository.findById(10L)).thenReturn(Optional.of(eleveNotable()));
         Grade existante = Grade.builder()
                 .id(100L)
-                .student(Student.builder().id(10L).firstName("Test").lastName("Student").matricule("ST-10").build())
-                .exam(Exam.builder().id(1L).name("Évaluation")
-                        .subject(Subject.builder().id(5L).name("Matière").build()).build())
+                .student(eleveNotable())
+                .exam(evaluation())
                 .maxValue(new BigDecimal("20"))
                 .build();
         when(gradeRepository.findByStudentIdAndExamId(10L, 1L)).thenReturn(Optional.of(existante));

@@ -75,6 +75,7 @@ class AuthServiceTest {
     @Mock private RefreshTokenRepository refreshTokenRepository;
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private AuditService auditService;
+    @Mock private LoginAttemptService loginAttemptService;
     @Mock private HttpServletRequest httpRequest;
 
     @InjectMocks private AuthService service;
@@ -128,7 +129,7 @@ class AuthServiceTest {
     }
 
     @Test
-    @DisplayName("un échec de mot de passe incrémente le compteur")
+    @DisplayName("un échec de mot de passe incrémente le compteur PERSISTÉ (délégué au service transactionnel)")
     void echecIncrementeLeCompteur() {
         User user = utilisateur(1L, "prof1");
         user.setFailedAttempts(2);
@@ -139,13 +140,16 @@ class AuthServiceTest {
         assertThatThrownBy(() -> service.login(connexion("prof1", "faux"), httpRequest))
                 .isInstanceOf(BadCredentialsException.class);
 
-        assertThat(user.getFailedAttempts()).isEqualTo(3);
+        // L'incrément NE DOIT PAS se faire dans la transaction de login() :
+        // elle est annulée par la réémission de BadCredentialsException, ce qui
+        // rendait le verrouillage inopérant. Il est donc délégué à un service
+        // REQUIRES_NEW (voir LoginAttemptServiceTest pour le calcul du seuil).
+        verify(loginAttemptService).registerFailedAttempt(1L);
         assertThat(user.getLockedUntil()).isNull();
-        verify(userRepository).save(user);
     }
 
     @Test
-    @DisplayName("le 5e échec verrouille le compte et remet le compteur à zéro")
+    @DisplayName("le 5e échec déclenche le verrouillage via le service transactionnel")
     void cinquiemeEchecVerrouilleLeCompte() {
         User user = utilisateur(1L, "prof1");
         user.setFailedAttempts(4);
@@ -156,9 +160,7 @@ class AuthServiceTest {
         assertThatThrownBy(() -> service.login(connexion("prof1", "faux"), httpRequest))
                 .isInstanceOf(BadCredentialsException.class);
 
-        assertThat(user.getFailedAttempts()).isZero();
-        assertThat(user.getLockedUntil()).isAfter(LocalDateTime.now().plusMinutes(14));
-        assertThat(user.getLockedUntil()).isBefore(LocalDateTime.now().plusMinutes(16));
+        verify(loginAttemptService).registerFailedAttempt(1L);
     }
 
     @Test
@@ -240,7 +242,7 @@ class AuthServiceTest {
     }
 
     @Test
-    @DisplayName("un jeton révoqué est supprimé puis refusé")
+    @DisplayName("un jeton révoqué révoque TOUTE la famille de jetons puis est refusé")
     void refreshJetonRevoqueRefuse() {
         RefreshToken revoque = RefreshToken.builder()
                 .token("revoque").user(utilisateur(1L, "prof1"))
@@ -252,12 +254,16 @@ class AuthServiceTest {
                 .isInstanceOf(TokenRefreshException.class)
                 .hasMessageContaining("expiré ou révoqué");
 
-        verify(refreshTokenRepository).delete(revoque);
+        // Réutilisation d'un jeton déjà consommé = vol probable : on coupe toute
+        // la famille (via une transaction indépendante, sinon l'exception
+        // annulerait la révocation), sinon le jeton délivré à l'attaquant
+        // restait valide.
+        verify(loginAttemptService).revokeAllRefreshTokens(1L);
         verify(jwtService, never()).generateToken(any());
     }
 
     @Test
-    @DisplayName("un jeton expiré est supprimé puis refusé")
+    @DisplayName("un jeton expiré révoque la famille puis est refusé")
     void refreshJetonExpireRefuse() {
         RefreshToken expire = RefreshToken.builder()
                 .token("expire").user(utilisateur(1L, "prof1"))
@@ -268,7 +274,7 @@ class AuthServiceTest {
         assertThatThrownBy(() -> service.refresh(new RefreshTokenRequest("expire")))
                 .isInstanceOf(TokenRefreshException.class);
 
-        verify(refreshTokenRepository).delete(expire);
+        verify(loginAttemptService).revokeAllRefreshTokens(1L);
         verify(jwtService, never()).generateToken(any());
     }
 
@@ -291,6 +297,44 @@ class AuthServiceTest {
         // Sans cette révocation, un jeton volé resterait valable indéfiniment.
         assertThat(ancien.isRevoked()).isTrue();
         verify(refreshTokenRepository, times(2)).save(any());
+    }
+
+    @Test
+    @DisplayName("un compte DÉSACTIVÉ ne peut plus rafraîchir son jeton (et sa famille est révoquée)")
+    void refreshRefuseUnCompteDesactive() {
+        User user = utilisateur(1L, "prof1");
+        user.setEnabled(false);
+        RefreshToken valide = RefreshToken.builder()
+                .token("valide").user(user).expiryDate(LocalDateTime.now().plusDays(1)).build();
+        when(refreshTokenRepository.findByToken(AuthService.hashRefreshToken("valide")))
+                .thenReturn(Optional.of(valide));
+
+        assertThatThrownBy(() -> service.refresh(new RefreshTokenRequest("valide")))
+                .isInstanceOf(TokenRefreshException.class)
+                .hasMessageContaining("désactivé");
+
+        // Contournement historique : /api/auth/refresh est permitAll et n'était
+        // contrôlé par personne — un compte révoqué par l'admin gardait un accès
+        // permanent (jeton renouvelé toutes les heures, 7 jours durant).
+        verify(loginAttemptService).revokeAllRefreshTokens(1L);
+        verify(jwtService, never()).generateToken(any());
+    }
+
+    @Test
+    @DisplayName("un compte VERROUILLÉ ne peut plus rafraîchir son jeton")
+    void refreshRefuseUnCompteVerrouille() {
+        User user = utilisateur(1L, "prof1");
+        user.setLockedUntil(LocalDateTime.now().plusMinutes(10));
+        RefreshToken valide = RefreshToken.builder()
+                .token("valide").user(user).expiryDate(LocalDateTime.now().plusDays(1)).build();
+        when(refreshTokenRepository.findByToken(AuthService.hashRefreshToken("valide")))
+                .thenReturn(Optional.of(valide));
+
+        assertThatThrownBy(() -> service.refresh(new RefreshTokenRequest("valide")))
+                .isInstanceOf(TokenRefreshException.class)
+                .hasMessageContaining("verrouillé");
+
+        verify(jwtService, never()).generateToken(any());
     }
 
     @Test

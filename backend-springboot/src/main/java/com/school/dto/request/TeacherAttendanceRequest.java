@@ -1,6 +1,7 @@
 package com.school.dto.request;
 
 import com.school.enums.AttendanceStatus;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -20,6 +21,7 @@ public class TeacherAttendanceRequest {
     private LocalDate date;
 
     @NotNull(message = "Les pointages sont obligatoires")
+    @Valid
     private List<Entry> entries;
 
     @Data

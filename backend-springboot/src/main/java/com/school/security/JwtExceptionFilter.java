@@ -7,7 +7,10 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -18,6 +21,7 @@ import java.io.IOException;
  */
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class JwtExceptionFilter extends OncePerRequestFilter {
 
     @Override
@@ -31,6 +35,16 @@ public class JwtExceptionFilter extends OncePerRequestFilter {
             handleError(response, "Jeton expiré, veuillez vous reconnecter");
         } catch (JwtException | IllegalArgumentException ex) {
             handleError(response, "Jeton invalide");
+        } catch (UsernameNotFoundException ex) {
+            // Jeton signé valide mais compte supprimé entre-temps : le filtre JWT
+            // ne peut pas charger l'utilisateur. Sans cette branche, l'exception
+            // remontait à Tomcat et produisait un 500 (y compris sur /auth/login
+            // si le client renvoyait encore son ancien Bearer).
+            log.debug("Jeton présentant un compte inexistant : {}", ex.getMessage());
+            handleError(response, "Jeton invalide : compte introuvable");
+        } catch (AuthenticationException ex) {
+            log.debug("Échec d'authentification dans la chaîne de filtres : {}", ex.getMessage());
+            handleError(response, "Authentification refusée");
         }
     }
 

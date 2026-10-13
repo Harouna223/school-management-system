@@ -20,6 +20,7 @@ import com.school.repository.StudentRepository;
 import com.school.utils.CodeGenerator;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +35,7 @@ import java.util.Objects;
  */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class GradeService {
 
     private final GradeRepository gradeRepository;
@@ -47,10 +49,25 @@ public class GradeService {
     private final EmailService emailService;
     private final SmsService smsService;
     private final AccessControlService accessControlService;
+    private final AcademicCalendarService academicCalendarService;
 
     @Transactional(readOnly = true)
     public List<GradeResponse> listByExam(Long examId) {
         return gradeRepository.findByExamId(examId).stream()
+                .map(GradeResponse::from).toList();
+    }
+
+    /**
+     * Notes d'une évaluation, bornées à une année scolaire (celle de l'évaluation
+     * par défaut) : évite de mélanger les notes de deux années sur un même écran.
+     */
+    @Transactional(readOnly = true)
+    public List<GradeResponse> listByExam(Long examId, Long yearId) {
+        Exam exam = examService.findById(examId);
+        String year = yearId != null
+                ? academicCalendarService.resolveYear(yearId, null, null).getLabel()
+                : exam.getAcademicYear();
+        return gradeRepository.findByExamIdAndYear(examId, year).stream()
                 .map(GradeResponse::from).toList();
     }
 
@@ -73,6 +90,17 @@ public class GradeService {
                 : BigDecimal.valueOf(20);
         if (maxValue.compareTo(BigDecimal.ZERO) <= 0) {
             throw new BusinessException("Le barème doit être supérieur à zéro");
+        }
+        // Cohérence élève ↔ évaluation : une note saisie sur l'évaluation d'une
+        // autre classe polluait la moyenne et le rang de l'élève (les moyennes
+        // sont calculées par élève + trimestre).
+        if (student.getSchoolClass() == null
+                || exam.getSchoolClass() == null
+                || !student.getSchoolClass().getId().equals(exam.getSchoolClass().getId())) {
+            String classeEvaluation = exam.getSchoolClass() != null
+                    ? exam.getSchoolClass().getName() : "inconnue";
+            throw new BusinessException("Cet élève (" + student.getFullName()
+                    + ") n'appartient pas à la classe de l'évaluation (" + classeEvaluation + ")");
         }
         if (request.getValue() == null) {
             throw new BusinessException("La note est obligatoire");
@@ -104,10 +132,19 @@ public class GradeService {
     /**
      * Moyenne trimestrielle pondérée d'un élève.
      * moyenne = Σ(note × coef évaluation × coef matière) / Σ(coef évaluation × coef matière)
+     *
+     * @param yearId année scolaire ; {@code null} = année courante (celle qui
+     *               couvre la date du jour, sinon celle marquée « courante »)
      */
     @Transactional(readOnly = true)
     public BigDecimal averageForStudent(Long studentId, Term term) {
-        List<Grade> grades = gradeRepository.findByStudentIdAndTerm(studentId, term);
+        return averageForStudent(studentId, term, null);
+    }
+
+    @Transactional(readOnly = true)
+    public BigDecimal averageForStudent(Long studentId, Term term, Long yearId) {
+        String year = academicCalendarService.resolveYear(yearId, null, null).getLabel();
+        List<Grade> grades = gradeRepository.findByStudentIdAndTermAndYear(studentId, term, year);
         if (grades.isEmpty()) {
             return null;
         }
@@ -134,10 +171,16 @@ public class GradeService {
      */
     @Transactional(readOnly = true)
     public List<StudentRank> rankStudents(Long classId, Term term) {
+        return rankStudents(classId, term, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<StudentRank> rankStudents(Long classId, Term term, Long yearId) {
+        String year = academicCalendarService.resolveYear(yearId, null, null).getLabel();
         List<Student> students = studentRepository.findBySchoolClassId(classId);
         return students.stream()
                 .map(s -> new StudentRank(s.getId(), s.getFirstName(), s.getLastName(),
-                        s.getMatricule(), averageForStudent(s.getId(), term)))
+                        s.getMatricule(), averageForStudent(s.getId(), term, yearId)))
                 .filter(r -> r.average() != null)
                 .sorted(Comparator.comparing(StudentRank::average).reversed())
                 .toList();
@@ -145,12 +188,20 @@ public class GradeService {
 
     /**
      * Génération des bulletins pour une classe et un trimestre.
+     *
+     * @param yearId année scolaire à étiqueter ; {@code null} = année courante
      */
     @Transactional
     public List<BulletinResponse> generateBulletins(Long classId, Term term,
                                                     HttpServletRequest httpRequest) {
-        List<StudentRank> ranking = rankStudents(classId, term);
-        String year = CodeGenerator.currentAcademicYear();
+        return generateBulletins(classId, term, null, httpRequest);
+    }
+
+    @Transactional
+    public List<BulletinResponse> generateBulletins(Long classId, Term term, Long yearId,
+                                                    HttpServletRequest httpRequest) {
+        String year = referenceYearLabel(yearId);
+        List<StudentRank> ranking = rankStudents(classId, term, yearId);
 
         List<BigDecimal> averages = ranking.stream()
                 .map(StudentRank::average)
@@ -200,8 +251,14 @@ public class GradeService {
     @Transactional
     public List<BulletinResponse> runDeliberation(Long classId, Term term,
                                                   HttpServletRequest httpRequest) {
-        String year = CodeGenerator.currentAcademicYear();
-        generateBulletins(classId, term, httpRequest);
+        return runDeliberation(classId, term, null, httpRequest);
+    }
+
+    @Transactional
+    public List<BulletinResponse> runDeliberation(Long classId, Term term, Long yearId,
+                                                  HttpServletRequest httpRequest) {
+        String year = referenceYearLabel(yearId);
+        generateBulletins(classId, term, yearId, httpRequest);
         List<Bulletin> bulletins = bulletinRepository
                 .findByStudentSchoolClassIdAndTermAndAcademicYear(classId, term, year)
                 .stream()
@@ -250,8 +307,11 @@ public class GradeService {
         // auquel il a accès, même en devinant un bulletinId.
         accessControlService.assertCanAccessStudent(bulletin.getStudent().getId());
         BulletinResponse responseData = BulletinResponse.from(bulletin);
+        // Les notes imprimées doivent être celles de l'ANNÉE du bulletin, pas
+        // celles de toutes les années confondues.
         List<Grade> grades = gradeRepository
-                .findByStudentIdAndTerm(bulletin.getStudent().getId(), bulletin.getTerm());
+                .findByStudentIdAndTermAndYear(bulletin.getStudent().getId(), bulletin.getTerm(),
+                        bulletin.getAcademicYear());
         reportService.bulletinPdf(response, responseData, grades);
     }
 
@@ -259,22 +319,18 @@ public class GradeService {
      * Export PDF de tous les bulletins d'une classe dans un seul document.
      */
     @Transactional(readOnly = true)
-    public void exportClassBulletinsPdf(Long classId, Term term,
+    public void exportClassBulletinsPdf(Long classId, Term term, Long yearId,
                                         jakarta.servlet.http.HttpServletResponse response)
             throws java.io.IOException {
-        String year = com.school.utils.CodeGenerator.currentAcademicYear();
-        List<Bulletin> bulletins = bulletinRepository
-                .findByStudentSchoolClassIdAndTermAndAcademicYear(classId, term, year)
-                .stream()
-                .sorted(Comparator.comparing(Bulletin::getRank,
-                        Comparator.nullsLast(Comparator.naturalOrder())))
-                .toList();
+        String year = referenceYearLabel(yearId);
+        List<Bulletin> bulletins = bulletinsOfClass(classId, term, year);
         if (bulletins.isEmpty()) {
             throw new com.school.exception.BusinessException("Aucun bulletin trouvé pour cette classe et ce trimestre");
         }
         List<BulletinResponse> responses = bulletins.stream().map(BulletinResponse::from).toList();
         List<List<Grade>> gradesList = bulletins.stream()
-                .map(b -> gradeRepository.findByStudentIdAndTerm(b.getStudent().getId(), term))
+                .map(b -> gradeRepository.findByStudentIdAndTermAndYear(b.getStudent().getId(), term,
+                        b.getAcademicYear()))
                 .toList();
         reportService.classBulletinsPdf(response, responses, gradesList);
     }
@@ -283,19 +339,16 @@ public class GradeService {
      * Export PDF du procès-verbal de délibération (classement + décisions).
      */
     @Transactional(readOnly = true)
-    public void exportDeliberationPv(Long classId, Term term,
+    public void exportDeliberationPv(Long classId, Term term, Long yearId,
                                      jakarta.servlet.http.HttpServletResponse response)
             throws java.io.IOException {
-        String year = CodeGenerator.currentAcademicYear();
-        String className = bulletinRepository
-                .findByStudentSchoolClassIdAndTermAndAcademicYear(classId, term, year).stream()
-                .findFirst()
-                .map(b -> b.getStudent().getSchoolClass().getName())
-                .orElse("Classe " + classId);
-        List<Bulletin> bulletins = bulletinRepository
-                .findByStudentSchoolClassIdAndTermAndAcademicYear(classId, term, year);
+        String year = referenceYearLabel(yearId);
+        List<Bulletin> bulletins = bulletinsOfClass(classId, term, year);
         bulletins.sort(Comparator.comparing(Bulletin::getRank,
                 Comparator.nullsLast(Comparator.naturalOrder())));
+        String className = bulletins.stream().findFirst()
+                .map(b -> b.getStudent().getSchoolClass().getName())
+                .orElse("Classe " + classId);
         List<String[]> rows = bulletins.stream().map(b -> new String[]{
                 String.valueOf(b.getRank() != null ? b.getRank() : "-"),
                 b.getStudent().getMatricule(),
@@ -307,6 +360,43 @@ public class GradeService {
         reportService.exportStudentsPdf(response, rows,
                 new String[]{"Rang", "Matricule", "Élève", "Moyenne", "Mention", "Décision"},
                 "Procès-verbal de délibération - " + className + " - " + term + " - " + year);
+    }
+
+    /**
+     * Libellé de l'année scolaire de référence, avec repli explicite.
+     *
+     * <p>Si l'année demandée ne contient aucun bulletin (typiquement un
+     * établissement dont les bulletins ont été générés par l'ancien calcul fondé
+     * sur l'année civile), on retombe sur la dernière année où des bulletins
+     * existent POUR CE TRIMESTRE plutôt que d'échouer : les documents restent
+     * imprimables, et l'année réellement utilisée figure sur le document.</p>
+     */
+    private String referenceYearLabel(Long yearId) {
+        return academicCalendarService.resolveYear(yearId, null, null).getLabel();
+    }
+
+    /** Bulletins d'une classe pour un trimestre et une année, avec repli documenté. */
+    private List<Bulletin> bulletinsOfClass(Long classId, Term term, String year) {
+        List<Bulletin> bulletins = bulletinRepository
+                .findByStudentSchoolClassIdAndTermAndAcademicYear(classId, term, year)
+                .stream()
+                .sorted(Comparator.comparing(Bulletin::getRank,
+                        Comparator.nullsLast(Comparator.naturalOrder())))
+                .toList();
+        if (!bulletins.isEmpty()) {
+            return bulletins;
+        }
+        String latest = bulletinRepository.findLatestAcademicYear(classId, term);
+        if (latest == null || latest.equals(year)) {
+            return bulletins;
+        }
+        log.warn("Aucun bulletin pour la classe {} / {} / {} : repli sur l'année {}",
+                classId, term, year, latest);
+        return bulletinRepository.findByStudentSchoolClassIdAndTermAndAcademicYear(classId, term, latest)
+                .stream()
+                .sorted(Comparator.comparing(Bulletin::getRank,
+                        Comparator.nullsLast(Comparator.naturalOrder())))
+                .toList();
     }
 
     /**

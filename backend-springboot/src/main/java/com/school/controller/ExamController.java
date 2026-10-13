@@ -19,8 +19,10 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.constraints.Min;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -31,6 +33,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/exams")
 @RequiredArgsConstructor
+@Validated
 @Tag(name = "Notes & Examens", description = "Évaluations, notes, bulletins")
 public class ExamController {
 
@@ -46,16 +49,18 @@ public class ExamController {
             @RequestParam(required = false) Long subjectId,
             @RequestParam(required = false) Term term,
             @RequestParam(required = false) ExamStatus status,
-            @RequestParam(defaultValue = "0") int page,
+            @Min(value = 0, message = "Le numéro de page ne peut pas être négatif") @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         return ok("Recherche réussie",
                 examService.search(search, classId, subjectId, term, status, page, size));
     }
 
     @GetMapping("/class/{classId}")
-    @Operation(summary = "Évaluations d'une classe")
-    public ResponseEntity<ApiResponse<List<ExamResponse>>> byClass(@PathVariable Long classId) {
-        return ok("Évaluations de la classe", examService.listByClass(classId));
+    @Operation(summary = "Évaluations d'une classe",
+            description = "yearId optionnel : sans lui, toutes les années sont renvoyées")
+    public ResponseEntity<ApiResponse<List<ExamResponse>>> byClass(@PathVariable Long classId,
+                                                                   @RequestParam(required = false) Long yearId) {
+        return ok("Évaluations de la classe", examService.listByClass(classId, yearId));
     }
 
     @GetMapping("/{id}")
@@ -114,39 +119,53 @@ public class ExamController {
     }
 
     @GetMapping("/student/{studentId}/average")
-    @Operation(summary = "Moyenne trimestrielle d'un élève")
+    @Operation(summary = "Moyenne trimestrielle d'un élève",
+            description = "yearId optionnel : par défaut l'année scolaire courante de l'établissement")
     public ResponseEntity<ApiResponse<java.math.BigDecimal>> average(@PathVariable Long studentId,
-                                                                     @RequestParam Term term) {
+                                                                     @RequestParam Term term,
+                                                                     @RequestParam(required = false) Long yearId) {
         accessControlService.assertCanAccessStudent(studentId);
-        return ok("Moyenne calculée", gradeService.averageForStudent(studentId, term));
+        return ok("Moyenne calculée", gradeService.averageForStudent(studentId, term, yearId));
     }
 
     @GetMapping("/class/{classId}/ranking")
-    @Operation(summary = "Classement des élèves d'une classe")
+    @Operation(summary = "Classement des élèves d'une classe",
+            description = "yearId optionnel : par défaut l'année scolaire courante de l'établissement")
     public ResponseEntity<ApiResponse<List<GradeService.StudentRank>>> ranking(
-            @PathVariable Long classId, @RequestParam Term term) {
-        return ok("Classement calculé", gradeService.rankStudents(classId, term));
+            @PathVariable Long classId, @RequestParam Term term,
+            @RequestParam(required = false) Long yearId) {
+        // Classement de TOUTE la classe : donnée établissement, pas une donnée
+        // d'élève (le parent dispose de /api/parents/children/{id}/bulletins).
+        accessControlService.assertStaffOnly("le classement d'une classe");
+        return ok("Classement calculé", gradeService.rankStudents(classId, term, yearId));
     }
 
     @PostMapping("/class/{classId}/bulletins")
-    @Operation(summary = "Générer les bulletins d'une classe pour un trimestre")
+    @Operation(summary = "Générer les bulletins d'une classe pour un trimestre",
+            description = "yearId optionnel : par défaut l'année scolaire courante de l'établissement")
     public ResponseEntity<ApiResponse<List<BulletinResponse>>> generateBulletins(
-            @PathVariable Long classId, @RequestParam Term term, HttpServletRequest httpRequest) {
-        return ok("Bulletins générés", gradeService.generateBulletins(classId, term, httpRequest));
+            @PathVariable Long classId, @RequestParam Term term,
+            @RequestParam(required = false) Long yearId, HttpServletRequest httpRequest) {
+        return ok("Bulletins générés", gradeService.generateBulletins(classId, term, yearId, httpRequest));
     }
 
     @PostMapping("/class/{classId}/deliberation")
-    @Operation(summary = "Lancer la délibération d'une classe (décision admis / ajourné / redouble)")
+    @Operation(summary = "Lancer la délibération d'une classe (décision admis / ajourné / redouble)",
+            description = "yearId optionnel : par défaut l'année scolaire courante de l'établissement")
     public ResponseEntity<ApiResponse<List<BulletinResponse>>> deliberate(
-            @PathVariable Long classId, @RequestParam Term term, HttpServletRequest httpRequest) {
-        return ok("Délibération effectuée", gradeService.runDeliberation(classId, term, httpRequest));
+            @PathVariable Long classId, @RequestParam Term term,
+            @RequestParam(required = false) Long yearId, HttpServletRequest httpRequest) {
+        return ok("Délibération effectuée", gradeService.runDeliberation(classId, term, yearId, httpRequest));
     }
 
     @GetMapping("/class/{classId}/deliberation/pv")
-    @Operation(summary = "Procès-verbal de délibération (PDF)")
+    @Operation(summary = "Procès-verbal de délibération (PDF)",
+            description = "yearId optionnel ; à défaut, la dernière année où des bulletins existent")
     public void deliberationPv(@PathVariable Long classId, @RequestParam Term term,
+                               @RequestParam(required = false) Long yearId,
                                jakarta.servlet.http.HttpServletResponse response) throws java.io.IOException {
-        gradeService.exportDeliberationPv(classId, term, response);
+        accessControlService.assertStaffOnly("le procès-verbal de délibération");
+        gradeService.exportDeliberationPv(classId, term, yearId, response);
     }
 
     @GetMapping("/student/{studentId}/bulletins")
@@ -164,10 +183,13 @@ public class ExamController {
     }
 
     @GetMapping("/class/{classId}/bulletins/pdf")
-    @Operation(summary = "Tous les bulletins de la classe dans un seul document PDF")
+    @Operation(summary = "Tous les bulletins de la classe dans un seul document PDF",
+            description = "yearId optionnel ; à défaut, la dernière année où des bulletins existent")
     public void classBulletinsPdf(@PathVariable Long classId, @RequestParam Term term,
+                                  @RequestParam(required = false) Long yearId,
                                   HttpServletResponse response) throws IOException {
-        gradeService.exportClassBulletinsPdf(classId, term, response);
+        accessControlService.assertStaffOnly("les bulletins d'une classe");
+        gradeService.exportClassBulletinsPdf(classId, term, yearId, response);
     }
 
     private <T> ResponseEntity<ApiResponse<T>> ok(String message, T data) {

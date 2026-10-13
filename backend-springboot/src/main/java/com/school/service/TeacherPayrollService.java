@@ -69,6 +69,7 @@ public class TeacherPayrollService {
     private final ExpenseRepository expenseRepository;
     private final ExpenseCategoryRepository expenseCategoryRepository;
     private final AcademicYearRepository academicYearRepository;
+    private final NumberSequenceService numberSequenceService;
     private final AuditService auditService;
     private final com.school.service.NotificationService notificationService;
 
@@ -169,6 +170,27 @@ public class TeacherPayrollService {
     }
 
     /**
+     * Variante verrouillée utilisée par le paiement : le bulletin est relu avec un
+     * verrou pessimiste avant tout contrôle de solde, ce qui sérialise deux
+     * paiements concurrents du même mois.
+     */
+    private TeacherMonthlyPayment ensurePaymentLocked(Long teacherId, LocalDate monthDate) {
+        LocalDate firstDay = monthDate.withDayOfMonth(1);
+        return paymentRepository.findWithLockingByTeacherIdAndMonthDate(teacherId, firstDay)
+                .map(this::recalculate)
+                .orElseGet(() -> {
+                    // Aucun bulletin : il faut le créer. Le verrou n'a rien à
+                    // protéger tant que la ligne n'existe pas ; la contrainte
+                    // uk_tmp_teacher_month empêche un doublon.
+                    ensurePayment(teacherId, firstDay);
+                    return paymentRepository.findWithLockingByTeacherIdAndMonthDate(teacherId, firstDay)
+                            .map(this::recalculate)
+                            .orElseThrow(() -> new com.school.exception.BusinessException(
+                                    "Impossible de préparer le bulletin de paie de ce mois"));
+                });
+    }
+
+    /**
      * Recalcule le bulletin depuis les saisies du mois : total d'heures,
      * tarif de référence, montant total, payé, restant et statut.
      * Le montant ne provient JAMAIS du frontend.
@@ -231,7 +253,10 @@ public class TeacherPayrollService {
 
         Teacher teacher = teacherRepository.findById(request.getTeacherId())
                 .orElseThrow(() -> ResourceNotFoundException.of("Enseignant", request.getTeacherId()));
-        TeacherMonthlyPayment payment = ensurePayment(teacher.getId(), request.getMonthDate());
+        // Verrou pessimiste sur le bulletin du mois : sans lui, deux paiements
+        // simultanés validaient tous les deux le même « reste à payer » et
+        // créaient chacun une transaction + une dépense (surpaiement réel).
+        TeacherMonthlyPayment payment = ensurePaymentLocked(teacher.getId(), request.getMonthDate());
 
         BigDecimal remaining = payment.getTotalAmount().subtract(payment.getAmountPaid());
         if (payment.getTotalAmount().signum() <= 0) {
@@ -248,13 +273,18 @@ public class TeacherPayrollService {
                     + remaining + " FCFA).");
         }
 
-        long sequence = transactionRepository.count() + 1;
+        // Numéro de reçu issu d'un compteur persisté et verrouillé : l'ancien
+        // « count() + 1 » sans reprise collisionnait avec un reçu déjà émis
+        // (409 définitif, paiement impossible) après toute suppression ou
+        // restauration de sauvegarde.
+        long sequence = numberSequenceService.next(NumberSequenceService.TEACHER_RECEIPT);
+        java.time.LocalDateTime now = LocalDateTime.now();
         TeacherPaymentTransaction tx = TeacherPaymentTransaction.builder()
                 .monthlyPayment(payment)
-                .receiptNo(com.school.utils.CodeGenerator.teacherReceiptNo(sequence))
+                .receiptNo(com.school.utils.CodeGenerator.teacherReceiptNo(sequence, now.toLocalDate()))
                 .amount(request.getAmount())
                 .method(request.getMethod())
-                .paymentDate(LocalDateTime.now())
+                .paymentDate(now)
                 .reference(request.getReference())
                 .receivedBy(SecurityUtils.currentUser())
                 .observation(request.getObservation())

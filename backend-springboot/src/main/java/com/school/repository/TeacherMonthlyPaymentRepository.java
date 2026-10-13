@@ -2,7 +2,9 @@ package com.school.repository;
 
 import com.school.entity.TeacherMonthlyPayment;
 import com.school.enums.TeacherPaymentStatus;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -13,6 +15,20 @@ import java.util.Optional;
 public interface TeacherMonthlyPaymentRepository extends JpaRepository<TeacherMonthlyPayment, Long> {
 
     Optional<TeacherMonthlyPayment> findByTeacherIdAndMonthDate(Long teacherId, LocalDate monthDate);
+
+    /**
+     * Même recherche, avec VERROU pessimiste.
+     *
+     * <p>Sans lui, deux paiements simultanés du même mois lisaient tous les deux le
+     * même « reste à payer », passaient le contrôle et créaient chacun une
+     * transaction + une dépense : surpaiement réel et comptabilité incohérente.
+     * L'encaissement d'une facture élève utilisait déjà ce verrou
+     * ({@code InvoiceRepository.findWithLockingById}).</p>
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM TeacherMonthlyPayment p WHERE p.teacher.id = :teacherId AND p.monthDate = :monthDate")
+    Optional<TeacherMonthlyPayment> findWithLockingByTeacherIdAndMonthDate(
+            @Param("teacherId") Long teacherId, @Param("monthDate") LocalDate monthDate);
 
     List<TeacherMonthlyPayment> findByMonthDateOrderByTeacherLastNameAsc(LocalDate monthDate);
 

@@ -11,8 +11,10 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -24,6 +26,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/library")
 @RequiredArgsConstructor
+@Validated
 @Tag(name = "Bibliothèque", description = "Gestion des livres et emprunts")
 public class LibraryController {
 
@@ -34,7 +37,7 @@ public class LibraryController {
     public ResponseEntity<ApiResponse<PageResponse<BookResponse>>> searchBooks(
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String category,
-            @RequestParam(defaultValue = "0") int page,
+            @Min(value = 0, message = "Le numéro de page ne peut pas être négatif") @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         return ok("Livres", libraryService.searchBooks(search, category, page, size));
     }
@@ -63,7 +66,7 @@ public class LibraryController {
     @Operation(summary = "Liste des emprunts")
     public ResponseEntity<ApiResponse<PageResponse<BookResponse.BorrowingResponse>>> borrowings(
             @RequestParam(required = false) BorrowingStatus status,
-            @RequestParam(defaultValue = "0") int page,
+            @Min(value = 0, message = "Le numéro de page ne peut pas être négatif") @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         return ok("Emprunts", libraryService.searchBorrowings(status, page, size));
     }

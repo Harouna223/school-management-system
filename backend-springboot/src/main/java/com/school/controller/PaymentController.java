@@ -19,8 +19,10 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.constraints.Min;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -33,6 +35,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/payments")
 @RequiredArgsConstructor
+@Validated
 @Tag(name = "Finances", description = "Factures, paiements et reçus")
 public class PaymentController {
 
@@ -45,10 +48,13 @@ public class PaymentController {
     public ResponseEntity<ApiResponse<PageResponse<InvoiceResponse>>> searchInvoices(
             @RequestParam(required = false) Long studentId,
             @RequestParam(required = false) InvoiceStatus status,
-            @RequestParam(defaultValue = "0") int page,
+            @Min(value = 0, message = "Le numéro de page ne peut pas être négatif") @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        if (studentId != null) accessControlService.assertCanAccessStudentData(studentId);
-        return ok("Factures", financeService.searchInvoices(studentId, status, page, size));
+        // Un PARENT / ELEVE ne peut pas élargir le périmètre : sans identifiant
+        // il ne voit que ses propres factures, avec un identifiant étranger il
+        // est refusé (au lieu de lister tout l'établissement).
+        var scope = accessControlService.resolveStudentScope(studentId);
+        return ok("Factures", financeService.searchInvoices(scope, status, page, size));
     }
 
     @GetMapping("/invoices/student/{studentId}")
@@ -73,10 +79,10 @@ public class PaymentController {
             @RequestParam(required = false) PaymentMethod method,
             @RequestParam(required = false) LocalDate from,
             @RequestParam(required = false) LocalDate to,
-            @RequestParam(defaultValue = "0") int page,
+            @Min(value = 0, message = "Le numéro de page ne peut pas être négatif") @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        if (studentId != null) accessControlService.assertCanAccessStudentData(studentId);
-        return ok("Paiements", financeService.searchPayments(studentId, method, from, to, page, size));
+        var scope = accessControlService.resolveStudentScope(studentId);
+        return ok("Paiements", financeService.searchPayments(scope, method, from, to, page, size));
     }
 
     @GetMapping("/student/{studentId}")
@@ -104,6 +110,9 @@ public class PaymentController {
             response.setStatus(HttpServletResponse.SC_NOT_FOUND);
             return;
         }
+        // IDOR : un parent / élève ne peut télécharger que les reçus des élèves
+        // auxquels il a accès, même en devinant l'identifiant du paiement.
+        accessControlService.assertCanAccessStudentData(payment.getStudentId());
         java.math.BigDecimal remaining = null;
         if (payment.getInvoiceId() != null) {
             try {
@@ -127,8 +136,9 @@ public class PaymentController {
                                   @RequestParam(required = false) PaymentMethod method,
                                   @RequestParam(required = false) LocalDate from,
                                   @RequestParam(required = false) LocalDate to) throws IOException {
+        var scope = accessControlService.resolveStudentScope(studentId);
         List<PaymentResponse> payments = financeService
-                .searchPayments(studentId, method, from, to, 0, 10000).getContent();
+                .searchPayments(scope, method, from, to, 0, 10000).getContent();
         String[] headers = new String[]{"Reçu", "Élève", "Matricule", "Facture", "Montant", "Mode", "Date", "Enregistré par"};
         List<String[]> rows = paymentRows(payments);
         java.math.BigDecimal total = payments.stream()
@@ -144,8 +154,10 @@ public class PaymentController {
     public void exportInvoicesPdf(HttpServletResponse response,
                                   @RequestParam(required = false) Long studentId,
                                   @RequestParam(required = false) InvoiceStatus status) throws IOException {
+        var scope = accessControlService.resolveStudentScope(studentId);
         List<InvoiceResponse> invoices = financeService
-                .searchInvoices(studentId, status, 0, 10000).getContent();
+                .searchInvoices(scope, status, 0, 10000)
+                .getContent();
         String[] headers = new String[]{"N° Facture", "Élève", "Matricule", "Frais", "Montant", "Payé", "Restant", "Statut", "Échéance"};
         List<String[]> rows = invoiceRows(invoices);
         java.math.BigDecimal total = invoices.stream()
@@ -183,8 +195,9 @@ public class PaymentController {
                                     @RequestParam(required = false) PaymentMethod method,
                                     @RequestParam(required = false) LocalDate from,
                                     @RequestParam(required = false) LocalDate to) throws IOException {
+        var scope = accessControlService.resolveStudentScope(studentId);
         List<PaymentResponse> payments = financeService
-                .searchPayments(studentId, method, from, to, 0, 10000).getContent();
+                .searchPayments(scope, method, from, to, 0, 10000).getContent();
         reportService.exportExcel(response,
                 new String[]{"Reçu", "Élève", "Matricule", "Facture", "Montant", "Mode", "Date", "Enregistré par"},
                 paymentRows(payments), "paiements");
@@ -195,8 +208,10 @@ public class PaymentController {
     public void exportInvoicesExcel(HttpServletResponse response,
                                     @RequestParam(required = false) Long studentId,
                                     @RequestParam(required = false) InvoiceStatus status) throws IOException {
+        var scope = accessControlService.resolveStudentScope(studentId);
         List<InvoiceResponse> invoices = financeService
-                .searchInvoices(studentId, status, 0, 10000).getContent();
+                .searchInvoices(scope, status, 0, 10000)
+                .getContent();
         reportService.exportExcel(response,
                 new String[]{"N° Facture", "Élève", "Matricule", "Frais", "Montant", "Payé", "Restant", "Statut", "Échéance"},
                 invoiceRows(invoices), "factures");

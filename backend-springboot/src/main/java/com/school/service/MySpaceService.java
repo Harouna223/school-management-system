@@ -47,6 +47,7 @@ public class MySpaceService {
     private final AttendanceRepository attendanceRepository;
     private final InvoiceRepository invoiceRepository;
     private final SubjectAssignmentRepository subjectAssignmentRepository;
+    private final AcademicCalendarService academicCalendarService;
 
     private Student currentStudent() {
         Long userId = SecurityUtils.currentUserId();
@@ -80,12 +81,19 @@ public class MySpaceService {
 
     @Transactional(readOnly = true)
     public List<MyGradeResponse> myGrades(Term term) {
-        List<Grade> grades = gradeRepository.findByStudentId(currentStudent().getId());
+        // Notes de l'année scolaire courante. Si l'établissement n'a configuré
+        // aucune année, on n'échoue pas : l'élève doit toujours pouvoir consulter
+        // ses notes (l'année est alors affichée sur chaque ligne du bulletin).
+        List<Grade> grades = academicCalendarService.findYearFor(null)
+                .map(year -> gradeRepository.findByStudentIdAndYear(currentStudent().getId(), year.getLabel()))
+                .orElseGet(() -> gradeRepository.findByStudentId(currentStudent().getId()));
         if (term != null) {
             grades = grades.stream().filter(g -> g.getExam().getTerm() == term).toList();
         }
         return grades.stream()
-                .sorted(Comparator.comparing((Grade g) -> g.getExam().getExamDate()).reversed())
+                .sorted(Comparator.comparing((Grade g) -> g.getExam().getExamDate(),
+                                Comparator.nullsLast(Comparator.naturalOrder()))
+                        .reversed())
                 .map(MyGradeResponse::from)
                 .toList();
     }

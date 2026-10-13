@@ -77,6 +77,30 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
                                    Pageable pageable);
 
     /**
+     * Variante multi-dossiers de {@link #searchByParentId} : un même compte
+     * utilisateur peut être lié à plusieurs dossiers parent (enfants inscrits
+     * séparément). Ne filter que sur le premier dossier masquait les autres
+     * enfants dans la liste et les exports.
+     */
+    @Query("""
+            SELECT s FROM Student s
+            WHERE s.parent.id IN :parentIds
+              AND (:search IS NULL OR :search = '' OR
+                   LOWER(s.firstName) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                   LOWER(s.lastName) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                   LOWER(s.matricule) LIKE LOWER(CONCAT('%', :search, '%')))
+              AND (:classId IS NULL OR s.schoolClass.id = :classId)
+              AND (:status IS NULL OR s.status = :status)
+              AND (:cycle IS NULL OR s.educationCycle = :cycle)
+            """)
+    Page<Student> searchByParentIds(@Param("parentIds") java.util.Collection<Long> parentIds,
+                                    @Param("search") String search,
+                                    @Param("classId") Long classId,
+                                    @Param("status") com.school.enums.StudentStatus status,
+                                    @Param("cycle") com.school.enums.EducationCycle cycle,
+                                    Pageable pageable);
+
+    /**
      * Variante de {@link #search} restreinte au profil de l'élève connecté
      * (rôles ELEVE / ETUDIANT) pour empêcher la consultation de l'annuaire.
      */
@@ -99,6 +123,9 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
                                    Pageable pageable);
 
     List<Student> findByParentId(Long parentId);
+
+    /** Enfants de TOUS les dossiers parent d'un même compte utilisateur. */
+    List<Student> findByParentIdIn(java.util.Collection<Long> parentIds);
 
     List<Student> findBySchoolClassId(Long classId);
 

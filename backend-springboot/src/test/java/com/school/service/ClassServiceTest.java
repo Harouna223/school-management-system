@@ -104,6 +104,18 @@ class ClassServiceTest {
     @Mock
     private AuditService auditService;
 
+    // Gardes de suppression ajoutées au LOT 2 : une classe ne peut plus être
+    // supprimée si des évaluations, créneaux, affectations ou présences y sont
+    // rattachés (les FK en cascade détruisaient sinon des notes en silence).
+    @Mock
+    private com.school.repository.ExamRepository examRepository;
+    @Mock
+    private com.school.repository.ScheduleRepository scheduleRepository;
+    @Mock
+    private com.school.repository.SubjectAssignmentRepository subjectAssignmentRepository;
+    @Mock
+    private com.school.repository.AttendanceRepository attendanceRepository;
+
     @InjectMocks
     private ClassService classService;
 

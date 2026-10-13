@@ -15,8 +15,10 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -28,6 +30,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/communication")
 @RequiredArgsConstructor
+@Validated
 @Tag(name = "Communication", description = "Annonces, notifications et messagerie interne")
 public class CommunicationController {
 
@@ -70,7 +73,7 @@ public class CommunicationController {
     @GetMapping("/notifications")
     @Operation(summary = "Mes notifications")
     public ResponseEntity<ApiResponse<PageResponse<NotificationResponse>>> notifications(
-            @RequestParam(defaultValue = "0") int page,
+            @Min(value = 0, message = "Le numéro de page ne peut pas être négatif") @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         return ok("Notifications", notificationService.getMyNotifications(
                 SecurityUtils.currentUserId(), page, size));
@@ -99,7 +102,7 @@ public class CommunicationController {
     @GetMapping("/messages/inbox")
     @Operation(summary = "Messages reçus")
     public ResponseEntity<ApiResponse<PageResponse<MessageResponse>>> inbox(
-            @RequestParam(defaultValue = "0") int page,
+            @Min(value = 0, message = "Le numéro de page ne peut pas être négatif") @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         return ok("Boîte de réception", messageService.inbox(SecurityUtils.currentUserId(), page, size));
     }
@@ -107,7 +110,7 @@ public class CommunicationController {
     @GetMapping("/messages/sent")
     @Operation(summary = "Messages envoyés")
     public ResponseEntity<ApiResponse<PageResponse<MessageResponse>>> sent(
-            @RequestParam(defaultValue = "0") int page,
+            @Min(value = 0, message = "Le numéro de page ne peut pas être négatif") @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         return ok("Messages envoyés", messageService.sent(SecurityUtils.currentUserId(), page, size));
     }
@@ -137,7 +140,7 @@ public class CommunicationController {
     @Operation(summary = "Historique des envois de notifications (WhatsApp, SMS, Email)")
     public ResponseEntity<ApiResponse<org.springframework.data.domain.Page<com.school.entity.MessageLog>>> messageLogs(
             @RequestParam(required = false) String channel,
-            @RequestParam(defaultValue = "0") int page,
+            @Min(value = 0, message = "Le numéro de page ne peut pas être négatif") @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
         org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, size,
                 org.springframework.data.domain.Sort.by("createdAt").descending());

@@ -11,5 +11,7 @@ public interface SubjectAssignmentRepository extends JpaRepository<SubjectAssign
 
     List<SubjectAssignment> findBySchoolClassId(Long classId);
 
+    long countBySchoolClassId(Long classId);
+
     boolean existsByTeacherIdAndSubjectIdAndSchoolClassId(Long teacherId, Long subjectId, Long classId);
 }

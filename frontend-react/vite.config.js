@@ -41,5 +41,13 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: './src/test/setup.js',
     css: true,
+    // Les fichiers de test sont exécutés SÉQUENTIELLEMENT : en parallèle, les
+    // 12 environnements jsdom (MUI + React Router) se disputent la mémoire et
+    // l'un ou l'autre dépasse le délai du test — un fichier différent à chaque
+    // exécution, ce qui donne une suite « verte ou rouge » au hasard et masque
+    // les vraies régressions. Le coût est de quelques minutes, la stabilité
+    // n'a pas de prix pour une CI.
+    fileParallelism: false,
+    testTimeout: 20000,
   },
 })

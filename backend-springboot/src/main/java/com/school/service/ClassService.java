@@ -13,6 +13,10 @@ import com.school.entity.Section;
 import com.school.exception.BusinessException;
 import com.school.exception.ResourceNotFoundException;
 import com.school.mapper.ClassMapper;
+import com.school.repository.AttendanceRepository;
+import com.school.repository.ExamRepository;
+import com.school.repository.ScheduleRepository;
+import com.school.repository.SubjectAssignmentRepository;
 import com.school.repository.LevelRepository;
 import com.school.repository.RoomRepository;
 import com.school.repository.SchoolClassRepository;
@@ -41,6 +45,10 @@ public class ClassService {
     private final RoomRepository roomRepository;
     private final ClassMapper classMapper;
     private final AuditService auditService;
+    private final ExamRepository examRepository;
+    private final ScheduleRepository scheduleRepository;
+    private final SubjectAssignmentRepository subjectAssignmentRepository;
+    private final AttendanceRepository attendanceRepository;
 
     @Transactional(readOnly = true)
     public PageResponse<ClassResponse> search(String search, Long levelId, Long sectionId,
@@ -95,6 +103,29 @@ public class ClassService {
         SchoolClass schoolClass = findById(id);
         if (!schoolClass.getStudents().isEmpty()) {
             throw new BusinessException("Impossible de supprimer : la classe contient des élèves");
+        }
+        // Les évaluations, notes, créneaux et affectations liés à la classe sont
+        // supprimés EN CASCADE par la base (fk_exams_class, fk_grades_exam,
+        // fk_schedules_class, fk_sa_class) : sans ces gardes, supprimer une classe
+        // vide faisait disparaître silencieusement des notes et des créneaux.
+        long exams = examRepository.findBySchoolClassId(id).size();
+        if (exams > 0) {
+            throw new BusinessException("Impossible de supprimer : " + exams
+                    + " évaluation(s) et leurs notes sont rattachées à cette classe. "
+                    + "Archivez-la ou supprimez d'abord les évaluations.");
+        }
+        if (!scheduleRepository.findBySchoolClassId(id).isEmpty()) {
+            throw new BusinessException("Impossible de supprimer : des créneaux d'emploi du temps "
+                    + "sont rattachés à cette classe.");
+        }
+        long assignments = subjectAssignmentRepository.countBySchoolClassId(id);
+        if (assignments > 0) {
+            throw new BusinessException("Impossible de supprimer : " + assignments
+                    + " affectation(s) enseignant/matière sont rattachées à cette classe.");
+        }
+        if (attendanceRepository.existsBySchoolClassId(id)) {
+            throw new BusinessException("Impossible de supprimer : des présences sont enregistrées "
+                    + "pour cette classe.");
         }
         auditService.log("DELETE", "Class", id, "Suppression classe " + schoolClass.getName(), httpRequest);
         classRepository.delete(schoolClass);

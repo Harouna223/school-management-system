@@ -77,15 +77,19 @@ public final class CodeGenerator {
      * Numéro de reçu de paiement enseignant : REC-ENS-YYMMDD-XXXXX.
      */
     public static String teacherReceiptNo(long sequence) {
-        return String.format("REC-ENS-%s-%05d", LocalDate.now().format(DATE_COMPACT), sequence);
+        return teacherReceiptNo(sequence, LocalDate.now());
     }
 
     /**
-     * Identifiant académique courant : AAAA-AAAA.
+     * Numéro de reçu de paiement enseignant daté : REC-ENS-YYMMDD-XXXXX.
+     *
+     * <p>La date est celle du PAIEMENT et non celle de l'exécution. Le compteur,
+     * lui, reste global (pas de remise à zéro quotidienne) : deux journées ne
+     * peuvent donc pas produire le même numéro.</p>
      */
-    public static String currentAcademicYear() {
-        int year = LocalDate.now().getYear();
-        return year + "-" + (year + 1);
+    public static String teacherReceiptNo(long sequence, LocalDate paymentDate) {
+        LocalDate date = paymentDate != null ? paymentDate : LocalDate.now();
+        return String.format("REC-ENS-%s-%05d", date.format(DATE_COMPACT), sequence);
     }
 
     /**

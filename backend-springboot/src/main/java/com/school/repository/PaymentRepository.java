@@ -44,4 +44,26 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
                          @Param("from") LocalDateTime from,
                          @Param("to") LocalDateTime to,
                          Pageable pageable);
+
+    /**
+     * Variante « périmètre » utilisée par les listings accessibles aux parents et
+     * aux élèves : {@code unrestricted = true} pour le personnel, sinon les
+     * identifiants autorisés (liste vide = aucun résultat, jamais tout
+     * l'établissement).
+     */
+    @Query("""
+            SELECT p FROM Payment p
+            WHERE (:unrestricted = true OR p.student.id IN :studentIds)
+              AND (:studentId IS NULL OR p.student.id = :studentId)
+              AND (:method IS NULL OR p.method = :method)
+              AND (:from IS NULL OR p.paymentDate >= :from)
+              AND (:to IS NULL OR p.paymentDate <= :to)
+            """)
+    Page<Payment> searchScoped(@Param("unrestricted") boolean unrestricted,
+                               @Param("studentIds") java.util.Collection<Long> studentIds,
+                               @Param("studentId") Long studentId,
+                               @Param("method") PaymentMethod method,
+                               @Param("from") LocalDateTime from,
+                               @Param("to") LocalDateTime to,
+                               Pageable pageable);
 }

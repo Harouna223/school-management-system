@@ -20,9 +20,11 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import jakarta.validation.constraints.Min;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -33,6 +35,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/students")
 @RequiredArgsConstructor
+@Validated
 @Tag(name = "Élèves", description = "Gestion des élèves et dossiers scolaires")
 public class StudentController {
 
@@ -49,7 +52,7 @@ public class StudentController {
             @RequestParam(required = false) Long classId,
             @RequestParam(required = false) StudentStatus status,
             @RequestParam(required = false) com.school.enums.EducationCycle cycle,
-            @RequestParam(defaultValue = "0") int page,
+            @Min(value = 0, message = "Le numéro de page ne peut pas être négatif") @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         return ok("Recherche réussie", studentService.search(search, classId, status, cycle, page, size));
     }

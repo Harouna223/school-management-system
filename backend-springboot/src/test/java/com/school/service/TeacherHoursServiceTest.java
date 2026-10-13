@@ -129,6 +129,30 @@ class TeacherHoursServiceTest {
         SecurityContextHolder.clearContext();
     }
 
+    /**
+     * Défauts lenient communs :
+     * <ul>
+     *   <li>aucun doublon (matière/classe absentes) — la détection est désormais
+     *       NULL-safe et porte sur {@code findDuplicates} ;</li>
+     *   <li>aucune heure déjà saisie le jour visé, y compris en excluant la ligne
+     *       corrigée : {@code update()} revérifie le plafond de 24 h, ce que
+     *       l'ancienne version ne faisait pas.</li>
+     * </ul>
+     * Les tests qui éprouvent ces règles surchargent ces stubs.
+     */
+    @org.junit.jupiter.api.BeforeEach
+    void stubsParDefaut() {
+        org.mockito.Mockito.lenient()
+                .when(workHourRepository.findDuplicates(any(), any(), any(), any()))
+                .thenReturn(List.of());
+        org.mockito.Mockito.lenient()
+                .when(workHourRepository.sumHoursOfTeacherOnDate(anyLong(), any()))
+                .thenReturn(BigDecimal.ZERO);
+        org.mockito.Mockito.lenient()
+                .when(workHourRepository.sumHoursOfTeacherOnDateExcluding(anyLong(), any(), anyLong()))
+                .thenReturn(BigDecimal.ZERO);
+    }
+
     // ------------------------------------------------------------------ helpers
 
     /**
@@ -188,8 +212,8 @@ class TeacherHoursServiceTest {
     /** Aucune cloture sauf mention contraire ; aucun doublon ; 0 h deja saisies. */
     private void contexteNeutre() {
         when(closureRepository.existsByMonthDateAndClosedTrue(any())).thenReturn(false);
-        when(workHourRepository.findByTeacherIdAndDateAndSubjectIdAndSchoolClassId(
-                anyLong(), any(), anyLong(), anyLong())).thenReturn(Optional.empty());
+        when(workHourRepository.findDuplicates(
+                any(), any(), any(), any())).thenReturn(List.of());
         when(workHourRepository.sumHoursOfTeacherOnDate(anyLong(), any()))
                 .thenReturn(BigDecimal.ZERO);
         when(workHourRepository.save(any(TeacherWorkHour.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -453,9 +477,8 @@ class TeacherHoursServiceTest {
         when(rateRepository.findApplicable(1L, jour))
                 .thenReturn(List.of(tarif(5L, t, "5000.00", LocalDate.of(2026, 1, 1), null)));
         when(closureRepository.existsByMonthDateAndClosedTrue(any())).thenReturn(false);
-        when(workHourRepository.findByTeacherIdAndDateAndSubjectIdAndSchoolClassId(
-                1L, jour, -1L, -1L)).thenReturn(Optional.of(
-                        TeacherWorkHour.builder().id(77L).teacher(t).date(jour).build()));
+        when(workHourRepository.findDuplicates(1L, jour, null, null)).thenReturn(List.of(
+                TeacherWorkHour.builder().id(77L).teacher(t).date(jour).build()));
 
         assertThatThrownBy(() -> teacherHoursService.record(saisie(t, jour, "3"), httpRequest))
                 .isInstanceOf(BusinessException.class)
@@ -465,8 +488,8 @@ class TeacherHoursServiceTest {
     }
 
     @Test
-    @DisplayName("record utilise -1 comme cle pour une matiere/classe absente (pas null)")
-    void recordUtiliseMoinsUnPourLesClesAbsentes() {
+    @DisplayName("record cherche le doublon avec NULL (jamais une sentinelle -1, qui ne matche pas NULL en SQL)")
+    void recordChercheLeDoublonAvecNull() {
         Teacher t = enseignant(1L);
         when(rateRepository.findApplicable(1L, jour))
                 .thenReturn(List.of(tarif(5L, t, "5000.00", LocalDate.of(2026, 1, 1), null)));
@@ -474,8 +497,12 @@ class TeacherHoursServiceTest {
 
         teacherHoursService.record(saisie(t, jour, "3"), httpRequest);
 
-        // Sans matiere ni classe, la cle de doublon doit rester stable et comparable en base.
-        verify(workHourRepository).findByTeacherIdAndDateAndSubjectIdAndSchoolClassId(1L, jour, -1L, -1L);
+        // Régression corrigée : la sentinelle -1L produisait `subject_id = -1 AND
+        // class_id = -1`, qui ne correspond JAMAIS à NULL. Deux saisies identiques
+        // le même jour étaient donc acceptées et le salaire du mois doublait.
+        verify(workHourRepository).findDuplicates(1L, jour, null, null);
+        verify(workHourRepository, never())
+                .findByTeacherIdAndDateAndSubjectIdAndSchoolClassId(anyLong(), any(), anyLong(), anyLong());
     }
 
     @Test
@@ -485,8 +512,8 @@ class TeacherHoursServiceTest {
         when(rateRepository.findApplicable(1L, jour))
                 .thenReturn(List.of(tarif(5L, t, "5000.00", LocalDate.of(2026, 1, 1), null)));
         when(closureRepository.existsByMonthDateAndClosedTrue(any())).thenReturn(false);
-        when(workHourRepository.findByTeacherIdAndDateAndSubjectIdAndSchoolClassId(
-                anyLong(), any(), anyLong(), anyLong())).thenReturn(Optional.empty());
+        when(workHourRepository.findDuplicates(
+                any(), any(), any(), any())).thenReturn(List.of());
         // 22 h deja saisies + 3 h = 25 h > 24 h.
         when(workHourRepository.sumHoursOfTeacherOnDate(1L, jour)).thenReturn(new BigDecimal("22"));
 
@@ -521,8 +548,8 @@ class TeacherHoursServiceTest {
         when(rateRepository.findApplicable(1L, demain))
                 .thenReturn(List.of(tarif(5L, t, "5000.00", LocalDate.of(2026, 1, 1), null)));
         when(closureRepository.existsByMonthDateAndClosedTrue(any())).thenReturn(false);
-        when(workHourRepository.findByTeacherIdAndDateAndSubjectIdAndSchoolClassId(
-                anyLong(), any(), anyLong(), anyLong())).thenReturn(Optional.empty());
+        when(workHourRepository.findDuplicates(
+                any(), any(), any(), any())).thenReturn(List.of());
         when(workHourRepository.sumHoursOfTeacherOnDate(anyLong(), any())).thenReturn(BigDecimal.ZERO);
 
         assertThatThrownBy(() -> teacherHoursService.record(saisie(t, demain, "3"), httpRequest))
@@ -656,8 +683,8 @@ class TeacherHoursServiceTest {
                 .build();
         when(workHourRepository.findById(77L)).thenReturn(Optional.of(existant));
         when(closureRepository.existsByMonthDateAndClosedTrue(any())).thenReturn(false);
-        when(workHourRepository.findByTeacherIdAndDateAndSubjectIdAndSchoolClassId(
-                anyLong(), any(), anyLong(), anyLong())).thenReturn(Optional.empty());
+        when(workHourRepository.findDuplicates(
+                any(), any(), any(), any())).thenReturn(List.of());
         // La nouvelle date (octobre) tombe sous un tarif plus eleve.
         when(rateRepository.findApplicable(1L, jour))
                 .thenReturn(List.of(tarif(6L, t, "7000.00", LocalDate.of(2026, 6, 1), null)));
@@ -695,8 +722,8 @@ class TeacherHoursServiceTest {
                 .hourlyRateApplied(new BigDecimal("4000.00")).build();
         when(workHourRepository.findById(77L)).thenReturn(Optional.of(existant));
         when(closureRepository.existsByMonthDateAndClosedTrue(moisDeJour)).thenReturn(true);
-        when(workHourRepository.findByTeacherIdAndDateAndSubjectIdAndSchoolClassId(
-                anyLong(), any(), anyLong(), anyLong())).thenReturn(Optional.empty());
+        when(workHourRepository.findDuplicates(
+                any(), any(), any(), any())).thenReturn(List.of());
         when(rateRepository.findApplicable(1L, jour))
                 .thenReturn(List.of(tarif(5L, t, "5000.00", LocalDate.of(2026, 1, 1), null)));
         when(workHourRepository.save(any(TeacherWorkHour.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -716,8 +743,8 @@ class TeacherHoursServiceTest {
                 .hourlyRateApplied(new BigDecimal("4000.00")).build();
         when(workHourRepository.findById(77L)).thenReturn(Optional.of(existant));
         when(closureRepository.existsByMonthDateAndClosedTrue(any())).thenReturn(true);
-        when(workHourRepository.findByTeacherIdAndDateAndSubjectIdAndSchoolClassId(
-                anyLong(), any(), anyLong(), anyLong())).thenReturn(Optional.empty());
+        when(workHourRepository.findDuplicates(
+                any(), any(), any(), any())).thenReturn(List.of());
         when(rateRepository.findApplicable(1L, jour))
                 .thenReturn(List.of(tarif(5L, t, "5000.00", LocalDate.of(2026, 1, 1), null)));
         when(workHourRepository.save(any(TeacherWorkHour.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -737,8 +764,8 @@ class TeacherHoursServiceTest {
         when(workHourRepository.findById(77L)).thenReturn(Optional.of(existant));
         when(closureRepository.existsByMonthDateAndClosedTrue(any())).thenReturn(false);
         // Le repository renvoie la saisie en cours de modification : elle ne doit pas compter comme doublon.
-        when(workHourRepository.findByTeacherIdAndDateAndSubjectIdAndSchoolClassId(
-                anyLong(), any(), anyLong(), anyLong())).thenReturn(Optional.of(existant));
+        when(workHourRepository.findDuplicates(
+                any(), any(), any(), any())).thenReturn(List.of(existant));
         when(rateRepository.findApplicable(1L, jour))
                 .thenReturn(List.of(tarif(5L, t, "5000.00", LocalDate.of(2026, 1, 1), null)));
         when(workHourRepository.save(any(TeacherWorkHour.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -761,8 +788,8 @@ class TeacherHoursServiceTest {
                 .id(99L).teacher(t).date(jour).hours(new BigDecimal("5")).build();
         when(workHourRepository.findById(77L)).thenReturn(Optional.of(existant));
         when(closureRepository.existsByMonthDateAndClosedTrue(any())).thenReturn(false);
-        when(workHourRepository.findByTeacherIdAndDateAndSubjectIdAndSchoolClassId(
-                anyLong(), any(), anyLong(), anyLong())).thenReturn(Optional.of(autre));
+        when(workHourRepository.findDuplicates(
+                any(), any(), any(), any())).thenReturn(List.of(autre));
 
         assertThatThrownBy(() -> teacherHoursService.update(77L, saisie(t, jour, "4"), httpRequest))
                 .isInstanceOf(BusinessException.class)

@@ -67,6 +67,7 @@ public class SchoolDocumentTheme {
 
     private final SettingService settingService;
     private final AppProperties appProperties;
+    private final com.school.service.AcademicCalendarService academicCalendarService;
 
     // ---------- Métadonnées établissement ----------
 
@@ -95,7 +96,9 @@ public class SchoolDocumentTheme {
     }
 
     public String academicYear() {
-        return com.school.utils.CodeGenerator.currentAcademicYear();
+        // Source de vérité : table academic_years (la déduction depuis l'année
+        // civile affichait l'année N+1 sur tous les PDF de janvier à août).
+        return academicCalendarService.yearLabel(null);
     }
 
     /**

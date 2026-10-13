@@ -45,6 +45,10 @@ class FinanceServiceTest {
     private ReportService reportService;
     @Mock
     private NotificationService notificationService;
+    @Mock
+    private AccessControlService accessControlService;
+    @Mock
+    private NumberSequenceService numberSequenceService;
 
     private FinanceService service;
 
@@ -52,7 +56,7 @@ class FinanceServiceTest {
     void setUp() {
         service = new FinanceService(invoiceRepository, paymentRepository, feeTypeRepository,
                 expenseRepository, expenseCategoryRepository, studentService,
-                auditService, notificationService);
+                auditService, notificationService, accessControlService, numberSequenceService);
     }
 
     private Invoice invoice(BigDecimal amount, BigDecimal discount, BigDecimal paid) {

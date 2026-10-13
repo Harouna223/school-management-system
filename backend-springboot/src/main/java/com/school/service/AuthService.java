@@ -56,11 +56,12 @@ public class AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuditService auditService;
+    private final LoginAttemptService loginAttemptService;
 
     /** Nombre maximal de tentatives avant verrouillage du compte. */
-    private static final int MAX_ATTEMPTS = 5;
+    private static final int MAX_ATTEMPTS = LoginAttemptService.MAX_ATTEMPTS;
     /** Durée du verrouillage en minutes. */
-    private static final long LOCK_MINUTES = 15;
+    private static final long LOCK_MINUTES = LoginAttemptService.LOCK_MINUTES;
 
     @Value("${app.jwt.refresh-expiration-ms}")
     private long refreshExpirationMs;
@@ -117,16 +118,16 @@ public class AuthService {
 
     /**
      * Enregistre un échec de connexion et verrouille le compte au-delà du seuil.
+     *
+     * <p>L'écriture se fait dans une transaction INDÉPENDANTE : le rollback de
+     * {@link #login} (provoqué par l'exception d'authentification relancée)
+     * annulait auparavant le compteur, rendant le verrouillage inopérant.</p>
      */
     private void registerFailedAttempt(User user) {
-        user.setFailedAttempts(user.getFailedAttempts() + 1);
-        if (user.getFailedAttempts() >= MAX_ATTEMPTS) {
-            user.setLockedUntil(LocalDateTime.now().plusMinutes(LOCK_MINUTES));
-            user.setFailedAttempts(0);
-            log.warn("Compte verrouillé {} min après {} échecs : {}", LOCK_MINUTES, MAX_ATTEMPTS,
-                    user.getUsername());
+        if (user.getId() == null) {
+            return; // utilisateur non persisté : rien à comptabiliser
         }
-        userRepository.save(user);
+        loginAttemptService.registerFailedAttempt(user.getId());
     }
 
     /**
@@ -153,12 +154,25 @@ public class AuthService {
                         "Jeton de rafraîchissement inconnu"));
 
         if (refreshToken.isRevoked() || refreshToken.getExpiryDate().isBefore(LocalDateTime.now())) {
-            refreshTokenRepository.delete(refreshToken);
+            // Réutilisation d'un jeton déjà consommé (vol probable) : on révoque
+            // TOUTE la famille de jetons de l'utilisateur, pas seulement celui-ci.
+            // Transaction indépendante : l'exception ci-dessous annulerait la
+            // suppression si elle partageait la transaction de refresh().
+            loginAttemptService.revokeAllRefreshTokens(refreshToken.getUser().getId());
             throw new TokenRefreshException(request.getRefreshToken(),
                     "Jeton de rafraîchissement expiré ou révoqué, veuillez vous reconnecter");
         }
 
         User user = refreshToken.getUser();
+        // Un compte désactivé ou verrouillé ne doit plus pouvoir obtenir de jeton,
+        // même en présentant un refresh token encore valide : cette garde existait
+        // uniquement dans le filtre JWT, contournable via /api/auth/refresh.
+        if (!user.isEnabled() || !user.isAccountNonLocked()) {
+            loginAttemptService.revokeAllRefreshTokens(user.getId());
+            throw new TokenRefreshException(request.getRefreshToken(),
+                    "Compte désactivé ou verrouillé : veuillez contacter l'administrateur");
+        }
+
         String newAccessToken = jwtService.generateToken(user);
         String newRefreshToken = createRefreshToken(user);
         refreshToken.setRevoked(true);

@@ -7,6 +7,8 @@ import com.school.dto.response.ContractResponse;
 import com.school.dto.response.LeaveResponse;
 import com.school.dto.response.PayrollResponse;
 import com.school.entity.Contract;
+import com.school.entity.Expense;
+import com.school.entity.ExpenseCategory;
 import com.school.entity.Leave;
 import com.school.entity.Payroll;
 import com.school.entity.Teacher;
@@ -21,6 +23,8 @@ import com.school.enums.TeacherStatus;
 import com.school.exception.BusinessException;
 import com.school.exception.ResourceNotFoundException;
 import com.school.repository.ContractRepository;
+import com.school.repository.ExpenseCategoryRepository;
+import com.school.repository.ExpenseRepository;
 import com.school.repository.LeaveRepository;
 import com.school.repository.PayrollRepository;
 import jakarta.servlet.http.HttpServletRequest;
@@ -84,6 +88,12 @@ class HrServiceTest {
 
     @Mock
     private AuditService auditService;
+
+    @Mock
+    private ExpenseRepository expenseRepository;
+
+    @Mock
+    private ExpenseCategoryRepository expenseCategoryRepository;
 
     @Mock
     private HttpServletRequest httpRequest;
@@ -232,11 +242,18 @@ class HrServiceTest {
     @DisplayName("decide APPROVED bascule aussi le statut de l'enseignant en ON_LEAVE")
     void approuverUnCongeBasculeLEnseignantEnConge() {
         Teacher t = enseignant(1L);
+        // Le statut est recalculé à partir des congés approuvés COUVRANT LA DATE DU
+        // JOUR : la fixture est donc relative à l'horloge, sinon le test dépend du
+        // jour où il est exécuté (même piège que les fixtures de TeacherHoursService).
         Leave conge = conge(9L, t, LeaveStatus.PENDING);
+        conge.setStartDate(LocalDate.now().minusDays(1));
+        conge.setEndDate(LocalDate.now().plusDays(2));
         User decideur = User.builder().id(77L).username("rh").build();
         connecte(decideur);
         when(leaveRepository.findById(9L)).thenReturn(Optional.of(conge));
         when(leaveRepository.save(any(Leave.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(leaveRepository.findByStatus(LeaveStatus.APPROVED)).thenReturn(List.of(conge));
+        when(teacherService.findById(1L)).thenReturn(t);
 
         LeaveResponse reponse = hrService.decide(9L, LeaveStatus.APPROVED, httpRequest);
 
@@ -247,18 +264,37 @@ class HrServiceTest {
     }
 
     @Test
-    @DisplayName("decide REJECTED ne touche PAS au statut de l'enseignant")
+    @DisplayName("decide REJECTED ne bascule pas l'enseignant en congé (statut recalculé, inchangé)")
     void rejeterUnCongeNeBasculePasLEnseignant() {
         Teacher t = enseignant(1L);
         Leave conge = conge(9L, t, LeaveStatus.PENDING);
         connecte(User.builder().id(77L).username("rh").build());
         when(leaveRepository.findById(9L)).thenReturn(Optional.of(conge));
         when(leaveRepository.save(any(Leave.class))).thenAnswer(inv -> inv.getArgument(0));
+        // Aucun congé approuvé ne le couvre : il reste ACTIVE.
+        when(leaveRepository.findByStatus(LeaveStatus.APPROVED)).thenReturn(List.of());
+        when(teacherService.findById(1L)).thenReturn(t);
 
         LeaveResponse reponse = hrService.decide(9L, LeaveStatus.REJECTED, httpRequest);
 
         assertThat(reponse.getStatus()).isEqualTo(LeaveStatus.REJECTED);
         // Un rejet ne doit surtout pas mettre l'enseignant en conge.
+        verify(teacherService, never()).updateStatus(anyLong(), any(), any());
+    }
+
+    @Test
+    @DisplayName("decide refuse de re-trancher un congé déjà décidé (statut bloqué sinon)")
+    void decideRefuseUneReDecision() {
+        Teacher t = enseignant(1L);
+        Leave dejaApprouve = conge(9L, t, LeaveStatus.APPROVED);
+        when(leaveRepository.findById(9L)).thenReturn(Optional.of(dejaApprouve));
+
+        // Rejeter un congé déjà approuvé laissait l'enseignant ON_LEAVE pour
+        // toujours : le job de nuit n'itère que les congés APPROVED.
+        assertThatThrownBy(() -> hrService.decide(9L, LeaveStatus.REJECTED, httpRequest))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("déjà été tranché");
+
         verify(teacherService, never()).updateStatus(anyLong(), any(), any());
     }
 
@@ -682,20 +718,47 @@ class HrServiceTest {
     }
 
     @Test
-    @DisplayName("markPayrollPaid passe le bulletin en PAID et horodate le paiement")
+    @DisplayName("markPayrollPaid passe le bulletin en PAID, horodate le paiement ET crée la dépense")
     void markPayrollPaidHorodateLePaiement() {
         Teacher t = enseignant(1L);
         Payroll bulletin = bulletin(88L, t, PayrollStatus.PENDING);
+        bulletin.setNetSalary(new BigDecimal("300000.00"));
         when(payrollRepository.findById(88L)).thenReturn(Optional.of(bulletin));
         when(payrollRepository.save(any(Payroll.class))).thenAnswer(inv -> inv.getArgument(0));
+        ExpenseCategory salaires = ExpenseCategory.builder().id(5L).name("Salaires du personnel").build();
+        when(expenseCategoryRepository.findAll()).thenReturn(List.of(salaires));
+        when(expenseRepository.save(any(Expense.class))).thenAnswer(inv -> {
+            Expense e = inv.getArgument(0);
+            e.setId(404L);
+            return e;
+        });
 
         PayrollResponse reponse = hrService.markPayrollPaid(88L, httpRequest);
 
         assertThat(reponse.getStatus()).isEqualTo(PayrollStatus.PAID);
         // Sans paidAt, la date de paiement serait indeterminable.
         assertThat(bulletin.getPaidAt()).isNotNull();
+        // Régression corrigée : les salaires versés via le module RH n'entraient
+        // dans AUCUNE dépense, donc les totaux financiers étaient sous-estimés.
+        assertThat(bulletin.getExpenseId()).isEqualTo(404L);
+        ArgumentCaptor<Expense> depense = ArgumentCaptor.forClass(Expense.class);
+        verify(expenseRepository).save(depense.capture());
+        assertThat(depense.getValue().getAmount()).isEqualByComparingTo("300000.00");
         verify(auditService).log(eq("PAYROLL_PAID"), eq("Payroll"), eq(88L),
                 contains("Jean Kamdem"), eq(httpRequest));
+    }
+
+    @Test
+    @DisplayName("markPayrollPaid ne comptabilise pas deux fois une dépense existante")
+    void markPayrollPaidNeDupliquePasLaDepense() {
+        Payroll bulletin = bulletin(88L, enseignant(1L), PayrollStatus.PENDING);
+        bulletin.setExpenseId(404L);
+        when(payrollRepository.findById(88L)).thenReturn(Optional.of(bulletin));
+        when(payrollRepository.save(any(Payroll.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        hrService.markPayrollPaid(88L, httpRequest);
+
+        verify(expenseRepository, never()).save(any(Expense.class));
     }
 
     @Test

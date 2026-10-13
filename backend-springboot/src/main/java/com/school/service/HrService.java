@@ -7,6 +7,8 @@ import com.school.dto.response.ContractResponse;
 import com.school.dto.response.LeaveResponse;
 import com.school.dto.response.PayrollResponse;
 import com.school.entity.Contract;
+import com.school.entity.Expense;
+import com.school.entity.ExpenseCategory;
 import com.school.entity.Leave;
 import com.school.entity.Payroll;
 import com.school.entity.Teacher;
@@ -17,6 +19,8 @@ import com.school.enums.TeacherStatus;
 import com.school.exception.BusinessException;
 import com.school.exception.ResourceNotFoundException;
 import com.school.repository.ContractRepository;
+import com.school.repository.ExpenseCategoryRepository;
+import com.school.repository.ExpenseRepository;
 import com.school.repository.LeaveRepository;
 import com.school.repository.PayrollRepository;
 import com.school.utils.SecurityUtils;
@@ -47,6 +51,11 @@ public class HrService {
     private final ContractRepository contractRepository;
     private final PayrollRepository payrollRepository;
     private final AuditService auditService;
+    private final ExpenseRepository expenseRepository;
+    private final ExpenseCategoryRepository expenseCategoryRepository;
+
+    /** Catégorie comptable des salaires versés via le module RH. */
+    private static final String EXPENSE_CATEGORY = "Salaires du personnel";
 
     @Transactional(readOnly = true)
     public List<LeaveResponse> listLeaves(Long teacherId, LeaveStatus status) {
@@ -77,18 +86,41 @@ public class HrService {
     public LeaveResponse decide(Long leaveId, LeaveStatus status, HttpServletRequest httpRequest) {
         Leave leave = leaveRepository.findById(leaveId)
                 .orElseThrow(() -> ResourceNotFoundException.of("Congé", leaveId));
-        if (status == LeaveStatus.APPROVED || status == LeaveStatus.REJECTED) {
-            leave.setStatus(status);
-            leave.setApprovedBy(SecurityUtils.currentUser());
-            if (status == LeaveStatus.APPROVED) {
-                teacherService.updateStatus(leave.getTeacher().getId(),
-                        com.school.enums.TeacherStatus.ON_LEAVE, httpRequest);
-            }
-        } else {
+        if (status != LeaveStatus.APPROVED && status != LeaveStatus.REJECTED) {
             throw new BusinessException("Décision invalide : APPROVED ou REJECTED attendu");
         }
+        if (leave.getStatus() != LeaveStatus.PENDING) {
+            // Re-décider un congé déjà tranché laissait l'enseignant bloqué
+            // ON_LEAVE : le job de nuit n'itère que les congés APPROVED, donc
+            // plus aucun congé ne le référençait et rien ne le corrigeait.
+            throw new BusinessException("Ce congé a déjà été tranché (" + leave.getStatus()
+                    + "). Créez une nouvelle demande si nécessaire.");
+        }
+        leave.setStatus(status);
+        leave.setApprovedBy(SecurityUtils.currentUser());
+        Leave saved = leaveRepository.save(leave);
+        // Le statut de l'enseignant est recalculé dans les DEUX branches, à partir
+        // de ses congés approuvés réels (et non posé à la main).
+        refreshTeacherLeaveStatus(leave.getTeacher().getId(), httpRequest);
         auditService.log("LEAVE_DECISION", "Leave", leaveId, "Congé -> " + status, httpRequest);
-        return LeaveResponse.from(leaveRepository.save(leave));
+        return LeaveResponse.from(saved);
+    }
+
+    /**
+     * Recalcule le statut d'un enseignant à partir de ses congés approuvés
+     * couvrant la date du jour : ON_LEAVE s'il est en congé, ACTIVE sinon.
+     */
+    private void refreshTeacherLeaveStatus(Long teacherId, HttpServletRequest httpRequest) {
+        LocalDate today = LocalDate.now();
+        boolean onLeaveToday = leaveRepository.findByStatus(LeaveStatus.APPROVED).stream()
+                .filter(l -> l.getTeacher() != null && teacherId.equals(l.getTeacher().getId()))
+                .anyMatch(l -> !l.getStartDate().isAfter(today) && !l.getEndDate().isBefore(today));
+        Teacher teacher = teacherService.findById(teacherId);
+        if (onLeaveToday && teacher.getStatus() != com.school.enums.TeacherStatus.ON_LEAVE) {
+            teacherService.updateStatus(teacherId, com.school.enums.TeacherStatus.ON_LEAVE, httpRequest);
+        } else if (!onLeaveToday && teacher.getStatus() == com.school.enums.TeacherStatus.ON_LEAVE) {
+            teacherService.updateStatus(teacherId, com.school.enums.TeacherStatus.ACTIVE, httpRequest);
+        }
     }
 
     /**
@@ -237,16 +269,24 @@ public class HrService {
         var teacher = teacherService.findById(request.getTeacherId());
         BigDecimal baseSalary = latestActiveSalary(teacher.getId())
                 .orElse(teacher.getSalary());
+        BigDecimal allowances = request.getAllowances() != null ? request.getAllowances() : BigDecimal.ZERO;
+        BigDecimal deductions = request.getDeductions() != null ? request.getDeductions() : BigDecimal.ZERO;
+        BigDecimal netSalary = baseSalary.add(allowances).subtract(deductions);
+        if (netSalary.signum() < 0) {
+            // Un bulletin négatif était persisté puis « payé » tel quel (dépense
+            // négative en comptabilité).
+            throw new BusinessException("Les retenues (" + deductions
+                    + ") dépassent le salaire de base et les primes (" + baseSalary.add(allowances)
+                    + ") : le net à payer serait négatif.");
+        }
 
         Payroll payroll = Payroll.builder()
                 .teacher(teacher)
                 .monthDate(request.getMonthDate())
                 .baseSalary(baseSalary)
-                .allowances(request.getAllowances() != null ? request.getAllowances() : BigDecimal.ZERO)
-                .deductions(request.getDeductions() != null ? request.getDeductions() : BigDecimal.ZERO)
-                .netSalary(baseSalary
-                        .add(request.getAllowances() != null ? request.getAllowances() : BigDecimal.ZERO)
-                        .subtract(request.getDeductions() != null ? request.getDeductions() : BigDecimal.ZERO))
+                .allowances(allowances)
+                .deductions(deductions)
+                .netSalary(netSalary)
                 .status(PayrollStatus.PENDING)
                 .build();
         Payroll saved = payrollRepository.save(payroll);
@@ -265,15 +305,50 @@ public class HrService {
         }
         payroll.setStatus(PayrollStatus.PAID);
         payroll.setPaidAt(java.time.LocalDateTime.now());
+        // Intégration comptable : sans elle, les salaires versés depuis le module RH
+        // n'apparaissaient dans aucune dépense et les totaux financiers étaient
+        // sous-estimés (la paie à l'heure, elle, créait bien sa dépense).
+        payroll.setExpenseId(createPayrollExpense(payroll));
         auditService.log("PAYROLL_PAID", "Payroll", id,
                 "Salaire payé à " + payroll.getTeacher().getFullName() + " (" + payroll.getMonthDate() + ")",
                 httpRequest);
         return PayrollResponse.from(payrollRepository.save(payroll));
     }
 
+    /** Crée (une seule fois) la dépense comptable correspondant à un bulletin payé. */
+    private Long createPayrollExpense(Payroll payroll) {
+        if (payroll.getExpenseId() != null) {
+            return payroll.getExpenseId(); // déjà comptabilisé (idempotence)
+        }
+        ExpenseCategory category = expenseCategoryRepository.findAll().stream()
+                .filter(c -> EXPENSE_CATEGORY.equalsIgnoreCase(c.getName()))
+                .findFirst()
+                .orElseGet(() -> expenseCategoryRepository.save(ExpenseCategory.builder()
+                        .name(EXPENSE_CATEGORY)
+                        .description("Salaires du personnel (module RH)")
+                        .build()));
+        Expense expense = Expense.builder()
+                .description("Salaire " + payroll.getTeacher().getFullName()
+                        + " — " + payroll.getMonthDate())
+                .amount(payroll.getNetSalary())
+                .category(category)
+                .expenseDate(LocalDate.now())
+                .paidBy(SecurityUtils.currentUser())
+                .build();
+        return expenseRepository.save(expense).getId();
+    }
+
     private java.util.Optional<BigDecimal> latestActiveSalary(Long teacherId) {
+        LocalDate today = LocalDate.now();
         return contractRepository.findByTeacherIdOrderByStartDateDesc(teacherId).stream()
-                .filter(c -> c.getStatus() == ContractStatus.ACTIVE)
+                // Un contrat TERMINATED ou EXPIRED n'est jamais une base salariale
+                // (le test « ignore un contrat TERMINATED plus récent » s'appuie là-dessus).
+                .filter(c -> c.getStatus() != ContractStatus.TERMINATED
+                        && c.getStatus() != ContractStatus.EXPIRED)
+                // Un contrat NON terminé dont la date de fin est dépassée est expiré,
+                // même si son statut stocké n'a pas encore été rafraîchi (aucun job ne
+                // le fait) : c'est la date qui fait foi.
+                .filter(c -> c.getEndDate() == null || !c.getEndDate().isBefore(today))
                 .findFirst()
                 .map(Contract::getBaseSalary);
     }

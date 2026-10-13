@@ -46,13 +46,30 @@ public class FinanceService {
     private final StudentService studentService;
     private final AuditService auditService;
     private final NotificationService notificationService;
+    private final AccessControlService accessControlService;
+    private final NumberSequenceService numberSequenceService;
 
     // ---------- Factures ----------
 
     public PageResponse<InvoiceResponse> searchInvoices(Long studentId, InvoiceStatus status,
                                                         int page, int size) {
+        return searchInvoices(AccessControlService.StudentScope.unrestricted(studentId),
+                status, page, size);
+    }
+
+    /**
+     * Recherche de factures bornée au périmètre du compte courant. Un parent ou
+     * un élève ne voit que ses propres factures, même sans filtre explicite.
+     */
+    public PageResponse<InvoiceResponse> searchInvoices(AccessControlService.StudentScope scope,
+                                                        InvoiceStatus status,
+                                                        int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<Invoice> result = invoiceRepository.search(studentId, status, pageable);
+        if (scope.isEmpty()) {
+            return PageResponse.from(Page.empty(pageable), InvoiceResponse::from);
+        }
+        Page<Invoice> result = invoiceRepository.searchScoped(scope.unrestricted(),
+                scope.studentIds(), scope.requestedId(), status, pageable);
         return PageResponse.from(result, InvoiceResponse::from);
     }
 
@@ -93,13 +110,16 @@ public class FinanceService {
         return InvoiceResponse.from(saved);
     }
 
+    /**
+     * Numéro de facture : compteur persisté et verrouillé.
+     *
+     * <p>L'ancien calcul ({@code count() + 1} complété par une boucle
+     * {@code existsBy}) se réparait après une suppression, mais deux créations
+     * simultanées pouvaient lire le même comptage : la seconde échouait alors sur
+     * la contrainte unique avec un 409 trompeur.</p>
+     */
     private String nextInvoiceNo() {
-        long count = invoiceRepository.count() + 1;
-        String no = CodeGenerator.invoiceNo(count);
-        while (invoiceRepository.existsByInvoiceNo(no)) {
-            no = CodeGenerator.invoiceNo(++count);
-        }
-        return no;
+        return CodeGenerator.invoiceNo(numberSequenceService.next(NumberSequenceService.INVOICE));
     }
 
     // ---------- Paiements ----------
@@ -107,10 +127,25 @@ public class FinanceService {
     public PageResponse<PaymentResponse> searchPayments(Long studentId, PaymentMethod method,
                                                         LocalDate from, LocalDate to,
                                                         int page, int size) {
+        return searchPayments(AccessControlService.StudentScope.unrestricted(studentId),
+                method, from, to, page, size);
+    }
+
+    /**
+     * Recherche de paiements bornée au périmètre du compte courant.
+     */
+    public PageResponse<PaymentResponse> searchPayments(AccessControlService.StudentScope scope,
+                                                        PaymentMethod method,
+                                                        LocalDate from, LocalDate to,
+                                                        int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("paymentDate").descending());
+        if (scope.isEmpty()) {
+            return PageResponse.from(Page.empty(pageable), PaymentResponse::from);
+        }
         LocalDateTime fromDt = from != null ? from.atStartOfDay() : null;
         LocalDateTime toDt = to != null ? to.atTime(LocalTime.MAX) : null;
-        Page<Payment> result = paymentRepository.search(studentId, method, fromDt, toDt, pageable);
+        Page<Payment> result = paymentRepository.searchScoped(scope.unrestricted(),
+                scope.studentIds(), scope.requestedId(), method, fromDt, toDt, pageable);
         return PageResponse.from(result, PaymentResponse::from);
     }
 
@@ -168,13 +203,9 @@ public class FinanceService {
         return PaymentResponse.from(saved);
     }
 
+    /** Numéro de reçu élève : compteur persisté et verrouillé (voir {@link #nextInvoiceNo()}). */
     private String nextReceiptNo() {
-        long count = paymentRepository.count() + 1;
-        String no = CodeGenerator.receiptNo(count);
-        while (paymentRepository.existsByReceiptNo(no)) {
-            no = CodeGenerator.receiptNo(++count);
-        }
-        return no;
+        return CodeGenerator.receiptNo(numberSequenceService.next(NumberSequenceService.PAYMENT_RECEIPT));
     }
 
     // ---------- Dépenses ----------
@@ -286,8 +317,11 @@ public class FinanceService {
                 .monthlyExpenses(expensesBetween(firstOfMonth, today))
                 .totalRevenue(totalRevenue())
                 .totalExpenses(totalExpenses())
+                // OVERDUE doit être compté : le passage en retard de 1 h 30 bascule
+                // toutes les impayées échues, et le KPI tombait à ~0 chaque nuit.
                 .unpaidInvoices(invoiceRepository.countByStatus(InvoiceStatus.UNPAID)
-                        + invoiceRepository.countByStatus(InvoiceStatus.PARTIAL))
+                        + invoiceRepository.countByStatus(InvoiceStatus.PARTIAL)
+                        + invoiceRepository.countByStatus(InvoiceStatus.OVERDUE))
                 .build();
     }
 

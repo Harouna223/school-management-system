@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
@@ -122,6 +123,147 @@ class AccessControlServiceTest {
         User user = user(1L, "SUPER_ADMIN");
         try (MockedStatic<com.school.utils.SecurityUtils> utils = mockSecurity(user)) {
             assertThatNoException().isThrownBy(() -> service.assertCanAccessStudent(999L));
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Parents multi-dossiers : un compte peut avoir plusieurs dossiers Parent
+    // ------------------------------------------------------------------
+
+    @Test
+    void parentMultiDossiersAccedeATousSesEnfants() {
+        User user = user(1L, "PARENT");
+        Parent premierDossier = parent(10L, user);
+        Parent secondDossier = parent(20L, user);
+        Student enfantDuSecond = student(30L, secondDossier);
+        // Un seul dossier ne doit plus suffire : retenir le premier (findFirst)
+        // refusait l'accès aux enfants des dossiers suivants, de façon
+        // incohérente selon l'endpoint (liste OK, fiche refusée).
+        when(parentRepository.findByUserIdOrderByIdAsc(1L))
+                .thenReturn(List.of(premierDossier, secondDossier));
+        when(studentRepository.findById(30L)).thenReturn(Optional.of(enfantDuSecond));
+
+        try (MockedStatic<com.school.utils.SecurityUtils> utils = mockSecurity(user)) {
+            assertThatNoException().isThrownBy(() -> service.assertCanAccessStudent(30L));
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Périmètre des listes : un identifiant client ne peut pas l'élargir
+    // ------------------------------------------------------------------
+
+    @Test
+    void resolveStudentScopeRefuseUnParentSansDossier() {
+        User user = user(1L, "PARENT");
+        when(parentRepository.findByUserIdOrderByIdAsc(1L)).thenReturn(List.of());
+
+        try (MockedStatic<com.school.utils.SecurityUtils> utils = mockSecurity(user)) {
+            assertThatThrownBy(() -> service.resolveStudentScope(null))
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessageContaining("Aucun dossier parent");
+        }
+    }
+
+    @Test
+    void resolveStudentScopeRefuseUnIdentifiantEtrangerPourUnParent() {
+        User user = user(1L, "PARENT");
+        Parent dossier = parent(10L, user);
+        Student enfantDunAutre = student(30L, parent(20L, user(2L, "PARENT")));
+        when(parentRepository.findByUserIdOrderByIdAsc(1L)).thenReturn(List.of(dossier));
+        when(studentRepository.findById(30L)).thenReturn(Optional.of(enfantDunAutre));
+
+        try (MockedStatic<com.school.utils.SecurityUtils> utils = mockSecurity(user)) {
+            assertThatThrownBy(() -> service.resolveStudentScope(30L))
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessageContaining("Accès refusé");
+        }
+    }
+
+    @Test
+    void resolveStudentScopeNeChangeRienPourUnAdmin() {
+        User user = user(1L, "SUPER_ADMIN");
+        try (MockedStatic<com.school.utils.SecurityUtils> utils = mockSecurity(user)) {
+            var sansFiltre = service.resolveStudentScope(null);
+            assertThat(sansFiltre.unrestricted()).isTrue();
+            assertThat(sansFiltre.requestedId()).isNull();
+
+            var avecFiltre = service.resolveStudentScope(42L);
+            assertThat(avecFiltre.unrestricted()).isTrue();
+            assertThat(avecFiltre.requestedId()).isEqualTo(42L);
+            assertThat(avecFiltre.isEmpty()).isFalse();
+        }
+    }
+
+    @Test
+    void resolveStudentScopeRameneUnEleveASonPropreProfil() {
+        User user = user(1L, "ELEVE");
+        Student profil = student(1L, null);
+        when(studentRepository.findByUserId(1L)).thenReturn(Optional.of(profil));
+
+        try (MockedStatic<com.school.utils.SecurityUtils> utils = mockSecurity(user)) {
+            var scope = service.resolveStudentScope(null);
+            assertThat(scope.unrestricted()).isFalse();
+            assertThat(scope.studentIds()).containsExactly(1L);
+        }
+    }
+
+    @Test
+    void resolveStudentScopeParentSansFiltreCouvreTousSesEnfants() {
+        User user = user(1L, "PARENT");
+        Parent premier = parent(10L, user);
+        Parent second = parent(20L, user);
+        when(parentRepository.findByUserIdOrderByIdAsc(1L)).thenReturn(List.of(premier, second));
+        when(studentRepository.findByParentIdIn(List.of(10L, 20L)))
+                .thenReturn(List.of(student(30L, second), student(31L, premier)));
+
+        try (MockedStatic<com.school.utils.SecurityUtils> utils = mockSecurity(user)) {
+            var scope = service.resolveStudentScope(null);
+            assertThat(scope.unrestricted()).isFalse();
+            assertThat(scope.studentIds()).containsExactlyInAnyOrder(30L, 31L);
+            assertThat(scope.requestedId()).isNull();
+        }
+    }
+
+    @Test
+    void resolveStudentScopeParentSansEnfantNeRenvoieRien() {
+        User user = user(1L, "PARENT");
+        Parent dossier = parent(10L, user);
+        when(parentRepository.findByUserIdOrderByIdAsc(1L)).thenReturn(List.of(dossier));
+        when(studentRepository.findByParentIdIn(List.of(10L))).thenReturn(List.of());
+
+        try (MockedStatic<com.school.utils.SecurityUtils> utils = mockSecurity(user)) {
+            var scope = service.resolveStudentScope(null);
+            // Un compte parent sans enfant ne doit PAS retomber sur « aucune
+            // restriction » (c'était la fuite : tout l'établissement visible).
+            assertThat(scope.unrestricted()).isFalse();
+            assertThat(scope.isEmpty()).isTrue();
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Données « établissement » : interdites aux comptes parent / élève
+    // ------------------------------------------------------------------
+
+    @Test
+    void staffOnlyRefuseUnParentEtUnEleve() {
+        try (MockedStatic<com.school.utils.SecurityUtils> utils = mockSecurity(user(1L, "PARENT"))) {
+            assertThatThrownBy(() -> service.assertStaffOnly("le pointage d'une classe"))
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessageContaining("Accès refusé");
+        }
+        try (MockedStatic<com.school.utils.SecurityUtils> utils = mockSecurity(user(2L, "ELEVE"))) {
+            assertThatThrownBy(() -> service.assertStaffOnly("le pointage d'une classe"))
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessageContaining("Accès refusé");
+        }
+    }
+
+    @Test
+    void staffOnlyLaissePasserLePersonnel() {
+        for (String role : List.of("SUPER_ADMIN", "DIRECTEUR", "SECRETAIRE", "COMPTABLE", "ENSEIGNANT")) {
+            try (MockedStatic<com.school.utils.SecurityUtils> utils = mockSecurity(user(1L, role))) {
+                assertThatNoException().isThrownBy(() -> service.assertStaffOnly("le pointage d'une classe"));
+            }
         }
     }
 }

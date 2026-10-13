@@ -6,9 +6,11 @@ import com.school.dto.response.PageResponse;
 import com.school.entity.Exam;
 import com.school.enums.ExamStatus;
 import com.school.enums.Term;
+import com.school.exception.BusinessException;
 import com.school.exception.ResourceNotFoundException;
 import com.school.mapper.ExamMapper;
 import com.school.repository.ExamRepository;
+import com.school.repository.GradeRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -33,6 +35,8 @@ public class ExamService {
     private final ClassService classService;
     private final SubjectService subjectService;
     private final AuditService auditService;
+    private final GradeRepository gradeRepository;
+    private final AcademicCalendarService academicCalendarService;
 
     @Transactional(readOnly = true)
     public PageResponse<ExamResponse> search(String search, Long classId, Long subjectId,
@@ -44,7 +48,25 @@ public class ExamService {
 
     @Transactional(readOnly = true)
     public List<ExamResponse> listByClass(Long classId) {
-        return examRepository.findBySchoolClassId(classId).stream()
+        return listByClass(classId, null);
+    }
+
+    /**
+     * Évaluations d'une classe.
+     *
+     * @param yearId année scolaire ; {@code null} = toutes les années (comportement
+     *               historique, réservé aux écrans d'administration qui doivent
+     *               pouvoir consulter une année passée)
+     */
+    @Transactional(readOnly = true)
+    public List<ExamResponse> listByClass(Long classId, Long yearId) {
+        List<Exam> exams = examRepository.findBySchoolClassId(classId);
+        if (yearId == null) {
+            return exams.stream().map(ExamResponse::from).toList();
+        }
+        String year = academicCalendarService.resolveYear(yearId, null, null).getLabel();
+        return exams.stream()
+                .filter(e -> year.equals(e.getAcademicYear()))
                 .map(ExamResponse::from).toList();
     }
 
@@ -58,6 +80,10 @@ public class ExamService {
         Exam exam = examMapper.toEntity(request);
         exam.setSchoolClass(classService.findById(request.getClassId()));
         exam.setSubject(subjectService.findById(request.getSubjectId()));
+        // L'année scolaire ne peut plus venir « en texte libre » : elle doit
+        // correspondre à une année configurée, sinon des notes estampillées d'une
+        // année inexistante faussaient toutes les moyennes.
+        exam.setAcademicYear(resolveAcademicYearLabel(request, exam));
         exam.setStatus(request.getStatus() != null ? request.getStatus() : ExamStatus.PLANNED);
         exam.setCoefficient(request.getCoefficient() != null ? request.getCoefficient() : 1);
         Exam saved = examRepository.save(exam);
@@ -71,6 +97,7 @@ public class ExamService {
         examMapper.updateEntity(request, exam);
         exam.setSchoolClass(classService.findById(request.getClassId()));
         exam.setSubject(subjectService.findById(request.getSubjectId()));
+        exam.setAcademicYear(resolveAcademicYearLabel(request, exam));
         if (request.getCoefficient() != null) {
             exam.setCoefficient(request.getCoefficient());
         }
@@ -79,6 +106,12 @@ public class ExamService {
         }
         auditService.log("UPDATE", "Exam", id, "Modification évaluation " + exam.getName(), httpRequest);
         return ExamResponse.from(examRepository.save(exam));
+    }
+
+    /** Libellé d'année scolaire validé pour une évaluation. */
+    private String resolveAcademicYearLabel(ExamRequest request, Exam exam) {
+        String label = request.getAcademicYear() != null ? request.getAcademicYear() : exam.getAcademicYear();
+        return academicCalendarService.resolveYear(null, label, exam.getExamDate()).getLabel();
     }
 
     @Transactional
@@ -92,6 +125,15 @@ public class ExamService {
     @Transactional
     public void delete(Long id, HttpServletRequest httpRequest) {
         Exam exam = findById(id);
+        // Les notes d'une évaluation sont supprimées EN CASCADE par la base
+        // (fk_grades_exam ON DELETE CASCADE) : sans cette garde, supprimer une
+        // évaluation faisait disparaître silencieusement toutes ses notes.
+        long notes = gradeRepository.countByExamId(id);
+        if (notes > 0) {
+            throw new BusinessException("Impossible de supprimer : " + notes
+                    + " note(s) sont enregistrées sur cette évaluation. "
+                    + "Supprimez d'abord ces notes ou conservez l'évaluation.");
+        }
         auditService.log("DELETE", "Exam", id, "Suppression évaluation " + exam.getName(), httpRequest);
         examRepository.delete(exam);
     }

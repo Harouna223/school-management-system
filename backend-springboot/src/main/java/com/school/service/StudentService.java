@@ -62,12 +62,13 @@ public class StudentService {
         Long userId = SecurityUtils.currentUserId();
         if (SecurityUtils.hasRole("PARENT")) {
             // Un parent n'a accès qu'à la liste de SES enfants (IDOR sur les listes/exports).
-            Long parentId = parentRepository.findByUserIdOrderByIdAsc(userId).stream()
-                    .findFirst().map(Parent::getId).orElse(null);
-            result = parentId == null
+            // Tous ses dossiers sont pris en compte : un compte peut en avoir plusieurs.
+            List<Long> parentIds = parentRepository.findByUserIdOrderByIdAsc(userId).stream()
+                    .map(Parent::getId).toList();
+            result = parentIds.isEmpty()
                     ? new PageImpl<>(java.util.List.of(), pageable, 0)
-                    : studentRepository.searchByParentId(parentId, search, classId, status, cycle, pageable);
-        } else if (SecurityUtils.hasRole("ELEVE") || SecurityUtils.hasRole("ETUDIANT")) {
+                    : studentRepository.searchByParentIds(parentIds, search, classId, status, cycle, pageable);
+        } else if (SecurityUtils.hasRole("ELEVE")) {
             // Un élève/étudiant ne voit que son propre profil, quel que soit le filtre.
             Long selfId = userId == null ? null
                     : studentRepository.findByUserId(userId).map(Student::getId).orElse(null);

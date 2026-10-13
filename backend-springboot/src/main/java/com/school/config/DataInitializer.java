@@ -1,15 +1,20 @@
 package com.school.config;
 
 import com.school.entity.Permission;
+import com.school.entity.NumberSequence;
 import com.school.entity.Role;
 import com.school.entity.Setting;
 import com.school.entity.User;
 import com.school.entity.Level;
 import com.school.enums.EducationCycle;
+import com.school.repository.InvoiceRepository;
 import com.school.repository.LevelRepository;
+import com.school.repository.NumberSequenceRepository;
+import com.school.repository.PaymentRepository;
 import com.school.repository.PermissionRepository;
 import com.school.repository.RoleRepository;
 import com.school.repository.SettingRepository;
+import com.school.repository.TeacherPaymentTransactionRepository;
 import com.school.repository.UserRepository;
 import com.school.service.SettingService;
 import lombok.RequiredArgsConstructor;
@@ -46,6 +51,10 @@ public class DataInitializer implements CommandLineRunner {
     private final SettingService settingService;
     private final PasswordEncoder passwordEncoder;
     private final LevelRepository levelRepository;
+    private final NumberSequenceRepository sequenceRepository;
+    private final InvoiceRepository invoiceRepository;
+    private final PaymentRepository paymentRepository;
+    private final TeacherPaymentTransactionRepository teacherPaymentTransactionRepository;
 
     @Value("${app.admin.username:admin}")
     private String adminUsername;
@@ -118,6 +127,40 @@ public class DataInitializer implements CommandLineRunner {
         initializeAdmin();
         seedSettings();
         seedLevelCycles();
+        seedNumberSequences();
+    }
+
+    /**
+     * Initialise les compteurs de numérotation (factures, reçus élèves, reçus de
+     * paie enseignants).
+     *
+     * <p>Les numéros étaient dérivés de {@code count()+1} : après une suppression
+     * ou une restauration, le numéro calculé retombait sur une valeur déjà prise
+     * et la contrainte unique rejetait l'enregistrement (409 « Donnée en
+     * conflit »). Un compteur dédié, verrouillé par ligne, ne peut ni collisionner
+     * ni régresser.</p>
+     *
+     * <p>Idempotent : une séquence déjà présente n'est ni recréée ni remise à
+     * zéro. La valeur de départ est calculée à partir des numéros déjà émis
+     * (comptage par préfixe) pour rester au-dessus de l'existant.</p>
+     */
+    private void seedNumberSequences() {
+        for (String prefix : List.of("FAC-", "RCP-", "REC-ENS-")) {
+            if (sequenceRepository.existsById(prefix)) {
+                continue;
+            }
+            long maxUsed = switch (prefix) {
+                case "FAC-" -> invoiceRepository.count();
+                case "RCP-" -> paymentRepository.count();
+                default -> teacherPaymentTransactionRepository.count();
+            };
+            sequenceRepository.save(NumberSequence.builder()
+                    .prefix(prefix)
+                    .lastValue(maxUsed)
+                    .build());
+            log.info("Compteur de numérotation initialisé : {} (dernier numéro connu : {})",
+                    prefix, maxUsed);
+        }
     }
 
     /**

@@ -13,10 +13,12 @@ import com.school.repository.BookRepository;
 import com.school.repository.BorrowingRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +31,7 @@ import java.util.List;
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
+@Slf4j
 public class LibraryService {
 
     private final BookRepository bookRepository;
@@ -87,6 +90,12 @@ public class LibraryService {
     @Transactional
     public void deleteBook(Long id, HttpServletRequest httpRequest) {
         Book book = findBook(id);
+        // borrowings.book_id est en RESTRICT : sans ce contrôle, la suppression
+        // renvoyait un 409 générique au lieu d'un message métier.
+        if (borrowingRepository.existsByBookId(id)) {
+            throw new BusinessException("Impossible de supprimer : des emprunts existent pour "
+                    + "« " + book.getTitle() + " ». Consultez l'historique avant de retirer ce livre.");
+        }
         auditService.log("DELETE", "Book", id, "Suppression livre " + book.getTitle(), httpRequest);
         bookRepository.delete(book);
     }
@@ -109,6 +118,15 @@ public class LibraryService {
 
     @Transactional
     public BookResponse.BorrowingResponse borrow(BorrowingRequest request, HttpServletRequest httpRequest) {
+        // Cohérence des dates : un emprunt pouvait naître DÉJÀ en retard
+        // (dueDate antérieure à borrowDate), ce qu'aucun contrôle ne signalait.
+        if (request.getDueDate().isBefore(request.getBorrowDate())) {
+            throw new BusinessException("La date de retour prévue (" + request.getDueDate()
+                    + ") ne peut pas précéder la date d'emprunt (" + request.getBorrowDate() + ").");
+        }
+        if (request.getBorrowDate().isAfter(LocalDate.now())) {
+            throw new BusinessException("La date d'emprunt ne peut pas être dans le futur.");
+        }
         Book book = bookRepository.findWithLockingById(request.getBookId())
                 .orElseThrow(() -> com.school.exception.ResourceNotFoundException.of("Livre", request.getBookId()));
         if (book.getAvailable() <= 0) {
@@ -131,14 +149,17 @@ public class LibraryService {
 
     @Transactional
     public BookResponse.BorrowingResponse returnBook(Long borrowingId, HttpServletRequest httpRequest) {
-        Borrowing borrowing = borrowingRepository.findById(borrowingId)
+        // Verrou pessimiste : deux retours simultanés passaient tous les deux le
+        // test de statut et incrémentaient le stock deux fois.
+        Borrowing borrowing = borrowingRepository.findWithLockingById(borrowingId)
                 .orElseThrow(() -> ResourceNotFoundException.of("Emprunt", borrowingId));
         if (borrowing.getStatus() == BorrowingStatus.RETURNED) {
             throw new BusinessException("Cet emprunt a déjà été retourné");
         }
         borrowing.setStatus(BorrowingStatus.RETURNED);
         borrowing.setReturnDate(LocalDate.now());
-        Book book = borrowing.getBook();
+        Book book = bookRepository.findWithLockingById(borrowing.getBook().getId())
+                .orElse(borrowing.getBook());
         book.setAvailable(Math.min(book.getQuantity(), book.getAvailable() + 1));
         bookRepository.save(book);
         auditService.log("RETURN", "Borrowing", borrowingId,
@@ -148,6 +169,11 @@ public class LibraryService {
 
     /**
      * Marquage automatique des emprunts en retard.
+     *
+     * <p>Exécuté chaque nuit : la méthode n'était atteignable que par un appel
+     * manuel, donc le statut {@code OVERDUE} et la liste « en retard » restaient
+     * vides par défaut, contrairement aux factures qui basculent en retard
+     * automatiquement.</p>
      */
     @Transactional
     public int markOverdue() {
@@ -156,6 +182,15 @@ public class LibraryService {
         overdue.forEach(b -> b.setStatus(BorrowingStatus.OVERDUE));
         borrowingRepository.saveAll(overdue);
         return overdue.size();
+    }
+
+    /** Marquage quotidien des retards (4 h du matin). */
+    @Scheduled(cron = "0 0 4 * * *")
+    public void scheduledMarkOverdue() {
+        int count = markOverdue();
+        if (count > 0) {
+            log.info("Bibliothèque : {} emprunt(s) passé(s) en retard", count);
+        }
     }
 
     public long countBorrowed() {

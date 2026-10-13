@@ -15,8 +15,10 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -28,6 +30,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/classes")
 @RequiredArgsConstructor
+@Validated
 @Tag(name = "Classes", description = "Gestion des classes, niveaux, sections et salles")
 public class ClassController {
 
@@ -39,7 +42,7 @@ public class ClassController {
             @RequestParam(required = false) String search,
             @RequestParam(required = false) Long levelId,
             @RequestParam(required = false) Long sectionId,
-            @RequestParam(defaultValue = "0") int page,
+            @Min(value = 0, message = "Le numéro de page ne peut pas être négatif") @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         return ok("Recherche réussie", classService.search(search, levelId, sectionId, page, size));
     }

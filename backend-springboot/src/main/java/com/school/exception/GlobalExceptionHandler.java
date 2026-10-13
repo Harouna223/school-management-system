@@ -4,6 +4,7 @@ import com.school.dto.response.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.context.MessageSourceResolvable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -14,9 +15,13 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -118,6 +123,47 @@ public class GlobalExceptionHandler {
         log.warn("Paramètre invalide : {} = {}", ex.getName(), ex.getValue());
         return build(HttpStatus.BAD_REQUEST,
                 "Paramètre invalide : " + ex.getName(), request);
+    }
+
+    /**
+     * Paramètre de requête invalide (ex. {@code page} négatif ou {@code size}
+     * hors bornes, contrôlés par {@code @Min}/{@code @Max} sur les contrôleurs).
+     * Sans ce gestionnaire, la violation remontait en 500.
+     */
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMethodValidation(HandlerMethodValidationException ex,
+                                                                    HttpServletRequest request) {
+        String detail = ex.getAllValidationResults().stream()
+                .flatMap(r -> r.getResolvableErrors().stream())
+                .map(MessageSourceResolvable::getDefaultMessage)
+                .filter(java.util.Objects::nonNull)
+                .findFirst()
+                .orElse("Paramètres de requête invalides");
+        log.warn("Paramètres invalides sur {} : {}", request.getRequestURI(), detail);
+        return build(HttpStatus.BAD_REQUEST, detail, request);
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleConstraintViolation(ConstraintViolationException ex,
+                                                                       HttpServletRequest request) {
+        String detail = ex.getConstraintViolations().stream()
+                .map(ConstraintViolation::getMessage)
+                .findFirst()
+                .orElse("Paramètres de requête invalides");
+        log.warn("Contrainte violée sur {} : {}", request.getRequestURI(), detail);
+        return build(HttpStatus.BAD_REQUEST, detail, request);
+    }
+
+    /**
+     * Argument illégal : typiquement {@code PageRequest.of(page, size)} appelé
+     * avec une page négative ou une taille nulle par un service qui n'est pas
+     * encore borné. Réponse 400 explicite plutôt qu'un 500 opaque.
+     */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiResponse<Void>> handleIllegalArgument(IllegalArgumentException ex,
+                                                                   HttpServletRequest request) {
+        log.warn("Argument invalide sur {} : {}", request.getRequestURI(), ex.getMessage());
+        return build(HttpStatus.BAD_REQUEST, "Paramètre invalide : " + ex.getMessage(), request);
     }
 
     @ExceptionHandler(Exception.class)
