@@ -102,6 +102,19 @@ vi.mock('../../api/endpoints', () => {
     { get: () => () => Promise.resolve({ data: { data: emptyList() } }) },
   )
 
+  /**
+   * Complete une surcharge : toute methode NON listee retombe sur le repli benin.
+   *
+   * Sans ce repli, `mocked.examApi = { byClass }` SUPPRIME les autres methodes du
+   * client : la page levait « examApi.bulletinsByStudent is not a function » et le
+   * garde-fou de routes signalait un plantage qui n'existait pas en production.
+   * Un client surcharge doit rester complet, jamais tronque.
+   */
+  const extend = (overrides) =>
+    new Proxy(overrides, {
+      get: (target, prop) => (prop in target ? target[prop] : benign[prop]),
+    })
+
   // TOUS les clients exportes par api/endpoints doivent exister : `Sidebar`
   // appelle `settingsApi.cycles()` et `Navbar` appelle `communicationApi`, qui
   // sont montes par le vrai DashboardLayout. Un client manquant ferait lever
@@ -119,11 +132,11 @@ vi.mock('../../api/endpoints', () => {
 
   // Clients dont les tableaux de bord ont besoin, avec des charges utiles
   // copiees de reponses REELLES de l'API.
-  mocked.dashboardApi = {
+  mocked.dashboardApi = extend({
     stats: () => ok({}),
     auditLogs: () => ok({ content: [] }),
-  }
-  mocked.myApi = {
+  })
+  mocked.myApi = extend({
     profile: () => ok(STUDENT),
     schedule: () => ok([SCHEDULE]),
     grades: () => ok([MY_GRADE]),
@@ -133,21 +146,33 @@ vi.mock('../../api/endpoints', () => {
     teacherProfile: () => ok(TEACHER),
     teacherSchedule: () => ok([SCHEDULE]),
     teacherClasses: () => ok([TEACHER_CLASS]),
-  }
-  mocked.parentApi = {
+  })
+  mocked.parentApi = extend({
     children: () => ok([STUDENT]),
     childBulletins: () => ok([BULLETIN]),
     childAttendances: () => ok([ATTENDANCE]),
     childGrades: () => ok([MY_GRADE]),
     childTimeline: () => ok([]),
     childInvoices: () => ok([INVOICE]),
-  }
-  mocked.teacherHoursApi = {
+  })
+  mocked.teacherHoursApi = extend({
     myMonthly: () => ok([PAYROLL_ROW]),
     myTransactions: () => ok([]),
-  }
-  mocked.examApi = { byClass: () => ok([]), gradesByExam: () => ok([]) }
-  mocked.studentApi = { search: () => ok([]) }
+  })
+  mocked.examApi = extend({ byClass: () => ok([]), gradesByExam: () => ok([]) })
+  /*
+   * `studentApi.search` doit renvoyer une liste PAGINEE (`.content`), pas un
+   * tableau nu : StudentsPage, PaymentsPage et LibraryPage font tous
+   * `setX(data.data.content)`. Avec `ok([])`, `.content` valait `undefined`,
+   * l'etat devenait `undefined` et la page levait « Cannot read properties of
+   * undefined (reading 'map') » — un faux plantage, verifie sain en navigateur.
+   * `get` doit renvoyer un ELEVE complet : StudentDocumentsPage lit
+   * `student.lastName.toUpperCase()`.
+   */
+  mocked.studentApi = extend({
+    search: () => ok(emptyList()),
+    get: () => ok(STUDENT),
+  })
 
   return mocked
 })
@@ -230,5 +255,94 @@ describe('Câblage réel — les gardes de route', () => {
     mountApp('/route-qui-nexiste-pas', { roles: ['SUPER_ADMIN'] })
     expect(await screen.findByText('Page introuvable')).toBeInTheDocument()
     expectNoRenderCrash()
+  })
+})
+
+/*
+ * Toutes les routes d'administration, une par une.
+ *
+ * Pourquoi ce garde existe
+ * ------------------------
+ * Le bloc precedent ne monte que `/dashboard`. Les ~35 autres pages ne sont donc
+ * jamais rendues par la CI — et une page qui plante AU RENDU passe inapercue.
+ *
+ * Cas reel (2026-10-13) : `/settings` etait inaccessible en production. Cause :
+ * `SettingsPage` listait `loadYears` dans le tableau de dependances d'un
+ * `useEffect` ecrit PLUS HAUT que la declaration `const loadYears = useCallback(...)`.
+ * Ce tableau est evalue pendant le rendu : la variable etait encore dans sa zone
+ * morte temporelle (TDZ) et la page levait
+ * « Cannot access 'loadYears' before initialization ». L'ErrorBoundary affichait
+ * « Une erreur est survenue ». Aucun test ne montait cette route, donc la CI
+ * restait verte et le bug n'apparaissait qu'en navigateur.
+ *
+ * Les routes de portail (`/my-children`, `/my-school`, `/my-teaching`) sont
+ * volontairement exclues : SUPER_ADMIN y est refuse par la garde interne du
+ * portail (comportement attendu), elles sont couvertes par Portals.render.test.jsx.
+ */
+const ADMIN_ROUTES = [
+  '/dashboard',
+  '/profile',
+  '/students',
+  '/students/new',
+  '/students/10',
+  '/students/10/edit',
+  '/students/10/documents',
+  '/teachers',
+  '/teachers/new',
+  '/teachers/1/edit',
+  '/classes',
+  '/levels',
+  '/sections',
+  '/rooms',
+  '/subjects',
+  '/schedules',
+  '/attendances',
+  '/grades',
+  '/exams',
+  '/exam-types',
+  '/convocations',
+  '/stages',
+  '/candidatures',
+  '/memoires',
+  '/alumni',
+  '/payments',
+  '/fee-types',
+  '/expenses',
+  '/teacher-payroll',
+  '/library',
+  '/hr',
+  '/reports',
+  '/messages',
+  '/announcements',
+  '/users',
+  '/audit',
+  '/settings',
+]
+
+describe('Câblage réel — chaque route d’administration se rend sans plantage', () => {
+  it.each(ADMIN_ROUTES)('%s', async (path) => {
+    mountApp(path, { roles: ['SUPER_ADMIN'] })
+
+    /*
+     * Le <Suspense> de routes/index.jsx est place AU-DESSUS du DashboardLayout :
+     * tant que la page paresseuse n'est pas resolue, TOUT l'arbre (layout compris)
+     * est remplace par le fallback. On attend donc que le layout soit monte — ou
+     * que la frontiere d'erreur apparaisse, ce qui signifie un plantage.
+     */
+    await waitFor(
+      () => {
+        if (screen.queryByText('Une erreur est survenue')) return // plantage : on sort
+        expect(document.querySelector('.page-fade')).not.toBeNull()
+      },
+      { timeout: 10000 },
+    )
+
+    // La frontiere d'erreur remplace TOUT l'arbre : sa presence = plantage au rendu.
+    // On lit le message qu'elle affiche (un `Alert`) pour que l'echec nomme la cause
+    // au lieu de dire seulement « ca a plante ».
+    const alerte = screen.queryByText('Une erreur est survenue')
+      ? screen.queryByRole('alert')?.textContent?.trim()
+      : null
+    expect(alerte, 'la route doit se rendre sans planter').toBeNull()
   })
 })

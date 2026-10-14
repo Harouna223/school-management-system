@@ -74,6 +74,19 @@ export default function SettingsPage() {
     } catch { /* historique optionnel */ }
   }, [])
 
+  /**
+   * Doit être déclaré AVANT le useEffect ci-dessous : le tableau de dépendances
+   * est évalué pendant le rendu. Placé plus bas, `loadYears` était encore dans sa
+   * zone morte temporelle (TDZ) au moment de lire la dépendance, et la page
+   * plantait au rendu sur « Cannot access 'loadYears' before initialization ».
+   */
+  const loadYears = useCallback(async () => {
+    try {
+      const { data } = await academicYearApi.all()
+      setYears(data.data || [])
+    } catch { /* ignore */ }
+  }, [])
+
   useEffect(() => {
     Promise.all([settingsApi.all(), settingsApi.defaults()])
       .then(([savedRes, defaultsRes]) => {
@@ -131,13 +144,6 @@ export default function SettingsPage() {
       setSaving(false)
     }
   }
-
-  const loadYears = useCallback(async () => {
-    try {
-      const { data } = await academicYearApi.all()
-      setYears(data.data || [])
-    } catch { /* ignore */ }
-  }, [])
 
   const openYearDialog = (year) => {
     setEditingYear(year)
