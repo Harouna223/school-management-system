@@ -286,8 +286,23 @@ public class AuthService {
         return refreshTokenRepository.deleteStale(LocalDateTime.now());
     }
 
-    /** Purge quotidienne des refresh tokens révoqués / expirés (3 h 30). */
+    /**
+     * Purge quotidienne des refresh tokens révoqués / expirés (3 h 30).
+     *
+     * <p><b>Le {@code @Transactional} doit être ICI, sur le point d'entrée.</b>
+     * Le planificateur de Spring invoque cette méthode à travers le proxy
+     * transactionnel : c'est le seul chemin qui ouvre réellement une transaction.
+     * Posé uniquement sur {@link #purgeStaleRefreshTokens()}, il était
+     * <em>inerte</em> : l'appel ci-dessous est une auto-invocation
+     * ({@code this.…}) qui contourne le proxy, si bien que la requête
+     * {@code @Modifying} {@code deleteStale} s'exécutait sans transaction et
+     * levait {@code TransactionRequiredException} (« Executing an update/delete
+     * query ») — chaque nuit à 3 h 30. Le test unitaire ne pouvait pas le voir
+     * (un mock ne réclame aucune transaction) ; c'est
+     * {@code ScheduledTasksIT} qui l'a mis en évidence.</p>
+     */
     @Scheduled(cron = "0 30 3 * * *")
+    @Transactional
     public void scheduledPurgeStaleRefreshTokens() {
         int purged = purgeStaleRefreshTokens();
         if (purged > 0) {

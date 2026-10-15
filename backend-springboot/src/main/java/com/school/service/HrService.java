@@ -170,8 +170,21 @@ public class HrService {
         return updated;
     }
 
-    /** Réconciliation quotidienne des statuts de congé (exécution à 2 h du matin). */
+    /**
+     * Réconciliation quotidienne des statuts de congé (exécution à 2 h du matin).
+     *
+     * <p><b>Le {@code @Transactional} doit être ICI, sur le point d'entrée.</b>
+     * La classe est annotée {@code @Transactional(readOnly = true)} : sans
+     * annotation sur cette méthode, la réconciliation s'exécutait dans une
+     * transaction <em>en lecture seule</em> (le {@code @Transactional} de
+     * {@link #reconcileTeacherLeaveStatus()} étant contourné par
+     * l'auto-invocation {@code this.…}). L'écriture du journal d'audit échouait
+     * alors avec « Connection is read-only. Queries leading to data modification
+     * are not allowed », et la transaction entière était annulée : aucun statut
+     * d'enseignant n'était mis à jour. Constaté par {@code ScheduledTasksIT}.</p>
+     */
     @Scheduled(cron = "0 0 2 * * *")
+    @Transactional
     public void scheduledReconcileTeacherLeaveStatus() {
         int updated = reconcileTeacherLeaveStatus();
         if (updated > 0) {

@@ -184,8 +184,22 @@ public class LibraryService {
         return overdue.size();
     }
 
-    /** Marquage quotidien des retards (4 h du matin). */
+    /**
+     * Marquage quotidien des retards (4 h du matin).
+     *
+     * <p><b>Le {@code @Transactional} doit être ICI, sur le point d'entrée.</b>
+     * La classe est annotée {@code @Transactional(readOnly = true)} : sans
+     * annotation sur cette méthode, la tâche s'exécutait donc dans une
+     * transaction <em>en lecture seule</em>, et le {@code @Transactional} de
+     * {@link #markOverdue()} était contourné par l'auto-invocation
+     * ({@code this.…}). Conséquence silencieuse : Hibernate passe le flush en
+     * {@code MANUAL} en lecture seule, les changements d'état des emprunts
+     * n'étaient <b>jamais écrits</b> — la tâche se terminait sans erreur mais la
+     * base restait inchangée, et la liste « en retard » restait vide à jamais.
+     * Constaté par {@code ScheduledTasksIT}.</p>
+     */
     @Scheduled(cron = "0 0 4 * * *")
+    @Transactional
     public void scheduledMarkOverdue() {
         int count = markOverdue();
         if (count > 0) {
