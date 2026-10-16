@@ -15,7 +15,7 @@
     <artifactId>school-management-backend</artifactId>
     <version>1.0.0</version>
     <name>school-management-backend</name>
-    <description>School Management System - Backend Spring Boot</description>
+    <description>Sahel Edu - Backend Spring Boot</description>
 
     <properties>
         <java.version>21</java.version>
