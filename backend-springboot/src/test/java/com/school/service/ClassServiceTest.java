@@ -6,8 +6,10 @@ import com.school.dto.request.RoomRequest;
 import com.school.dto.request.SectionRequest;
 import com.school.dto.response.ClassResponse;
 import com.school.dto.response.PageResponse;
+import com.school.entity.Exam;
 import com.school.entity.Level;
 import com.school.entity.Room;
+import com.school.entity.Schedule;
 import com.school.entity.SchoolClass;
 import com.school.entity.Section;
 import com.school.entity.Student;
@@ -81,6 +83,14 @@ import static org.mockito.Mockito.when;
  * garde « classe non vide » retiree =&gt; 1 echec ; {@code existsByCode} retire =&gt; 1 echec ;
  * defaut de capacite a la creation retire =&gt; 1 echec ; garde {@code existsByLevelId} retiree
  * =&gt; 1 echec. Les quatre sont donc reellement portees par les tests.
+ *
+ * <p>Les <b>quatre gardes de cascade</b> de {@code delete()} (evaluations, creneaux, affectations,
+ * presences) ont ete ajoutees apres coup, apres avoir constate qu'elles n'etaient couvertes par
+ * <b>aucun</b> test : {@code deleteSupprimeUneClasseVide} les traversait <b>par accident</b>,
+ * Mockito renvoyant par defaut liste vide / {@code 0L} / {@code false}. Les retirer laissait donc
+ * toute la suite au vert alors que la base propage la suppression de la classe a ses evaluations
+ * ({@code fk_exams_class}) <b>puis</b> a leurs notes ({@code fk_grades_exam}). Controle negatif :
+ * les quatre retirees ensemble =&gt; exactement <b>4 echecs</b>, un par garde.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -495,6 +505,76 @@ class ClassServiceTest {
 
         assertThatThrownBy(() -> classService.delete(404L, httpRequest))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    // ------------------------------------------------------------------
+    // Les quatre gardes de cascade de delete().
+    //
+    // Elles etaient jusque-la NON TESTEES : `deleteSupprimeUneClasseVide` les
+    // traverse par accident, parce que Mockito renvoie par defaut une liste vide,
+    // 0L et false. Les retirer laissait donc toute la suite au vert, alors que la
+    // base propage la suppression de la classe a ses evaluations (fk_exams_class)
+    // PUIS a leurs notes (fk_grades_exam) : un simple clic effacait des notes.
+    // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("delete refuse une classe portant des evaluations (cascade classe -> evaluations -> notes)")
+    void deleteRefuseUneClasseAvecEvaluations() {
+        SchoolClass existante = classe(1L, "6eme A", "6A", 30);
+        when(classRepository.findById(1L)).thenReturn(Optional.of(existante));
+        when(examRepository.findBySchoolClassId(1L)).thenReturn(List.of(Exam.builder().id(50L).build()));
+
+        assertThatThrownBy(() -> classService.delete(1L, httpRequest))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("évaluation(s) et leurs notes");
+
+        verify(classRepository, never()).delete(any(SchoolClass.class));
+        verifyNoInteractions(auditService);
+    }
+
+    @Test
+    @DisplayName("delete refuse une classe portant des creneaux d'emploi du temps")
+    void deleteRefuseUneClasseAvecCreneaux() {
+        SchoolClass existante = classe(1L, "6eme A", "6A", 30);
+        when(classRepository.findById(1L)).thenReturn(Optional.of(existante));
+        when(scheduleRepository.findBySchoolClassId(1L)).thenReturn(List.of(Schedule.builder().id(60L).build()));
+
+        assertThatThrownBy(() -> classService.delete(1L, httpRequest))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("créneaux d'emploi du temps");
+
+        verify(classRepository, never()).delete(any(SchoolClass.class));
+        verifyNoInteractions(auditService);
+    }
+
+    @Test
+    @DisplayName("delete refuse une classe portant des affectations enseignant/matiere")
+    void deleteRefuseUneClasseAvecAffectations() {
+        SchoolClass existante = classe(1L, "6eme A", "6A", 30);
+        when(classRepository.findById(1L)).thenReturn(Optional.of(existante));
+        when(subjectAssignmentRepository.countBySchoolClassId(1L)).thenReturn(3L);
+
+        assertThatThrownBy(() -> classService.delete(1L, httpRequest))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("3 affectation(s)");
+
+        verify(classRepository, never()).delete(any(SchoolClass.class));
+        verifyNoInteractions(auditService);
+    }
+
+    @Test
+    @DisplayName("delete refuse une classe portant des presences")
+    void deleteRefuseUneClasseAvecPresences() {
+        SchoolClass existante = classe(1L, "6eme A", "6A", 30);
+        when(classRepository.findById(1L)).thenReturn(Optional.of(existante));
+        when(attendanceRepository.existsBySchoolClassId(1L)).thenReturn(true);
+
+        assertThatThrownBy(() -> classService.delete(1L, httpRequest))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("présences sont enregistrées");
+
+        verify(classRepository, never()).delete(any(SchoolClass.class));
+        verifyNoInteractions(auditService);
     }
 
     // ================================================================== niveaux
