@@ -5,10 +5,10 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
- * KALANKO - Application principale.
+ * Sahel Edu - Application principale.
  *
  * <p>Le nom technique reste {@code SchoolManagementApplication} (classe, artefact
- * Maven, base de données) : seul le nom affiché de l'application est KALANKO.</p>
+ * Maven, base de données) : seul le nom affiché de l'application est Sahel Edu.</p>
  */
 @SpringBootApplication
 @EnableScheduling

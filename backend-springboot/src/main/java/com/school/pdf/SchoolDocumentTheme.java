@@ -196,11 +196,22 @@ public class SchoolDocumentTheme {
         document.add(Chunk.NEWLINE);
     }
 
+    /**
+     * Initiales de repli de la marque « Sahel Edu », affichées sur les documents
+     * PDF quand aucun nom d'établissement n'est configuré (première lettre de
+     * chacun des deux mots : <b>S</b>ahel + <b>E</b>du).
+     */
+    private static final String BRAND_INITIALS = "SE";
+
     private Element initialsFallback() {
         // Repli quand aucun nom d'établissement n'est configuré : on affiche les
-        // initiales de la marque (« KA » pour KALANKO) plutôt qu'un logo absent.
-        String name = schoolName() != null ? schoolName().trim() : "KALANKO";
-        String initials = name.isEmpty() ? "KALANKO" : name.substring(0, Math.min(2, name.length())).toUpperCase();
+        // initiales de la marque (« SE » pour Sahel Edu) plutôt qu'un logo absent.
+        // Si un nom d'établissement EST configuré, on conserve ses deux premières
+        // lettres (comportement historique : « École Les Palmiers » -> « ÉC »).
+        String configured = schoolName() == null ? "" : schoolName().trim();
+        String initials = configured.isEmpty()
+                ? BRAND_INITIALS
+                : configured.substring(0, Math.min(2, configured.length())).toUpperCase();
         PdfPTable box = new PdfPTable(1);
         box.setWidthPercentage(100);
         PdfPCell cell = new PdfPCell(new Phrase(initials, whiteBold(18)));

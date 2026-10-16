@@ -69,7 +69,7 @@ export const en = {
   'topbar.myProfile': 'My profile',
   'topbar.connectedAccount': 'Connected account',
   'topbar.home': 'Home',
-  'topbar.schoolName': 'KALANKO',
+  'topbar.schoolName': 'Sahel Edu',
 
   // Common
   'common.search': 'Search…',

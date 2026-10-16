@@ -1,4 +1,4 @@
-# KALANKO
+# Sahel Edu
 ## Guide complet de déploiement et d'adoption multi-écoles
 
 ---

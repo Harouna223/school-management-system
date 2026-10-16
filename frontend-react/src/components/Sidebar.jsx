@@ -261,12 +261,12 @@ export default function Sidebar({ open, onClose, collapsed, onCollapseToggle, va
             overflow: 'hidden',
           }}
         >
-          <img src={logo} alt="Logo KALANKO" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <img src={logo} alt="Logo Sahel Edu" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         </Box>
         {!compact && (
           <Box minWidth={0}>
             <Typography variant="subtitle1" fontWeight={800} lineHeight={1.15} noWrap sx={{ fontSize: 17, letterSpacing: '-0.01em' }}>
-              KALANKO
+              Sahel Edu
             </Typography>
           </Box>
         )}
@@ -391,7 +391,7 @@ export default function Sidebar({ open, onClose, collapsed, onCollapseToggle, va
         )}
         {!compact && (
           <Typography variant="caption" color="text.disabled" align="center" display="block" sx={{ fontSize: 10, mt: 0.8, letterSpacing: '0.04em' }}>
-            KALANKO v1.0
+            Sahel Edu v1.0
           </Typography>
         )}
       </Box>

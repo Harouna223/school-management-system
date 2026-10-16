@@ -101,11 +101,11 @@ export default function AuthLayout({ children }) {
               border: '1px solid rgba(255,255,255,0.2)',
             }}
           >
-            <img src={logo} alt="Logo KALANKO" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <img src={logo} alt="Logo Sahel Edu" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           </Box>
           <Box>
             <Typography variant="h6" fontWeight={800} lineHeight={1.1} sx={{ fontSize: 19, letterSpacing: '-0.01em' }}>
-              KALANKO
+              Sahel Edu
             </Typography>
           </Box>
         </Box>
@@ -148,7 +148,7 @@ export default function AuthLayout({ children }) {
         </Box>
 
         <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', position: 'relative', mt: 3 }}>
-          © {new Date().getFullYear()} KALANKO
+          © {new Date().getFullYear()} Sahel Edu
         </Typography>
       </Box>
 
@@ -208,18 +208,18 @@ export default function AuthLayout({ children }) {
                 overflow: 'hidden',
               }}
             >
-              <img src={logo} alt="Logo KALANKO" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <img src={logo} alt="Logo Sahel Edu" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </Box>
             <Box>
               <Typography variant="subtitle1" fontWeight={800} lineHeight={1.1} sx={{ fontSize: 16 }}>
-                KALANKO
+                Sahel Edu
               </Typography>
             </Box>
           </Box>
 
           <Box textAlign="center" mb={3}>
             <Typography variant="h5" fontWeight={800} letterSpacing="-0.02em">
-              KALANKO
+              Sahel Edu
             </Typography>
             <Typography variant="body2" color="text.secondary">
               Plateforme de gestion scolaire

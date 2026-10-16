@@ -1,4 +1,4 @@
-name: KALANKO CI/CD Pipeline
+name: Sahel Edu CI/CD Pipeline
 
 on:
   push:

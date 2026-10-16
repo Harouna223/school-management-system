@@ -1,6 +1,6 @@
-# Déploiement KALANKO chez un client — Guide pas à pas
+# Déploiement Sahel Edu chez un client — Guide pas à pas
 
-Ce guide couvre l'installation de l'application KALANKO sur
+Ce guide couvre l'installation de l'application Sahel Edu sur
 un serveur client avec Docker Compose : configuration, sécurisation, HTTPS,
 sauvegardes, mise à jour et dépannage.
 

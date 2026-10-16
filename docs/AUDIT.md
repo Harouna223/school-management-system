@@ -1,4 +1,4 @@
-# RAPPORT D'AUDIT FONCTIONNEL COMPLET — KALANKO
+# RAPPORT D'AUDIT FONCTIONNEL COMPLET — Sahel Edu
 
 > **⚠️ Document historique — il décrit un état antérieur du produit.**
 > Cet audit a été rédigé sur une version ancienne du code : plusieurs fonctionnalités alors
@@ -16,7 +16,7 @@
 
 ## 1. RÉSUMÉ EXÉCUTIF
 
-KALANKO est une plateforme éducative fonctionnelle couvrant Jardin → Université. L'audit révèle un état général **bon** avec des points forts (module scolaire mature, sécurité récemment renforcée, architecture extensible) et des lacunes identifiées (module LMD insuffisamment développé malgré les extensions récentes, absence de gestion des convocations, espace parent non finalisé, parcours académique incomplet, rôle Élève/Étudiant non distingué).
+Sahel Edu est une plateforme éducative fonctionnelle couvrant Jardin → Université. L'audit révèle un état général **bon** avec des points forts (module scolaire mature, sécurité récemment renforcée, architecture extensible) et des lacunes identifiées (module LMD insuffisamment développé malgré les extensions récentes, absence de gestion des convocations, espace parent non finalisé, parcours académique incomplet, rôle Élève/Étudiant non distingué).
 
 > *(Obsolète : le module LMD et le rôle ÉTUDIANT évoqués dans ce résumé ont été entièrement retirés du produit.)*
 
@@ -673,7 +673,7 @@ docker/
 > *(Obsolète : le bloc « UNIVERSITÉ », le « Dashboard étudiant (/my-university) » et la timeline « scolaire + universitaire » ci-dessous décrivent une cible abandonnée avec le retrait du module universitaire/LMD.)*
 
 ```
-KALANKO — PLATEFORME ÉDUCATIVE UNIFIÉE
+Sahel Edu — PLATEFORME ÉDUCATIVE UNIFIÉE
 │
 ├── AUTH / RBAC / IDOR
 │   ├── 8 rôles (SUPER_ADMIN, DIRECTEUR, SECRETAIRE, COMPTABLE, ENSEIGNANT, PARENT, ELEVE, ETUDIANT)

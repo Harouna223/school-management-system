@@ -1,4 +1,4 @@
-# Diagrammes — KALANKO
+# Diagrammes — Sahel Edu
 
 Diagrammes (format Mermaid) de l'architecture, du modèle de données et des flux clés.
 Rendu sur [mermaid.live](https://mermaid.live) ou dans tout éditeur compatible.
