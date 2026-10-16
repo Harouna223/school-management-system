@@ -310,7 +310,7 @@ export default function StudentPortalPage() {
         {lastBulletin && (
           <>
             <Typography variant="h6" textAlign="center" fontWeight={800}>
-              School Management System
+              KALANKO
             </Typography>
             <Typography variant="body2" textAlign="center" color="text.secondary" mb={2}>
               Bulletin · {TERM_LABEL[lastBulletin.term] || lastBulletin.term} · {lastBulletin.academicYear}

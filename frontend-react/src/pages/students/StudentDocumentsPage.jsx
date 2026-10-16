@@ -9,7 +9,7 @@ import { useToast } from '../../hooks/useToast'
 import FileImage from '../../components/FileImage'
 import logo from '../../assets/logo.svg'
 
-const SCHOOL_NAME = 'School Manager'
+const SCHOOL_NAME = 'KALANKO'
 const SCHOOL_SLOGAN = 'Établissement d’enseignement et de formation'
 
 function schoolYear() {

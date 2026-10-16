@@ -21,12 +21,12 @@ public class OpenApiConfig {
 
         return new OpenAPI()
                 .info(new Info()
-                        .title("School Management System API")
+                        .title("KALANKO API")
                         .version("1.0.0")
                         .description("API REST complète de gestion scolaire : élèves, enseignants, classes, " +
                                 "notes, examens, paiements, présences, emploi du temps, bibliothèque, RH.")
                         .contact(new Contact()
-                                .name("School Management System")
+                                .name("KALANKO")
                                 .email("contact@school.edu")))
                 .addSecurityItem(new SecurityRequirement().addList(schemeName))
                 .components(new Components().addSecuritySchemes(schemeName,

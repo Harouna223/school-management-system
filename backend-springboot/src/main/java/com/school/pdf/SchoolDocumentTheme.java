@@ -197,8 +197,10 @@ public class SchoolDocumentTheme {
     }
 
     private Element initialsFallback() {
-        String name = schoolName() != null ? schoolName().trim() : "SMS";
-        String initials = name.isEmpty() ? "SMS" : name.substring(0, Math.min(2, name.length())).toUpperCase();
+        // Repli quand aucun nom d'établissement n'est configuré : on affiche les
+        // initiales de la marque (« KA » pour KALANKO) plutôt qu'un logo absent.
+        String name = schoolName() != null ? schoolName().trim() : "KALANKO";
+        String initials = name.isEmpty() ? "KALANKO" : name.substring(0, Math.min(2, name.length())).toUpperCase();
         PdfPTable box = new PdfPTable(1);
         box.setWidthPercentage(100);
         PdfPCell cell = new PdfPCell(new Phrase(initials, whiteBold(18)));

@@ -26,11 +26,18 @@ import java.util.regex.Pattern;
  * La sauvegarde est un dump SQL portable (header de validation {@code -- SMS BACKUP}),
  * généré via JDBC. La restauration n'accepte que les fichiers produits par ce
  * service (garde-fou anti-destruction).
+ * <p>
+ * <b>Ne pas renommer {@link #BACKUP_MARKER} lors d'un changement de nom de
+ * l'application.</b> Ce marqueur est écrit en première ligne de chaque sauvegarde
+ * et {@link #restoreBackup} refuse tout fichier qui ne commence pas par lui :
+ * le renommer rendrait <b>toutes les sauvegardes déjà produites irrestaurables</b>.
+ * Il s'agit d'un identifiant de format, pas d'un libellé affiché.
  */
 @Service
 @RequiredArgsConstructor
 public class BackupService {
 
+    /** Identifiant de format — historique, volontairement figé (cf. javadoc ci-dessus). */
     public static final String BACKUP_MARKER = "-- SMS BACKUP";
 
     /** Taille maximale acceptée pour un fichier de sauvegarde (100 Mo). */

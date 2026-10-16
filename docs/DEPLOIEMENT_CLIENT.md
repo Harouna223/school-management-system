@@ -1,6 +1,6 @@
-# Déploiement SMS chez un client — Guide pas à pas
+# Déploiement KALANKO chez un client — Guide pas à pas
 
-Ce guide couvre l'installation de l'application SMS (School Management System) sur
+Ce guide couvre l'installation de l'application KALANKO sur
 un serveur client avec Docker Compose : configuration, sécurisation, HTTPS,
 sauvegardes, mise à jour et dépannage.
 

@@ -1,4 +1,4 @@
-name: SMS CI/CD Pipeline
+name: KALANKO CI/CD Pipeline
 
 on:
   push:

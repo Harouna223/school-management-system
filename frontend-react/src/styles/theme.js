@@ -1,7 +1,7 @@
 import { createTheme } from '@mui/material/styles'
 
 /* ============================================================
-   SMS — School Management System
+   KALANKO
    Design System v3 — ERP SaaS moderne
    Palette : bleu #2563EB, surfaces neutres, badges doux
    ============================================================ */

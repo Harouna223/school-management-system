@@ -1,4 +1,4 @@
-# Analyse technique — School Management System (SMS)
+# Analyse technique — KALANKO
 
 > Analyse indépendante menée le **9 octobre 2026** par inspection directe du code **et par exécution**
 > (build, tests, lint, requêtes SQL, conteneur MySQL neuf).
@@ -37,7 +37,7 @@
 
 ## 1. Synthèse exécutive
 
-SMS est une application full-stack **de grande envergure et sérieusement construite** : ~302 endpoints,
+KALANKO est une application full-stack **de grande envergure et sérieusement construite** : ~302 endpoints,
 67 entités JPA, 40 000 lignes de code applicatif, **444 tests backend verts**, lint frontend propre,
 Docker Compose complet avec sauvegarde quotidienne. Ce n'est pas un prototype.
 

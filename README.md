@@ -1,4 +1,4 @@
-# School Management System
+# KALANKO
 
 Système complet de gestion scolaire : élèves, enseignants, classes, emplois du temps, présences, notes, examens, bulletins et délibérations, paiements, bibliothèque, RH, messagerie interne, espace parent (bulletins, absences, notifications WhatsApp / e-mail / SMS) et journal d'audit.
 

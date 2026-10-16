@@ -1,7 +1,7 @@
-# 📚 SMS — School Management System
+# 📚 KALANKO
 ## Documentation fonctionnelle complète
 
-**SMS** est une plateforme de gestion scolaire unifiée qui couvre les cycles d'enseignement
+**KALANKO** est une plateforme de gestion scolaire unifiée qui couvre les cycles d'enseignement
 **Jardin → Primaire → Collège → Lycée**, ainsi que les **modules annexes du cycle Université**
 (stages, mémoires, alumni, admission).
 
@@ -21,7 +21,7 @@
 ### Architecture multi-cycle
 
 ```
-SMS
+KALANKO
  └── ENSEIGNEMENT
       ├── JARDIN (PS, MS, GS)
       ├── PRIMAIRE (CP → CM2)

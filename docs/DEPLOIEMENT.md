@@ -1,4 +1,4 @@
-# SMS — School Management System
+# KALANKO
 ## Guide complet de déploiement et d'adoption multi-écoles
 
 ---
