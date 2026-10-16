@@ -201,17 +201,29 @@ public class SchoolDocumentTheme {
      * PDF quand aucun nom d'établissement n'est configuré (première lettre de
      * chacun des deux mots : <b>S</b>ahel + <b>E</b>du).
      */
-    private static final String BRAND_INITIALS = "SE";
+    static final String BRAND_INITIALS = "SE";
 
-    private Element initialsFallback() {
-        // Repli quand aucun nom d'établissement n'est configuré : on affiche les
-        // initiales de la marque (« SE » pour Sahel Edu) plutôt qu'un logo absent.
-        // Si un nom d'établissement EST configuré, on conserve ses deux premières
-        // lettres (comportement historique : « École Les Palmiers » -> « ÉC »).
-        String configured = schoolName() == null ? "" : schoolName().trim();
-        String initials = configured.isEmpty()
+    /**
+     * Initiales affichées dans le cartouche du logo. Deux branches volontairement
+     * distinctes :
+     * <ul>
+     *   <li>aucun nom d'établissement ({@code null} ou blanc) → {@link #BRAND_INITIALS} ;</li>
+     *   <li>un nom est configuré → ses <b>deux premières lettres</b> (comportement
+     *       historique conservé : « École Les Palmiers » → « ÉC »).</li>
+     * </ul>
+     * ⚠️ Ne pas « simplifier » en prenant les deux premiers caractères de la marque :
+     * cela donnerait « SA » au lieu de « SE ».
+     * <p>Statique et package-private afin d'être testable sans contexte Spring.
+     */
+    static String initialsFor(String schoolName) {
+        String configured = schoolName == null ? "" : schoolName.trim();
+        return configured.isEmpty()
                 ? BRAND_INITIALS
                 : configured.substring(0, Math.min(2, configured.length())).toUpperCase();
+    }
+
+    private Element initialsFallback() {
+        String initials = initialsFor(schoolName());
         PdfPTable box = new PdfPTable(1);
         box.setWidthPercentage(100);
         PdfPCell cell = new PdfPCell(new Phrase(initials, whiteBold(18)));
