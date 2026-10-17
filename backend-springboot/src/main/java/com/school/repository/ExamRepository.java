@@ -41,4 +41,11 @@ public interface ExamRepository extends JpaRepository<Exam, Long> {
             """)
     List<Exam> findByExamDateBetween(@Param("from") java.time.LocalDate from,
                                      @Param("to") java.time.LocalDate to);
+
+
+    /**
+     * Garde anti-cascade : compte les enregistrements qui seraient detruits
+     * silencieusement avec le parent supprime.
+     */
+    long countBySubjectId(Long subjectId);
 }

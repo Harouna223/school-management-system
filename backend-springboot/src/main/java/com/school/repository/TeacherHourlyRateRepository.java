@@ -37,4 +37,11 @@ public interface TeacherHourlyRateRepository extends JpaRepository<TeacherHourly
     List<TeacherHourlyRate> search(@Param("teacherId") Long teacherId,
                                    @Param("yearId") Long yearId,
                                    @Param("active") Boolean active);
+
+
+    /**
+     * Garde anti-cascade : compte les enregistrements qui seraient detruits
+     * silencieusement avec le parent supprime.
+     */
+    long countByTeacherId(Long teacherId);
 }

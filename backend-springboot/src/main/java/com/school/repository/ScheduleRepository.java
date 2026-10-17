@@ -34,4 +34,11 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
                 || s.getTeacher().getId().equals(teacherId)
                 || (roomId != null && s.getRoom() != null && s.getRoom().getId().equals(roomId)));
     }
+
+
+    /**
+     * Garde anti-cascade : compte les enregistrements qui seraient detruits
+     * silencieusement avec le parent supprime.
+     */
+    long countByTeacherId(Long teacherId);
 }

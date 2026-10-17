@@ -44,4 +44,11 @@ public interface TeacherMonthlyPaymentRepository extends JpaRepository<TeacherMo
                                        @Param("monthDate") LocalDate monthDate,
                                        @Param("status") TeacherPaymentStatus status,
                                        @Param("yearId") Long yearId);
+
+
+    /**
+     * Garde anti-cascade : compte les enregistrements qui seraient detruits
+     * silencieusement avec le parent supprime.
+     */
+    long countByTeacherId(Long teacherId);
 }

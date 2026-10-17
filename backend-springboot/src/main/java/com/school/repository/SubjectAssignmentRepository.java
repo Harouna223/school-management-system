@@ -14,4 +14,12 @@ public interface SubjectAssignmentRepository extends JpaRepository<SubjectAssign
     long countBySchoolClassId(Long classId);
 
     boolean existsByTeacherIdAndSubjectIdAndSchoolClassId(Long teacherId, Long subjectId, Long classId);
+
+
+    /**
+     * Garde anti-cascade : compte les enregistrements qui seraient detruits
+     * silencieusement avec le parent supprime.
+     */
+    long countByTeacherId(Long teacherId);
+    long countBySubjectId(Long subjectId);
 }

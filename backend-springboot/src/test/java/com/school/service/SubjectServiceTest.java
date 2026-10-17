@@ -15,6 +15,7 @@ import com.school.enums.TeacherStatus;
 import com.school.exception.BusinessException;
 import com.school.exception.ResourceNotFoundException;
 import com.school.mapper.SubjectMapper;
+import com.school.repository.ExamRepository;
 import com.school.repository.SubjectAssignmentRepository;
 import com.school.repository.SubjectRepository;
 import jakarta.servlet.http.HttpServletRequest;
@@ -63,9 +64,11 @@ import static org.mockito.Mockito.when;
  *   <li><b>Le doublon d'affectation est refuse AVANT tout chargement</b> : enseignant, matiere et classe
  *       ne sont meme pas resolus quand le triplet existe deja. Une erreur ici renverrait
  *       « Enseignant introuvable » au lieu du vrai motif.</li>
- *   <li><b>{@code delete} d'une matiere n'a AUCUNE garde</b>, contrairement a {@code ClassService.delete}
- *       (eleves) ou a la suppression d'un niveau (classes). Une matiere referencee par des notes ou des
- *       affectations part donc et laisse la base decider. Comportement epingle tel quel, pas souhaite.</li>
+ *   <li><b>{@code delete} d'une matiere refuse la suppression</b> quand des affectations
+ *       ({@code fk_sa_subject}, en CASCADE : elles disparaissaient sans un mot) ou des evaluations
+ *       ({@code fk_exams_subject}, en RESTRICT : 409 generique) y sont rattachees. L'ancien
+ *       comportement — suppression sans aucune verification — etait epingle par un test nomme
+ *       {@code deleteSupprimeSansGarde} ; il a ete remplace, pas supprime.</li>
  * </ol>
  *
  * <p>⚠️ {@code SubjectMapper} est un mock : {@code updateEntity()} ne fait <b>rien</b> par defaut. Il faut
@@ -74,7 +77,8 @@ import static org.mockito.Mockito.when;
  *
  * <p><b>Controles negatifs effectues</b> (copie de travail, jamais le depot) :
  * garde de doublon d'affectation retiree =&gt; 1 echec ; controle d'unicite du code retire =&gt; 1 echec ;
- * priorite {@code teacherId}/{@code classId} intervertie =&gt; 1 echec.
+ * priorite {@code teacherId}/{@code classId} intervertie =&gt; 1 echec ;
+ * garde anti-cascade de {@code delete} retiree =&gt; 2 echecs (affectations + evaluations).
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -85,6 +89,9 @@ class SubjectServiceTest {
 
     @Mock
     private SubjectAssignmentRepository assignmentRepository;
+
+    @Mock
+    private ExamRepository examRepository;
 
     @Mock
     private SubjectMapper subjectMapper;
@@ -316,8 +323,39 @@ class SubjectServiceTest {
     // ================================================================== suppression matiere
 
     @Test
-    @DisplayName("delete supprime et journalise, SANS aucune garde de reference")
-    void deleteSupprimeSansGarde() {
+    @DisplayName("delete refuse une matiere encore affectee a une classe/enseignant")
+    void deleteRefuseUneMatiereAffectee() {
+        Subject existante = matiere(1L, "Mathematiques", "MATH", 4);
+        when(subjectRepository.findById(1L)).thenReturn(Optional.of(existante));
+        when(assignmentRepository.countBySubjectId(1L)).thenReturn(2L);
+
+        assertThatThrownBy(() -> subjectService.delete(1L, httpRequest))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("2 affectation(s)");
+
+        // fk_sa_subject est en CASCADE : sans cette garde, les affectations partent avec.
+        verify(subjectRepository, never()).delete(any(Subject.class));
+        verifyNoInteractions(auditService);
+    }
+
+    @Test
+    @DisplayName("delete refuse une matiere portant des evaluations (et leurs notes)")
+    void deleteRefuseUneMatiereAvecEvaluations() {
+        Subject existante = matiere(1L, "Mathematiques", "MATH", 4);
+        when(subjectRepository.findById(1L)).thenReturn(Optional.of(existante));
+        when(examRepository.countBySubjectId(1L)).thenReturn(5L);
+
+        assertThatThrownBy(() -> subjectService.delete(1L, httpRequest))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("5 evaluation(s)");
+
+        verify(subjectRepository, never()).delete(any(Subject.class));
+        verifyNoInteractions(auditService);
+    }
+
+    @Test
+    @DisplayName("delete supprime et journalise quand rien n'est rattache")
+    void deleteSupprimeQuandRienNEstRattache() {
         Subject existante = matiere(1L, "Mathematiques", "MATH", 4);
         when(subjectRepository.findById(1L)).thenReturn(Optional.of(existante));
 
@@ -325,8 +363,6 @@ class SubjectServiceTest {
 
         verify(subjectRepository).delete(existante);
         verify(auditService).log(eq("DELETE"), eq("Subject"), eq(1L), contains("Mathematiques"), eq(httpRequest));
-        // Comportement epingle : aucune verification de notes ni d'affectations avant suppression.
-        verifyNoInteractions(assignmentRepository);
     }
 
     @Test

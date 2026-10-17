@@ -8,6 +8,7 @@ import com.school.entity.User;
 import com.school.enums.ContractType;
 import com.school.enums.Gender;
 import com.school.enums.TeacherStatus;
+import com.school.exception.BusinessException;
 import com.school.exception.ResourceNotFoundException;
 import com.school.mapper.TeacherMapper;
 import com.school.repository.TeacherRepository;
@@ -70,6 +71,27 @@ class TeacherServiceTest {
 
     @Mock
     private FileStorageService fileStorageService;
+
+    // Gardes anti-cascade de delete() : une table liee non vide doit bloquer
+    // la suppression, sinon la base detruit tout l'historique RH en cascade.
+    @Mock
+    private com.school.repository.ContractRepository contractRepository;
+    @Mock
+    private com.school.repository.PayrollRepository payrollRepository;
+    @Mock
+    private com.school.repository.TeacherMonthlyPaymentRepository monthlyPaymentRepository;
+    @Mock
+    private com.school.repository.TeacherWorkHourRepository workHourRepository;
+    @Mock
+    private com.school.repository.TeacherAttendanceRepository teacherAttendanceRepository;
+    @Mock
+    private com.school.repository.TeacherHourlyRateRepository hourlyRateRepository;
+    @Mock
+    private com.school.repository.LeaveRepository leaveRepository;
+    @Mock
+    private com.school.repository.SubjectAssignmentRepository subjectAssignmentRepository;
+    @Mock
+    private com.school.repository.ScheduleRepository scheduleRepository;
 
     @Mock
     private HttpServletRequest httpRequest;
@@ -501,6 +523,51 @@ class TeacherServiceTest {
                 .isInstanceOf(ResourceNotFoundException.class);
         verify(teacherRepository, never()).delete(any(Teacher.class));
         verifyNoInteractions(auditService);
+    }
+
+    // ------------------------------------------------- gardes anti-cascade
+
+    @Test
+    @DisplayName("delete refuse un enseignant dont l'historique RH serait detruit en cascade")
+    void deleteRefuseUnEnseignantAvecHistoriqueRh() {
+        Teacher existant = enseignant(7L, "Jean", "Kamdem", "ENS-2026-0001");
+        when(teacherRepository.findById(7L)).thenReturn(Optional.of(existant));
+        when(payrollRepository.countByTeacherId(7L)).thenReturn(12L);
+
+        assertThatThrownBy(() -> teacherService.delete(7L, httpRequest))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("12 enregistrement(s)")
+                .hasMessageContaining("INACTIVE");
+
+        verify(teacherRepository, never()).delete(any(Teacher.class));
+        verifyNoInteractions(auditService);
+    }
+
+    @Test
+    @DisplayName("delete refuse des qu'UNE SEULE table liee est non vide (contrat)")
+    void deleteRefuseSurUneSeuleTableLiee() {
+        Teacher existant = enseignant(7L, "Jean", "Kamdem", "ENS-2026-0001");
+        when(teacherRepository.findById(7L)).thenReturn(Optional.of(existant));
+        when(contractRepository.countByTeacherId(7L)).thenReturn(1L);
+
+        assertThatThrownBy(() -> teacherService.delete(7L, httpRequest))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("1 enregistrement(s)");
+
+        verify(teacherRepository, never()).delete(any(Teacher.class));
+    }
+
+    @Test
+    @DisplayName("delete supprime un enseignant sans aucun enregistrement lie")
+    void deleteSupprimeUnEnseignantSansHistorique() {
+        Teacher existant = enseignant(7L, "Jean", "Kamdem", "ENS-2026-0001");
+        when(teacherRepository.findById(7L)).thenReturn(Optional.of(existant));
+
+        teacherService.delete(7L, httpRequest);
+
+        verify(teacherRepository).delete(existant);
+        verify(auditService).log(eq("DELETE"), eq("Teacher"), eq(7L),
+                contains("Jean Kamdem"), eq(httpRequest));
     }
 
     // -------------------------------------------------------------- search / get

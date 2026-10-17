@@ -24,4 +24,11 @@ public interface PayrollRepository extends JpaRepository<Payroll, Long> {
     List<Payroll> search(@Param("teacherId") Long teacherId,
                          @Param("monthDate") LocalDate monthDate,
                          @Param("status") PayrollStatus status);
+
+
+    /**
+     * Garde anti-cascade : compte les enregistrements qui seraient detruits
+     * silencieusement avec le parent supprime.
+     */
+    long countByTeacherId(Long teacherId);
 }

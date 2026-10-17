@@ -12,4 +12,11 @@ public interface TeacherAttendanceRepository extends JpaRepository<TeacherAttend
     List<TeacherAttendance> findByDateOrderByTeacherLastNameAsc(LocalDate date);
 
     Optional<TeacherAttendance> findByTeacherIdAndDate(Long teacherId, LocalDate date);
+
+
+    /**
+     * Garde anti-cascade : compte les enregistrements qui seraient detruits
+     * silencieusement avec le parent supprime.
+     */
+    long countByTeacherId(Long teacherId);
 }

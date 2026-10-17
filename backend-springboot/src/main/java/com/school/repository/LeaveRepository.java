@@ -16,4 +16,11 @@ public interface LeaveRepository extends JpaRepository<Leave, Long> {
 
     @Query("SELECT l FROM Leave l WHERE (:teacherId IS NULL OR l.teacher.id = :teacherId) AND (:status IS NULL OR l.status = :status)")
     List<Leave> search(@Param("teacherId") Long teacherId, @Param("status") LeaveStatus status);
+
+
+    /**
+     * Garde anti-cascade : compte les enregistrements qui seraient detruits
+     * silencieusement avec le parent supprime.
+     */
+    long countByTeacherId(Long teacherId);
 }

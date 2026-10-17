@@ -18,4 +18,11 @@ public interface ContractRepository extends JpaRepository<Contract, Long> {
 
     @Query("SELECT c FROM Contract c WHERE (:teacherId IS NULL OR c.teacher.id = :teacherId) AND (:status IS NULL OR c.status = :status) ORDER BY c.startDate DESC")
     List<Contract> search(@Param("teacherId") Long teacherId, @Param("status") ContractStatus status);
+
+
+    /**
+     * Garde anti-cascade : compte les enregistrements qui seraient detruits
+     * silencieusement avec le parent supprime.
+     */
+    long countByTeacherId(Long teacherId);
 }

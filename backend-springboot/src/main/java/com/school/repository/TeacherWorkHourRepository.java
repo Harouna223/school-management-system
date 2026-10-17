@@ -103,4 +103,11 @@ public interface TeacherWorkHourRepository extends JpaRepository<TeacherWorkHour
     BigDecimal sumHoursOfTeacherOnDateExcluding(@Param("teacherId") Long teacherId,
                                                 @Param("date") LocalDate date,
                                                 @Param("excludeId") Long excludeId);
+
+
+    /**
+     * Garde anti-cascade : compte les enregistrements qui seraient detruits
+     * silencieusement avec le parent supprime.
+     */
+    long countByTeacherId(Long teacherId);
 }

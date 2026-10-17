@@ -10,6 +10,7 @@ import com.school.entity.SubjectAssignment;
 import com.school.exception.BusinessException;
 import com.school.exception.ResourceNotFoundException;
 import com.school.mapper.SubjectMapper;
+import com.school.repository.ExamRepository;
 import com.school.repository.SubjectAssignmentRepository;
 import com.school.repository.SubjectRepository;
 import jakarta.servlet.http.HttpServletRequest;
@@ -33,6 +34,7 @@ public class SubjectService {
 
     private final SubjectRepository subjectRepository;
     private final SubjectAssignmentRepository assignmentRepository;
+    private final ExamRepository examRepository;
     private final SubjectMapper subjectMapper;
     private final TeacherService teacherService;
     private final ClassService classService;
@@ -75,6 +77,19 @@ public class SubjectService {
     @Transactional
     public void delete(Long id, HttpServletRequest httpRequest) {
         Subject subject = findById(id);
+        // fk_sa_subject est en CASCADE : les affectations enseignant/classe
+        // disparaissaient sans un mot. fk_exams_subject est en RESTRICT, mais
+        // remontait un 409 generique au lieu d'un message metier.
+        long assignments = assignmentRepository.countBySubjectId(id);
+        if (assignments > 0) {
+            throw new BusinessException("Impossible de supprimer : " + assignments
+                    + " affectation(s) enseignant/classe sont rattachees a cette matiere.");
+        }
+        long exams = examRepository.countBySubjectId(id);
+        if (exams > 0) {
+            throw new BusinessException("Impossible de supprimer : " + exams
+                    + " evaluation(s) et leurs notes sont rattachees a cette matiere.");
+        }
         auditService.log("DELETE", "Subject", id, "Suppression matière " + subject.getName(), httpRequest);
         subjectRepository.delete(subject);
     }
