@@ -7,9 +7,11 @@ import com.school.entity.Notification;
 import com.school.entity.Role;
 import com.school.entity.User;
 import com.school.enums.NotificationType;
+import com.school.exception.BusinessException;
 import com.school.exception.ResourceNotFoundException;
 import com.school.repository.AnnouncementRepository;
 import com.school.repository.NotificationRepository;
+import com.school.repository.RoleRepository;
 import com.school.repository.UserRepository;
 import com.school.utils.SecurityUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -47,17 +49,18 @@ import static org.mockito.Mockito.when;
  * comptes desactives ne recoivent rien, un role cible filtre exactement, et l'absence de role cible
  * diffuse a tous les actifs.</p>
  *
- * <p>⚠️ Deux defauts constates, non corriges ici car ils changent le comportement :</p>
+ * <p>Deux defauts ont ete corriges et sont desormais verrouilles par des tests :</p>
  * <ol>
  *   <li><b>Depassement de colonne sur le titre.</b> {@code Notification.title} est
  *       {@code VARCHAR(150)} ; le service ecrit {@code "Nouvelle annonce : " + titre} (19 caracteres)
- *       alors que {@code AnnouncementRequest.title} autorise <b>200</b> caracteres. Un titre de 132 a
- *       200 caracteres produit donc 151 a 219 caracteres : MySQL leve « Data too long » et toute la
- *       transaction de creation est annulee. Le test {@code titreLong_...} fige ce defaut pour qu'il
- *       ne puisse pas etre oublie.</li>
- *   <li><b>{@code targetRole} n'est jamais valide.</b> La comparaison est sensible a la casse et a la
- *       valeur exacte : {@code "enseignant"} ou {@code "PROF"} creent une annonce que <i>personne</i>
- *       ne verra et ne recevra, sans aucune erreur.</li>
+ *       alors que {@code AnnouncementRequest.title} autorise <b>200</b>. Un titre de 132 a 200
+ *       caracteres produisait 151 a 219 caracteres : MySQL levait « Data too long » et annulait
+ *       toute la transaction. Le titre de la notification est desormais tronque a 150.</li>
+ *   <li><b>{@code targetRole} n'etait pas valide.</b> La comparaison etait sensible a la casse et a
+ *       la valeur exacte : {@code "enseignant"} ou {@code "PROF"} creaient une annonce que
+ *       <i>personne</i> ne voyait, sans erreur. Le role est maintenant resolu contre la table
+ *       {@code roles} (insensible a la casse) et stocke sous forme canonique ; un role inconnu
+ *       est refuse en 400.</li>
  * </ol>
  */
 @ExtendWith(MockitoExtension.class)
@@ -72,6 +75,8 @@ class AnnouncementServiceTest {
     @Mock
     private UserRepository userRepository;
     @Mock
+    private RoleRepository roleRepository;
+    @Mock
     private AuditService auditService;
     @Mock
     private HttpServletRequest httpRequest;
@@ -82,7 +87,7 @@ class AnnouncementServiceTest {
     @BeforeEach
     void setUp() {
         service = new AnnouncementService(announcementRepository, notificationRepository,
-                userRepository, auditService);
+                userRepository, roleRepository, auditService);
         security = mockStatic(SecurityUtils.class, CALLS_REAL_METHODS);
     }
 
@@ -148,6 +153,8 @@ class AnnouncementServiceTest {
     void create_enregistreLAnnonceAvecLesChampsEtLAuteur() {
         User auteur = utilisateur(1L, true, "DIRECTEUR");
         security.when(SecurityUtils::currentUser).thenReturn(auteur);
+        when(roleRepository.findByNameIgnoreCase("PARENT"))
+                .thenReturn(Optional.of(role("PARENT")));
         annonceSauveeAvecId(50L);
         when(userRepository.findAll()).thenReturn(List.of());
 
@@ -226,6 +233,8 @@ class AnnouncementServiceTest {
     @Test
     void create_avecRoleCible_neNotifieQueLesPorteursDeCeRole() {
         security.when(SecurityUtils::currentUser).thenReturn(utilisateur(1L, true, "DIRECTEUR"));
+        when(roleRepository.findByNameIgnoreCase("ENSEIGNANT"))
+                .thenReturn(Optional.of(role("ENSEIGNANT")));
         annonceSauveeAvecId(50L);
         when(userRepository.findAll()).thenReturn(List.of(
                 utilisateur(2L, true, "PARENT"),
@@ -240,30 +249,47 @@ class AnnouncementServiceTest {
     }
 
     @Test
-    void create_roleCibleSensibleALaCasse_aucuneNotification() {
-        // Caracterisation d'un DEFAUT : la comparaison est exacte et sensible a la casse.
-        // L'annonce est creee et auditee, mais "enseignant" ne correspond a aucun role.
+    void create_normaliseLeRoleCibleEnMajuscules() {
+        // "enseignant" doit etre resolu puis stocke sous la forme canonique "ENSEIGNANT" :
+        // la lecture filtre sur le nom exact, donc un role stocke en minuscules serait invisible.
         security.when(SecurityUtils::currentUser).thenReturn(utilisateur(1L, true, "DIRECTEUR"));
+        when(roleRepository.findByNameIgnoreCase("enseignant"))
+                .thenReturn(Optional.of(role("ENSEIGNANT")));
         annonceSauveeAvecId(50L);
         when(userRepository.findAll()).thenReturn(List.of(utilisateur(3L, true, "ENSEIGNANT")));
 
         service.create(requete("Rentree", "Cours le 5 octobre", "enseignant"), httpRequest);
 
-        verify(notificationRepository, never()).save(any(Notification.class));
-        verify(announcementRepository).save(any(Announcement.class));
+        ArgumentCaptor<Announcement> captor = ArgumentCaptor.forClass(Announcement.class);
+        verify(announcementRepository).save(captor.capture());
+        assertThat(captor.getValue().getTargetRole()).isEqualTo("ENSEIGNANT");
+        assertThat(notificationsEnvoyees(1))
+                .extracting(n -> n.getUser().getId())
+                .containsExactly(3L);
     }
 
     @Test
-    void create_roleCibleInexistant_annonceOrpheline() {
-        // Caracterisation du meme defaut avec une valeur inconnue : personne ne la verra,
-        // puisque la lecture filtre sur targetRole = role de l'utilisateur (ou null).
+    void create_refuseUnRoleCibleInconnu() {
+        security.when(SecurityUtils::currentUser).thenReturn(utilisateur(1L, true, "DIRECTEUR"));
+        when(roleRepository.findByNameIgnoreCase("PROF")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.create(requete("Rentree", "Cours", "PROF"), httpRequest))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("PROF");
+
+        verify(announcementRepository, never()).save(any(Announcement.class));
+        verify(notificationRepository, never()).save(any(Notification.class));
+    }
+
+    @Test
+    void create_sansRoleCible_neResoutAucunRole() {
         security.when(SecurityUtils::currentUser).thenReturn(utilisateur(1L, true, "DIRECTEUR"));
         annonceSauveeAvecId(50L);
-        when(userRepository.findAll()).thenReturn(List.of(utilisateur(3L, true, "ENSEIGNANT")));
+        when(userRepository.findAll()).thenReturn(List.of());
 
-        service.create(requete("Rentree", "Cours le 5 octobre", "PROF"), httpRequest);
+        service.create(requete("Rentree", "Cours", null), httpRequest);
 
-        verify(notificationRepository, never()).save(any(Notification.class));
+        verify(roleRepository, never()).findByNameIgnoreCase(any());
     }
 
     // ==================================================================
@@ -323,20 +349,32 @@ class AnnouncementServiceTest {
     }
 
     @Test
-    void titreLong_depasseLaColonneNotificationTitle() {
-        // CARACTERISATION D'UN DEFAUT CONNU — a inverser le jour du correctif.
-        // notifications.title est VARCHAR(150) ; le prefixe fait 19 caracteres, donc un titre de
-        // 132 caracteres (autorise : @Size(max = 200)) produit 151 caracteres.
-        // MySQL repond « Data too long for column 'title' » et annule TOUTE la creation.
+    void titreLong_estTronqueALaTailleDeLaColonne() {
+        // notifications.title est VARCHAR(150). Le titre maximal autorise (200) plus le prefixe
+        // de 19 caracteres donnerait 219 : sans troncature, MySQL annule toute la creation.
         security.when(SecurityUtils::currentUser).thenReturn(utilisateur(1L, true, "DIRECTEUR"));
         annonceSauveeAvecId(50L);
         when(userRepository.findAll()).thenReturn(List.of(utilisateur(2L, true, "PARENT")));
 
-        service.create(requete("T".repeat(132), "Cours", null), httpRequest);
+        service.create(requete("T".repeat(200), "Cours", null), httpRequest);
 
         assertThat(notificationsEnvoyees(1).get(0).getTitle())
-                .as("151 caracteres pour une colonne de 150 : depassement")
-                .hasSize(151);
+                .as("jamais plus que notifications.title (VARCHAR(150))")
+                .hasSize(150);
+    }
+
+    @Test
+    void titreDe131Caracteres_tientExactementDansLaColonne() {
+        // Frontiere : 19 + 131 = 150, donc aucune troncature ne doit s'appliquer.
+        security.when(SecurityUtils::currentUser).thenReturn(utilisateur(1L, true, "DIRECTEUR"));
+        annonceSauveeAvecId(50L);
+        when(userRepository.findAll()).thenReturn(List.of(utilisateur(2L, true, "PARENT")));
+
+        service.create(requete("T".repeat(131), "Cours", null), httpRequest);
+
+        assertThat(notificationsEnvoyees(1).get(0).getTitle())
+                .isEqualTo(PREFIXE + "T".repeat(131))
+                .hasSize(150);
     }
 
     // ==================================================================
