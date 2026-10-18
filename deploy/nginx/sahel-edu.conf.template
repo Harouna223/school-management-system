@@ -1,0 +1,88 @@
+# ============================================================
+# Sahel Edu - nginx hote, PHASE 2 (HTTPS)
+# Installe par deploy/https.sh une fois le certificat obtenu.
+#   Internet -> ce serveur (TLS) -> conteneur frontend 127.0.0.1:8081
+# Le conteneur frontend proxifie deja /api et /uploads vers le backend ;
+# ce bloc ne fait donc qu'un seul saut de proxy.
+#
+# Les parametres SSL sont ecrits explicitement : le fichier
+# /etc/letsencrypt/options-ssl-nginx.conf n'existe pas avec `certbot certonly`.
+# ============================================================
+
+upstream sahel_edu_frontend {
+    server 127.0.0.1:8081;
+    keepalive 32;
+}
+
+# Redirection HTTP -> HTTPS, en conservant la validation ACME.
+server {
+    listen 80;
+    listen [::]:80;
+    server_name __DOMAIN__;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+        default_type text/plain;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name __DOMAIN__;
+
+    access_log /var/log/nginx/sahel-edu.access.log;
+    error_log  /var/log/nginx/sahel-edu.error.log warn;
+
+    ssl_certificate     /etc/letsencrypt/live/__DOMAIN__/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/__DOMAIN__/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305;
+    ssl_prefer_server_ciphers off;
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_tickets off;
+
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # Videos pedagogiques : doit rester >= aux limites du backend
+    # (MAX_FILE_SIZE / COURSE_MAX_VIDEO_MB).
+    client_max_body_size 512m;
+
+    # --- API : uploads volumineux et lecture video (HTTP Range) ----------
+    # Pas de mise en tampon : nginx ne doit ni attendre la fin d'un
+    # televersement, ni reecrire Content-Range/Content-Length du backend.
+    location /api/ {
+        proxy_pass http://sahel_edu_frontend;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+
+        proxy_request_buffering off;
+        proxy_buffering off;
+        proxy_read_timeout 600s;
+        proxy_send_timeout 600s;
+        client_body_timeout 600s;
+    }
+
+    # --- Reste de l'application (SPA + fichiers statiques) ---------------
+    location / {
+        proxy_pass http://sahel_edu_frontend;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_read_timeout 120s;
+    }
+}

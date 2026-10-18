@@ -1,0 +1,17 @@
+# ============================================================
+# Normalisation des fins de ligne
+# ------------------------------------------------------------
+# Les scripts de deploiement sont executes sur LINUX. Un fichier en CRLF
+# produit `bad interpreter: /bin/bash^M` (ou un mot de passe lu avec un
+# retour chariot, cf. deploy/backup.sh). Ces regles forcent LF dans le
+# depot, quel que soit core.autocrlf sur la machine de developpement.
+#
+# Regles ciblees volontairement : pas de `* text=auto` global, qui
+# renormaliserait tout le depot d'un coup.
+# ============================================================
+
+*.sh              text eol=lf
+deploy/**         text eol=lf
+docker/.env*      text eol=lf
+docker/*.conf     text eol=lf
+docker/*.yml      text eol=lf

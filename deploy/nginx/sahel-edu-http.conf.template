@@ -1,0 +1,21 @@
+# ============================================================
+# Sahel Edu - nginx hote, PHASE 1 (HTTP seul)
+# Utilise par deploy/https.sh AVANT l'obtention du certificat : il doit
+# exister un serveur HTTP joignable sur /.well-known/acme-challenge/ pour
+# que Let's Encrypt valide le domaine.
+# ============================================================
+server {
+    listen 80;
+    listen [::]:80;
+    server_name __DOMAIN__;
+
+    # Validation ACME : ce bloc est prioritaire sur la redirection.
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+        default_type text/plain;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}

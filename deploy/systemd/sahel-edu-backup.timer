@@ -1,0 +1,14 @@
+[Unit]
+Description=Sahel Edu - declenchement de la sauvegarde quotidienne (02:30)
+
+[Timer]
+OnCalendar=*-*-* 02:30:00
+# Si le serveur etait eteint a l'heure prevue, la sauvegarde est rattrapee
+# au demarrage suivant.
+Persistent=true
+# Decalage aleatoire : evite de taper sur le disque a la seconde pres.
+RandomizedDelaySec=300
+Unit=sahel-edu-backup.service
+
+[Install]
+WantedBy=timers.target

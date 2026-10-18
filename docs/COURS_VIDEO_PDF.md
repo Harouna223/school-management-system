@@ -280,6 +280,11 @@ une archive de sauvegarde non chiffrée.
 
 ## 9. Accès réseau local et Internet
 
+> La procédure complète d'installation du serveur (script, systemd, TLS
+> Let's Encrypt, pare-feu, sauvegarde hors site) est dans
+> [DEPLOIEMENT_UBUNTU.md](DEPLOIEMENT_UBUNTU.md). Ce qui suit ne couvre que
+> les points spécifiques au module cours.
+
 ### Réseau local
 
 1. Réserver une **IP fixe** pour le serveur (bail DHCP statique sur le routeur,

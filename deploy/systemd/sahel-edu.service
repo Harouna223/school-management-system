@@ -1,0 +1,26 @@
+[Unit]
+Description=Sahel Edu - pile Docker Compose (frontend, backend, MySQL)
+Documentation=file:///opt/sahel-edu/docs/DEPLOIEMENT_UBUNTU.md
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/sahel-edu
+# `up` sans -d : le processus reste au premier plan, systemd suit l'etat de
+# la pile et journalise les sorties. Les conteneurs ont deja
+# `restart: unless-stopped` pour survivre a un crash individuel.
+ExecStart=/usr/bin/docker compose -f docker/docker-compose.yml up --remove-orphans
+ExecReload=/usr/bin/docker compose -f docker/docker-compose.yml up -d --remove-orphans
+ExecStop=/usr/bin/docker compose -f docker/docker-compose.yml stop
+Restart=on-failure
+RestartSec=30
+TimeoutStartSec=900
+TimeoutStopSec=240
+# `docker compose stop` arrete proprement les conteneurs ; ne pas tuer le
+# processus avant qu'il ait termine.
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target

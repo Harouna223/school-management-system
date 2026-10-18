@@ -102,7 +102,9 @@ services:
     depends_on:
       - backend
     ports:
-      - "${FRONTEND_PORT:-80}:80"
+      # FRONTEND_BIND=127.0.0.1 quand un nginx hôte termine le TLS
+      # (deploy/https.sh) ; 0.0.0.0 pour un accès direct en HTTP sur le LAN.
+      - "${FRONTEND_BIND:-0.0.0.0}:${FRONTEND_PORT:-80}:80"
 
   # Sauvegarde automatique de la base (dump quotidien, rétention 14 jours)
   db-backup:

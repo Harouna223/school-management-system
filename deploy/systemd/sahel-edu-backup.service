@@ -1,0 +1,15 @@
+[Unit]
+Description=Sahel Edu - sauvegarde quotidienne (base de donnees + fichiers pedagogiques)
+Documentation=file:///opt/sahel-edu/docs/DEPLOIEMENT_UBUNTU.md
+Requires=docker.service
+After=docker.service sahel-edu.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/sahel-edu-backup
+# Priorite basse : la sauvegarde ne doit pas concurrencer les utilisateurs.
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+# Une sauvegarde lente ne doit pas etre tuee au bout de 90 s (defaut systemd).
+TimeoutStartSec=3600
