@@ -28,8 +28,8 @@
 --    peut exister en brouillon sans fichier, et MySQL autorise
 --    plusieurs NULL dans un index unique.
 --  * Aucun fichier n'est stocké en base : la colonne
---    `storage_filename` porte le chemin RELATIF sous
---    `${UPLOAD_DIR}/courses/`. Le binaire vit sur le volume
+--    `storage_filename` porte le chemin RELATIF sous le repertoire
+--    UPLOAD_DIR (sous-dossier courses/). Le binaire vit sur le volume
 --    persistant monté sur l'hôte (/srv/sahel-edu/uploads).
 --
 -- La migration est IDEMPOTENTE (IF NOT EXISTS / INSERT IGNORE).

@@ -57,6 +57,19 @@ public class CourseFileStorageService {
     private static final Set<String> VIDEO_MIME = Set.of("video/mp4", "video/webm");
     private static final Set<String> PDF_MIME = Set.of("application/pdf", "application/x-pdf");
 
+    /**
+     * Types MIME « génériques » : ils n'apportent AUCUNE information sur le
+     * contenu et sont fréquemment envoyés par des clients qui ne connaissent pas
+     * l'extension (curl, certaines moulinettes, navigateurs sur poste dont le
+     * registre n'associe pas .mp4). Les refuser bloquerait un fichier pourtant
+     * valide : dans ce cas, c'est la signature binaire qui fait foi.
+     */
+    private static final Set<String> GENERIC_MIME = Set.of(
+            "application/octet-stream",
+            "binary/octet-stream",
+            "application/binary",
+            "application/unknown");
+
     private static final Map<String, String> MIME_BY_EXT = Map.of(
             EXT_PDF, "application/pdf",
             EXT_MP4, "video/mp4",
@@ -254,6 +267,9 @@ public class CourseFileStorageService {
             return; // certains clients n'annoncent aucun type : la signature suffit
         }
         String declared = contentType.toLowerCase(Locale.ROOT).split(";")[0].trim();
+        if (GENERIC_MIME.contains(declared)) {
+            return; // type générique : seule la signature binaire est significative
+        }
         boolean ok = EXT_PDF.equals(extension)
                 ? PDF_MIME.contains(declared)
                 : VIDEO_MIME.contains(declared);

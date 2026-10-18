@@ -172,6 +172,22 @@ class CourseFileStorageServiceTest {
     }
 
     @Test
+    @DisplayName("Un type MIME générique (octet-stream) n'empêche pas d'accepter une vidéo valide")
+    void mimeGenerique_estAccepte() {
+        // Cas réel : curl (et certains navigateurs) envoient application/octet-stream
+        // pour un .mp4. Refuser ici bloquerait un fichier pourtant valide, alors que
+        // la signature binaire, elle, est formelle.
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "lecon.mp4", "application/octet-stream", mp4Bytes());
+
+        CourseFileStorageService.StoredFile stored =
+                service.store(file, CourseResourceType.VIDEO, 3L);
+
+        assertThat(stored.extension()).isEqualTo("mp4");
+        assertThat(stored.mimeType()).isEqualTo("video/mp4");
+    }
+
+    @Test
     @DisplayName("Un fichier au-delà de la limite PDF est refusé avec sa taille réelle")
     void fichierTropVolumineux_estRefuse() {
         properties.getCourses().setMaxPdfMb(1);
