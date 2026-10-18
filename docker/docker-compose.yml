@@ -18,7 +18,10 @@ services:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
     ports:
-      - "${DB_PORT:-3306}:3306"
+      # ⚠️ Écoute UNIQUEMENT sur la boucle locale de l'hôte : la base ne doit
+      # jamais être joignable depuis le réseau de l'établissement ni Internet.
+      # Pour une inspection locale : mysql -h 127.0.0.1 -P ${DB_PORT:-3306}.
+      - "127.0.0.1:${DB_PORT:-3306}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ../database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
@@ -49,6 +52,12 @@ services:
       OPEN_IN_VIEW: ${OPEN_IN_VIEW:-false}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
       UPLOAD_DIR: /app/uploads
+      # Module « Cours et ressources » : limites et durée de vie des jetons.
+      COURSE_MAX_VIDEO_MB: ${COURSE_MAX_VIDEO_MB:-500}
+      COURSE_MAX_PDF_MB: ${COURSE_MAX_PDF_MB:-25}
+      COURSE_TOKEN_TTL_MINUTES: ${COURSE_TOKEN_TTL_MINUTES:-120}
+      MAX_FILE_SIZE: ${MAX_FILE_SIZE:-512MB}
+      MAX_REQUEST_SIZE: ${MAX_REQUEST_SIZE:-512MB}
       SCHOOL_NAME: ${SCHOOL_NAME:-École Moderne de Technologie}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin@123}
       WA_ENABLED: ${WA_ENABLED:-false}
@@ -67,9 +76,16 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME:-}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
     volumes:
-      - uploads_data:/app/uploads
+      # ⚠️ Les fichiers pédagogiques vivent sur l'HÔTE, pas dans la couche du
+      # conteneur : un redémarrage, une mise à jour ou une reconstruction
+      # d'image ne perd rien. Le répertoire doit exister et appartenir à
+      # l'utilisateur qui administre la pile (voir docs/COURS_VIDEO_PDF.md).
+      - ${UPLOAD_HOST_DIR:-/srv/sahel-edu/uploads}:/app/uploads
     ports:
-      - "8080:8080"
+      # Le backend n'est joignable que depuis la boucle locale : le frontend
+      # l'atteint par le réseau interne Docker (backend:8080) et nginx proxifie
+      # /api. Ce port publié ne sert qu'au diagnostic local.
+      - "127.0.0.1:${BACKEND_PORT:-8080}:8080"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/actuator/health/liveness"]
       interval: 30s
@@ -100,17 +116,22 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-root}
     volumes:
       - backup_data:/backups
+      # Vidéos et PDF : archivés avec la base dans les mêmes sauvegardes.
+      - ${UPLOAD_HOST_DIR:-/srv/sahel-edu/uploads}:/uploads:ro
     command:
       - /bin/sh
       - -c
       - |
         while true; do
           mysqldump -h mysql -uroot -p"$$DB_PASSWORD" --single-transaction --routines --triggers school_management > /backups/backup-$$(date +%Y%m%d-%H%M).sql && echo "[backup] sauvegarde effectuée : backup-$$(date +%Y%m%d-%H%M).sql" || echo "[backup] ECHEC de la sauvegarde"
-          find /backups -name 'backup-*.sql' -mtime +14 -delete
+          tar czf /backups/uploads-$$(date +%Y%m%d-%H%M).tar.gz -C /uploads . && echo "[backup] fichiers pédagogiques archivés" || echo "[backup] ECHEC de l'archivage des fichiers"
+          find /backups \( -name 'backup-*.sql' -o -name 'uploads-*.tar.gz' \) -mtime +14 -delete
           sleep 86400
         done
 
 volumes:
   mysql_data:
+  # Conservé pour ne pas perdre les fichiers des installations antérieures :
+  # le backend n'écrit plus dans ce volume mais dans ${UPLOAD_HOST_DIR}.
   uploads_data:
   backup_data:

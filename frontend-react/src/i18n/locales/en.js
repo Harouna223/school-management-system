@@ -34,6 +34,8 @@ export const en = {
   'nav.expenses': 'Expenses',
   'nav.teacherPayroll': 'Teacher payroll',
   'nav.library': 'Library',
+  'nav.courses': 'Courses & resources',
+  'nav.myCourses': 'Courses & resources',
   'nav.hr': 'Human Resources',
   'nav.messages': 'Messages',
   'nav.announcements': 'Announcements',
@@ -101,7 +103,6 @@ export const en = {
   'login.usernameRequired': 'Username is required',
   'login.passwordRequired': 'Password is required',
   'login.success': 'Signed in successfully, welcome!',
-  'login.encrypted': 'Encrypted connection — Default account: admin / Admin@123',
   'login.error': 'Invalid username or password',
   'login.locked': 'Account temporarily locked',
 

@@ -35,6 +35,10 @@ const palette = {
   RADIATED: 'error',
   JUSTIFIED: 'info',
   ON_LEAVE: 'warning',
+  // Cours et ressources
+  PUBLISHED: 'success',
+  DRAFT: 'default',
+  ARCHIVED: 'warning',
 }
 
 const tones = {

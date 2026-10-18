@@ -3,6 +3,7 @@ package com.school.service;
 import com.school.dto.request.StudentRequest;
 import com.school.dto.response.StudentImportResult;
 import com.school.enums.Gender;
+import com.school.exception.BusinessException;
 import com.school.repository.SchoolClassRepository;
 import com.school.repository.StudentRepository;
 import jakarta.servlet.http.HttpServletRequest;
@@ -39,6 +40,9 @@ import java.util.Set;
 public class StudentImportService {
 
     private static final Logger log = LoggerFactory.getLogger(StudentImportService.class);
+
+    /** Limite propre à l'import Excel (la limite multipart globale sert aux vidéos). */
+    private static final long MAX_IMPORT_BYTES = 10L * 1024 * 1024;
 
     private final StudentRepository studentRepository;
     private final SchoolClassRepository schoolClassRepository;
@@ -97,6 +101,14 @@ public class StudentImportService {
      */
     @Transactional
     public StudentImportResult importFromExcel(MultipartFile file, HttpServletRequest httpRequest) {
+        // La limite multipart globale a été portée à 512 Mo pour les vidéos :
+        // sans ce garde, un .xlsx démesuré serait chargé entièrement par POI.
+        if (file == null || file.isEmpty()) {
+            throw new BusinessException("Fichier Excel manquant ou vide");
+        }
+        if (file.getSize() > MAX_IMPORT_BYTES) {
+            throw new BusinessException("Fichier Excel trop volumineux (max 10 Mo)");
+        }
         List<StudentImportResult.RowError> errors = new ArrayList<>();
         int total = 0;
         int imported = 0;

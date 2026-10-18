@@ -430,3 +430,47 @@ export const userApi = {
   unlock: (id) => api.post(`/users/${id}/unlock`),
   resetPassword: (id, newPassword) => api.post(`/users/${id}/reset-password`, { newPassword }),
 }
+
+/**
+ * Endpoints du module « Cours et ressources » (vidéos + PDF).
+ *
+ * Les fichiers ne sont jamais servis par une URL publique : `token()` délivre
+ * un jeton court, puis `streamUrl` / `previewUrl` / `downloadUrl` construisent
+ * l'URL à mettre dans `<video>`, `<iframe>` ou un lien de téléchargement —
+ * contextes où l'en-tête Authorization est impossible.
+ */
+export const courseApi = {
+  search: (params) => api.get('/courses', { params }),
+  get: (id) => api.get(`/courses/${id}`),
+  options: () => api.get('/courses/options'),
+  create: (data) => api.post('/courses', data),
+  update: (id, data) => api.put(`/courses/${id}`, data),
+  changeStatus: (id, status) => api.patch(`/courses/${id}/status`, null, { params: { status } }),
+  remove: (id) => api.delete(`/courses/${id}`),
+  token: (id, purpose) => api.get(`/courses/${id}/token`, { params: { purpose } }),
+  upload: (id, file, onProgress) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.post(`/courses/${id}/file`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      // Une vidéo peut être longue à envoyer : pas de délai d'expiration client.
+      timeout: 0,
+      onUploadProgress: (event) => {
+        if (onProgress && event.total) {
+          onProgress(Math.round((event.loaded * 100) / event.total))
+        }
+      },
+    })
+  },
+}
+
+const apiBase = import.meta.env.VITE_API_URL || '/api'
+
+/** URL de lecture vidéo (HTTP Range) valable le temps du jeton. */
+export const courseStreamUrl = (id, token) => `${apiBase}/courses/${id}/stream?token=${encodeURIComponent(token)}`
+
+/** URL de consultation PDF en ligne. */
+export const coursePreviewUrl = (id, token) => `${apiBase}/courses/${id}/preview?token=${encodeURIComponent(token)}`
+
+/** URL de téléchargement contrôlé. */
+export const courseDownloadUrl = (id, token) => `${apiBase}/courses/${id}/download?token=${encodeURIComponent(token)}`

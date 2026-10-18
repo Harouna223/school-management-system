@@ -37,6 +37,8 @@ const PaymentsPage = lazy(() => import('../pages/payments/PaymentsPage'))
 const FeeTypesPage = lazy(() => import('../pages/payments/FeeTypesPage'))
 const ExpensesPage = lazy(() => import('../pages/expenses/ExpensesPage'))
 const LibraryPage = lazy(() => import('../pages/library/LibraryPage'))
+const CoursesPage = lazy(() => import('../pages/courses/CoursesPage'))
+const StudentCoursesPage = lazy(() => import('../pages/courses/StudentCoursesPage'))
 const TeacherPayrollPage = lazy(() => import('../pages/payroll/TeacherPayrollPage'))
 const HrPage = lazy(() => import('../pages/hr/HrPage'))
 const MessagesPage = lazy(() => import('../pages/messages/MessagesPage'))
@@ -107,6 +109,10 @@ export default function AppRoutes() {
 
               {/* Services */}
               <Route path="/library" element={<RoleRoute roles={['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE']}><LibraryPage /></RoleRoute>} />
+              {/* Cours vidéo et PDF : gestion par l'administration et les enseignants */}
+              <Route path="/courses" element={<RoleRoute roles={['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE', 'ENSEIGNANT']}><CoursesPage /></RoleRoute>} />
+              {/* Catalogue de l'élève : ressources publiées de SA classe uniquement */}
+              <Route path="/my-courses" element={<RoleRoute roles={['ELEVE']}><StudentCoursesPage /></RoleRoute>} />
               <Route path="/hr" element={<RoleRoute roles={['SUPER_ADMIN', 'DIRECTEUR', 'COMPTABLE']}><HrPage /></RoleRoute>} />
               <Route path="/reports" element={<RoleRoute roles={['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE', 'COMPTABLE', 'ENSEIGNANT']}><ReportsPage /></RoleRoute>} />
               <Route path="/messages" element={<MessagesPage />} />

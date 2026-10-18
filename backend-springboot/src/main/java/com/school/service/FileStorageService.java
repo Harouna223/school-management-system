@@ -39,6 +39,14 @@ public class FileStorageService {
 
     private static final int MAGIC_BYTES = 4;
 
+    /**
+     * Limite propre aux images : la limite multipart globale a été portée à
+     * 512 Mo pour les vidéos pédagogiques. Sans ce garde, une « image » de
+     * plusieurs centaines de mégaoctets passerait la validation d'octets
+     * magiques et remplirait le disque.
+     */
+    private static final long MAX_IMAGE_BYTES = 5L * 1024 * 1024;
+
     private static final String FORMAT_INVALIDE =
             "Le fichier ne correspond pas à un format image valide (JPEG, PNG, WebP, GIF)";
 
@@ -47,6 +55,9 @@ public class FileStorageService {
     public String store(MultipartFile file, String subDir) {
         if (file == null || file.isEmpty()) {
             return null;
+        }
+        if (file.getSize() > MAX_IMAGE_BYTES) {
+            throw new BusinessException("Image trop volumineuse (max 5 Mo)");
         }
         if (!ALLOWED_MIME.contains(file.getContentType())) {
             throw new BusinessException("Type de fichier non autorisé (images uniquement)");

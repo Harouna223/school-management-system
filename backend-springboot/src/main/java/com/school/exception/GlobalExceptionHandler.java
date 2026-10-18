@@ -85,7 +85,10 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ApiResponse<Void>> handleUploadSize(MaxUploadSizeExceededException ex,
                                                               HttpServletRequest request) {
-        return build(HttpStatus.PAYLOAD_TOO_LARGE, "Fichier trop volumineux (max 5 Mo)", request);
+        // Message volontairement générique : la limite dépend du type de fichier
+        // (vidéo ou PDF) et de la configuration, pas d'une valeur fixe.
+        return build(HttpStatus.PAYLOAD_TOO_LARGE,
+                "Fichier trop volumineux : la limite autorisée est dépassée", request);
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)

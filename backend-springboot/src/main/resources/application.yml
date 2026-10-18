@@ -34,8 +34,12 @@ spring:
             enable: true
   servlet:
     multipart:
-      max-file-size: 5MB
-      max-request-size: 10MB
+      # Limite globale portée au maximum utile (vidéos pédagogiques).
+      # Les limites par nature de fichier restent appliquées par
+      # CourseFileStorageService (app.courses.max-video-mb / max-pdf-mb) :
+      # une photo reste refusée par sa liste blanche d'octets magiques.
+      max-file-size: ${MAX_FILE_SIZE:512MB}
+      max-request-size: ${MAX_REQUEST_SIZE:512MB}
   # PHASE 7 — Migrations de schema (Flyway).
   # Flyway est la SOURCE DE VERITE du schema ; Hibernate se contente de valider.
   # baseline-on-migrate : une base existante sans historique recoit un historique
@@ -52,6 +56,10 @@ spring:
 
 server:
   port: ${SERVER_PORT:8080}
+  tomcat:
+    # Un envoi trop volumineux doit produire un 413 JSON lisible, pas une
+    # connexion coupée : Tomcat doit absorber le corps restant avant de répondre.
+    max-swallow-size: ${MAX_SWALLOW_SIZE:512MB}
   error:
     include-message: never
 
@@ -82,6 +90,11 @@ app:
     twilio-sid: ${SMS_TWILIO_SID:${WA_TWILIO_SID:}}
     twilio-token: ${SMS_TWILIO_TOKEN:${WA_TWILIO_TOKEN:}}
     twilio-from: ${SMS_TWILIO_FROM:}
+  # Module « Cours et ressources » (vidéos + PDF).
+  courses:
+    max-video-mb: ${COURSE_MAX_VIDEO_MB:500}
+    max-pdf-mb: ${COURSE_MAX_PDF_MB:25}
+    stream-token-ttl-minutes: ${COURSE_TOKEN_TTL_MINUTES:120}
   admin:
     username: admin
     password: ${ADMIN_PASSWORD:Admin@123}

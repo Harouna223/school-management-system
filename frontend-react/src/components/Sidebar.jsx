@@ -16,6 +16,8 @@ import {
   Payments as PaymentsIcon,
   AccountBalanceWallet as FinanceIcon,
   LocalLibrary as LibraryIcon,
+  VideoLibrary as CoursesIcon,
+  PlayLesson as MyCoursesIcon,
   Group as HrIcon,
   Notifications as MessagesIcon,
   Campaign as AnnouncementsIcon,
@@ -91,6 +93,7 @@ const NAV_GROUPS = [
       { key: 'memoires', label: 'nav.memoires', icon: <EditNoteIcon />, to: '/memoires', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE', 'ENSEIGNANT'], requires: 'university' },
       { key: 'alumni', label: 'nav.alumni', icon: <EditNoteIcon />, to: '/alumni', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE'], requires: 'university' },
       { key: 'reports', label: 'nav.reports', icon: <ReportsIcon />, to: '/reports', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE', 'COMPTABLE', 'ENSEIGNANT'], requires: 'school' },
+      { key: 'courses', label: 'nav.courses', icon: <CoursesIcon />, to: '/courses', roles: ['SUPER_ADMIN', 'DIRECTEUR', 'SECRETAIRE', 'ENSEIGNANT'], requires: 'school' },
     ],
   },
   {
@@ -116,6 +119,7 @@ const NAV_GROUPS = [
     items: [
       { key: 'children', label: 'nav.children', icon: <ChildrenIcon />, to: '/my-children', roles: ['PARENT'], requires: 'school' },
       { key: 'my-school', label: 'nav.my-school', icon: <StudentsIcon />, to: '/my-school', roles: ['ELEVE'], requires: 'school' },
+      { key: 'my-courses', label: 'nav.myCourses', icon: <MyCoursesIcon />, to: '/my-courses', roles: ['ELEVE'], requires: 'school' },
       { key: 'my-teaching', label: 'nav.my-teaching', icon: <TeachersIcon />, to: '/my-teaching', roles: ['ENSEIGNANT'], requires: 'school' },
     ],
   },

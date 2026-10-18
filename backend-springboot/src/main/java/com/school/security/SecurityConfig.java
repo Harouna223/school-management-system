@@ -92,6 +92,17 @@ public class SecurityConfig {
                         .hasAnyAuthority("PERM_HOURS_WRITE")
                         .requestMatchers(HttpMethod.GET, "/api/library/**").hasAnyAuthority("PERM_LIBRARY_READ")
                         .requestMatchers("/api/library/**").hasAnyAuthority("PERM_LIBRARY_WRITE")
+                        // Cours et ressources : les trois endpoints binaires sont ouverts au
+                        // porteur d'un jeton de lecture — un <video> ou un <iframe> ne peut pas
+                        // envoyer l'en-tête Authorization. Le jeton est signé, court, limité à
+                        // une ressource et à un usage, et les droits réels sont revalidés dans
+                        // CourseResourceService.resolveFile à chaque requête.
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/courses/*/stream",
+                                "/api/courses/*/preview",
+                                "/api/courses/*/download").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/courses/**").hasAnyAuthority("PERM_COURSE_READ")
+                        .requestMatchers("/api/courses/**").hasAnyAuthority("PERM_COURSE_WRITE")
                         .requestMatchers(HttpMethod.GET, "/api/communication/**").hasAnyAuthority("PERM_COMMUNICATION_READ")
                         .requestMatchers("/api/communication/**").hasAnyAuthority("PERM_COMMUNICATION_WRITE")
                         // Recherche globale : réservée aux rôles d'administration (expose données personnelles et financières)

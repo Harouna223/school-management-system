@@ -5,14 +5,13 @@ import {
   TextField,
   Button,
   Alert,
-  Box,
   InputAdornment,
   IconButton,
   Typography,
   CircularProgress,
   Divider,
 } from '@mui/material'
-import { Visibility, VisibilityOff, Lock, Person, ShieldOutlined } from '@mui/icons-material'
+import { Visibility, VisibilityOff, Lock, Person } from '@mui/icons-material'
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { login } from '../../redux/slices/authSlice'
@@ -132,13 +131,6 @@ export default function LoginPage() {
               {t('login.secureArea')}
             </Typography>
           </Divider>
-
-          <Box display="flex" alignItems="center" justifyContent="center" gap={0.8}>
-            <ShieldOutlined sx={{ fontSize: 15, color: 'success.main' }} />
-            <Typography variant="caption" color="text.secondary">
-              {t('login.encrypted')}
-            </Typography>
-          </Box>
         </Form>
       )}
     </Formik>
