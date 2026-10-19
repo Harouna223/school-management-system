@@ -320,6 +320,10 @@ public class CourseResourceService {
         User user = currentUser();
         assertCanRead(resource, user);
         requireFileForPurpose(resource, purpose);
+        // Le refus doit tomber ICI, pas seulement au moment du téléchargement :
+        // sans ce controle, l'interface recevait un jeton valide pour une
+        // ressource « consultation seule » et n'echouait qu'ensuite.
+        requireDownloadAllowed(resource, purpose);
 
         long ttl = tokenService.ttlSeconds();
         String token = tokenService.issue(resource.getId(), user.getId(), purpose, ttl);
@@ -349,10 +353,19 @@ public class CourseResourceService {
                 .orElseThrow(() -> new BusinessException("Compte associé au lien introuvable"));
         assertCanRead(resource, user);
         requireFileForPurpose(resource, purpose);
+        requireDownloadAllowed(resource, purpose);
+        return new FileAccess(resource, storageService.resolve(resource.getStorageFilename()));
+    }
+
+    /**
+     * Règle unique du téléchargement, appliquée à l'émission du jeton COMME à
+     * l'accès au fichier : une seule définition, donc aucun chemin qui
+     * contournerait l'autre.
+     */
+    private void requireDownloadAllowed(CourseResource resource, String purpose) {
         if (CourseAccessTokenService.PURPOSE_DOWNLOAD.equals(purpose) && !resource.isDownloadable()) {
             throw new BusinessException("Le téléchargement de cette ressource n'est pas autorisé");
         }
-        return new FileAccess(resource, storageService.resolve(resource.getStorageFilename()));
     }
 
     private void requireFileForPurpose(CourseResource resource, String purpose) {

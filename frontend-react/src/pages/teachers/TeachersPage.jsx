@@ -29,6 +29,7 @@ export default function TeachersPage() {
   const [page, setPage] = useState(0)
   const [size, setSize] = useState(10)
   const [search, setSearch] = useState('')
+  const [searchInput, setSearchInput] = useState('')
   const [status, setStatus] = useState('')
   const [toDelete, setToDelete] = useState(null)
 
@@ -53,10 +54,21 @@ export default function TeachersPage() {
     }
   }
 
+  // Recherche différée : une requête par pause de frappe, retour en page 0.
+  // `search` était ABSENT des dépendances : taper puis Entrée depuis la page 2
+  // rechargeait la page 2 des résultats filtrés (tableau vide à tort).
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(searchInput.trim())
+      setPage(0)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchInput])
+
   useEffect(() => {
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, size, status])
+  }, [page, size, status, search])
 
   const handleDelete = async () => {
     try {
@@ -134,9 +146,14 @@ export default function TeachersPage() {
               size="small"
               fullWidth
               label="Rechercher (nom, matricule...)"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && load()}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setSearch(searchInput.trim())
+                  setPage(0)
+                }
+              }}
             />
           </Grid>
           <Grid item xs={12} md={3}>

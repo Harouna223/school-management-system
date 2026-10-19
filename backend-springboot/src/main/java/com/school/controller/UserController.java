@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Max;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -36,6 +37,7 @@ public class UserController {
     public ResponseEntity<ApiResponse<PageResponse<UserResponse>>> search(
             @RequestParam(required = false) String search,
             @Min(value = 0, message = "Le numéro de page ne peut pas être négatif") @RequestParam(defaultValue = "0") int page,
+            @Max(value = 100, message = "La taille de page ne peut pas dépasser 100")
             @RequestParam(defaultValue = "10") int size) {
         return ok("Utilisateurs", userService.search(search, page, size));
     }

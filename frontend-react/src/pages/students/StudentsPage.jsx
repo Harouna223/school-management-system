@@ -48,6 +48,9 @@ export default function StudentsPage() {
   const [page, setPage] = useState(0)
   const [size, setSize] = useState(10)
   const [search, setSearch] = useState(searchParams.get('search') || '')
+  // Texte saisi et texte APPLIQUÉ sont distincts : la recherche part après une
+  // courte pause (au lieu d'une requête par frappe) et toujours depuis la page 0.
+  const [searchInput, setSearchInput] = useState(searchParams.get('search') || '')
   const [classId, setClassId] = useState('')
   const [status, setStatus] = useState('')
   const [cycle, setCycle] = useState('')
@@ -64,6 +67,7 @@ export default function StudentsPage() {
     const s = searchParams.get('search')
     if (s !== null) {
       setSearch(s)
+      setSearchInput(s)
       setPage(0)
     }
   }, [searchParams])
@@ -100,10 +104,22 @@ export default function StudentsPage() {
     classApi.all().then((res) => setClasses(res.data.data)).catch(() => {})
   }, [])
 
+  // Recherche différée (300 ms) : une requête par pause de frappe, et retour
+  // systématique en page 0. Sans cela, chercher depuis la page 3 demandait la
+  // page 3 du résultat filtré et affichait « aucun résultat » à tort.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(searchInput.trim())
+      setPage(0)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchInput])
+
   useEffect(() => {
     load()
+    // `load` n'est pas mémoïsé : seule la liste des filtres est déclarative.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, size, classId, status, cycle])
+  }, [page, size, classId, status, cycle, search])
 
   const handleExport = async (type) => {
     try {
@@ -355,9 +371,14 @@ export default function StudentsPage() {
               size="small"
               fullWidth
               label="Rechercher (nom, matricule...)"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && load()}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setSearch(searchInput.trim())
+                  setPage(0)
+                }
+              }}
             />
           </Grid>
           <Grid item xs={6} md={2}>

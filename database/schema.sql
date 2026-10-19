@@ -677,7 +677,7 @@ CREATE TABLE teacher_month_closures (
 CREATE TABLE announcements (
   id BIGINT NOT NULL AUTO_INCREMENT,
   title VARCHAR(200) NOT NULL,
-  content TEXT NOT NULL,
+  content MEDIUMTEXT NOT NULL,
   target_role VARCHAR(20),
   pinned BOOLEAN NOT NULL DEFAULT FALSE,
   created_by BIGINT,

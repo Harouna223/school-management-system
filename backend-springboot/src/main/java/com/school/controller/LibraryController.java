@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Max;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -38,6 +39,7 @@ public class LibraryController {
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String category,
             @Min(value = 0, message = "Le numéro de page ne peut pas être négatif") @RequestParam(defaultValue = "0") int page,
+            @Max(value = 100, message = "La taille de page ne peut pas dépasser 100")
             @RequestParam(defaultValue = "10") int size) {
         return ok("Livres", libraryService.searchBooks(search, category, page, size));
     }
@@ -67,6 +69,7 @@ public class LibraryController {
     public ResponseEntity<ApiResponse<PageResponse<BookResponse.BorrowingResponse>>> borrowings(
             @RequestParam(required = false) BorrowingStatus status,
             @Min(value = 0, message = "Le numéro de page ne peut pas être négatif") @RequestParam(defaultValue = "0") int page,
+            @Max(value = 100, message = "La taille de page ne peut pas dépasser 100")
             @RequestParam(defaultValue = "10") int size) {
         return ok("Emprunts", libraryService.searchBorrowings(status, page, size));
     }

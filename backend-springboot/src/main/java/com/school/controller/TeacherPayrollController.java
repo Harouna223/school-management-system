@@ -28,6 +28,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Max;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -92,6 +93,7 @@ public class TeacherPayrollController {
             @RequestParam(required = false) LocalDate to,
             @RequestParam(required = false) Long academicYearId,
             @Min(value = 0, message = "Le numéro de page ne peut pas être négatif") @RequestParam(defaultValue = "0") int page,
+            @Max(value = 100, message = "La taille de page ne peut pas dépasser 100")
             @RequestParam(defaultValue = "20") int size) {
         return ok("Historique des heures",
                 hoursService.search(teacherId, subjectId, classId, from, to, academicYearId, page, size));

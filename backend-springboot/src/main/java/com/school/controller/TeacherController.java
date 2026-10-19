@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Max;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -43,6 +44,7 @@ public class TeacherController {
             @RequestParam(required = false) String search,
             @RequestParam(required = false) TeacherStatus status,
             @Min(value = 0, message = "Le numéro de page ne peut pas être négatif") @RequestParam(defaultValue = "0") int page,
+            @Max(value = 100, message = "La taille de page ne peut pas dépasser 100")
             @RequestParam(defaultValue = "10") int size) {
         return ok("Recherche réussie", teacherService.search(search, status, page, size));
     }

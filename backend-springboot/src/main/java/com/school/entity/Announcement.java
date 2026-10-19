@@ -2,6 +2,8 @@ package com.school.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
@@ -24,7 +26,16 @@ public class Announcement {
     @Column(nullable = false, length = 200)
     private String title;
 
-    @Lob
+    /**
+     * Contenu long de l'annonce (mediumtext en base).
+     *
+     * <p>{@code @Lob} déclarait un CLOB : Hibernate attendait alors un type
+     * CLOB et refusait {@code mediumtext} (LONGVARCHAR) à la validation du
+     * schéma — le démarrage échouait. {@code LONGVARCHAR} est le type JDBC
+     * réellement rapporté par MySQL pour tinytext/text/mediumtext/longtext :
+     * la correspondance est exacte et la taille reste gérée par la colonne.</p>
+     */
+    @JdbcTypeCode(SqlTypes.LONGVARCHAR)
     @Column(nullable = false)
     private String content;
 

@@ -16,6 +16,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Max;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -74,6 +75,7 @@ public class CommunicationController {
     @Operation(summary = "Mes notifications")
     public ResponseEntity<ApiResponse<PageResponse<NotificationResponse>>> notifications(
             @Min(value = 0, message = "Le numéro de page ne peut pas être négatif") @RequestParam(defaultValue = "0") int page,
+            @Max(value = 100, message = "La taille de page ne peut pas dépasser 100")
             @RequestParam(defaultValue = "10") int size) {
         return ok("Notifications", notificationService.getMyNotifications(
                 SecurityUtils.currentUserId(), page, size));
@@ -103,6 +105,7 @@ public class CommunicationController {
     @Operation(summary = "Messages reçus")
     public ResponseEntity<ApiResponse<PageResponse<MessageResponse>>> inbox(
             @Min(value = 0, message = "Le numéro de page ne peut pas être négatif") @RequestParam(defaultValue = "0") int page,
+            @Max(value = 100, message = "La taille de page ne peut pas dépasser 100")
             @RequestParam(defaultValue = "10") int size) {
         return ok("Boîte de réception", messageService.inbox(SecurityUtils.currentUserId(), page, size));
     }
@@ -111,6 +114,7 @@ public class CommunicationController {
     @Operation(summary = "Messages envoyés")
     public ResponseEntity<ApiResponse<PageResponse<MessageResponse>>> sent(
             @Min(value = 0, message = "Le numéro de page ne peut pas être négatif") @RequestParam(defaultValue = "0") int page,
+            @Max(value = 100, message = "La taille de page ne peut pas dépasser 100")
             @RequestParam(defaultValue = "10") int size) {
         return ok("Messages envoyés", messageService.sent(SecurityUtils.currentUserId(), page, size));
     }
@@ -141,6 +145,7 @@ public class CommunicationController {
     public ResponseEntity<ApiResponse<org.springframework.data.domain.Page<com.school.entity.MessageLog>>> messageLogs(
             @RequestParam(required = false) String channel,
             @Min(value = 0, message = "Le numéro de page ne peut pas être négatif") @RequestParam(defaultValue = "0") int page,
+            @Max(value = 100, message = "La taille de page ne peut pas dépasser 100")
             @RequestParam(defaultValue = "50") int size) {
         org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, size,
                 org.springframework.data.domain.Sort.by("createdAt").descending());

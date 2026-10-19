@@ -23,6 +23,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Max;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -50,6 +51,7 @@ public class ExamController {
             @RequestParam(required = false) Term term,
             @RequestParam(required = false) ExamStatus status,
             @Min(value = 0, message = "Le numéro de page ne peut pas être négatif") @RequestParam(defaultValue = "0") int page,
+            @Max(value = 100, message = "La taille de page ne peut pas dépasser 100")
             @RequestParam(defaultValue = "10") int size) {
         return ok("Recherche réussie",
                 examService.search(search, classId, subjectId, term, status, page, size));

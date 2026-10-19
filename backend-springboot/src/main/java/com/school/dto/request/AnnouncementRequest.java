@@ -18,6 +18,7 @@ public class AnnouncementRequest {
     private String title;
 
     @NotBlank(message = "Le contenu est obligatoire")
+    @Size(max = 5000, message = "Le contenu ne peut dépasser 5000 caractères")
     private String content;
 
     private String targetRole;

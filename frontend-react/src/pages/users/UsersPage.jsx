@@ -20,6 +20,7 @@ export default function UsersPage() {
   const [size, setSize] = useState(10)
   const [total, setTotal] = useState(0)
   const [search, setSearch] = useState('')
+  const [searchInput, setSearchInput] = useState('')
   const [rolesDialog, setRolesDialog] = useState(null)
   const [selectedRoles, setSelectedRoles] = useState([])
   const [passwordDialog, setPasswordDialog] = useState(null)
@@ -39,10 +40,21 @@ export default function UsersPage() {
     userApi.roles().then((r) => setRoles(r.data.data)).catch(() => {})
   }, [])
 
+  // Recherche différée : une requête par pause de frappe, retour en page 0.
+  // `search` était ABSENT des dépendances du chargement : le filtre n'était
+  // appliqué qu'au moment d'Entrée, et sans revenir en première page.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(searchInput.trim())
+      setPage(0)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchInput])
+
   useEffect(() => {
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, size])
+  }, [page, size, search])
 
   const openRoles = (user) => {
     setRolesDialog(user)
@@ -144,8 +156,14 @@ export default function UsersPage() {
       <FilterCard mb={3}>
         <Grid container spacing={2} alignItems="flex-end">
           <Grid item xs={12} md={4}>
-            <TextField size="small" fullWidth label="Rechercher..." value={search}
-              onChange={(e) => setSearch(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && load()} />
+            <TextField size="small" fullWidth label="Rechercher..." value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setSearch(searchInput.trim())
+                  setPage(0)
+                }
+              }} />
           </Grid>
           <Grid item xs={12} md={3}>
             <Button variant="contained" size="medium" fullWidth startIcon={<Search />} onClick={load}>

@@ -153,6 +153,8 @@ export default function AnnouncementsPage() {
             <Grid item xs={12}>
               <TextField fullWidth multiline rows={4} label="Contenu"
                 value={form.content}
+                inputProps={{ maxLength: 5000 }}
+                helperText={`${form.content.length}/5000 caractères`}
                 onChange={(e) => setForm({ ...form, content: e.target.value })} />
             </Grid>
             <Grid item xs={12} sm={6}>

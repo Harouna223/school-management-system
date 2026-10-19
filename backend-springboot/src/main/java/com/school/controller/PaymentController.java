@@ -23,6 +23,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Max;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -49,6 +50,7 @@ public class PaymentController {
             @RequestParam(required = false) Long studentId,
             @RequestParam(required = false) InvoiceStatus status,
             @Min(value = 0, message = "Le numéro de page ne peut pas être négatif") @RequestParam(defaultValue = "0") int page,
+            @Max(value = 100, message = "La taille de page ne peut pas dépasser 100")
             @RequestParam(defaultValue = "10") int size) {
         // Un PARENT / ELEVE ne peut pas élargir le périmètre : sans identifiant
         // il ne voit que ses propres factures, avec un identifiant étranger il
@@ -80,6 +82,7 @@ public class PaymentController {
             @RequestParam(required = false) LocalDate from,
             @RequestParam(required = false) LocalDate to,
             @Min(value = 0, message = "Le numéro de page ne peut pas être négatif") @RequestParam(defaultValue = "0") int page,
+            @Max(value = 100, message = "La taille de page ne peut pas dépasser 100")
             @RequestParam(defaultValue = "10") int size) {
         var scope = accessControlService.resolveStudentScope(studentId);
         return ok("Paiements", financeService.searchPayments(scope, method, from, to, page, size));

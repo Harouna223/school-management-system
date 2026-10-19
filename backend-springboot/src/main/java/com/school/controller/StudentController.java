@@ -25,6 +25,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Max;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -53,6 +54,7 @@ public class StudentController {
             @RequestParam(required = false) StudentStatus status,
             @RequestParam(required = false) com.school.enums.EducationCycle cycle,
             @Min(value = 0, message = "Le numéro de page ne peut pas être négatif") @RequestParam(defaultValue = "0") int page,
+            @Max(value = 100, message = "La taille de page ne peut pas dépasser 100")
             @RequestParam(defaultValue = "10") int size) {
         return ok("Recherche réussie", studentService.search(search, classId, status, cycle, page, size));
     }

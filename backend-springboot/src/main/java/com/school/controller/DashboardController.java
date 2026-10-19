@@ -8,6 +8,7 @@ import com.school.service.DashboardService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Max;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -43,6 +44,7 @@ public class DashboardController {
             @RequestParam(required = false) java.time.LocalDate from,
             @RequestParam(required = false) java.time.LocalDate to,
             @Min(value = 0, message = "Le numéro de page ne peut pas être négatif") @RequestParam(defaultValue = "0") int page,
+            @Max(value = 100, message = "La taille de page ne peut pas dépasser 100")
             @RequestParam(defaultValue = "20") int size) {
         return ok("Journal d'audit", dashboardService.auditLogs(username, action, entity, from, to, page, size));
     }

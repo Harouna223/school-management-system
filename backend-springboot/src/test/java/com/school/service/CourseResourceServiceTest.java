@@ -45,6 +45,7 @@ import java.util.stream.Collectors;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
@@ -427,5 +428,45 @@ class CourseResourceServiceTest {
         assertThatThrownBy(() -> service.resolveFile(1L, "jeton", CourseAccessTokenService.PURPOSE_DOWNLOAD))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("téléchargement");
+    }
+
+    @Test
+    @DisplayName("Aucun jeton n'est délivré quand le téléchargement est interdit")
+    void jetonDownload_refuseSiTelechargementInterdit() {
+        User admin = user(1L, "SUPER_ADMIN");
+        CourseResource resource = resource(1L, CourseStatus.PUBLISHED, admin, schoolClass(2L, "6e A"));
+        resource.setDownloadable(false);
+        when(repository.findById(1L)).thenReturn(Optional.of(resource));
+
+        try (MockedStatic<SecurityUtils> mocked = mockStatic(SecurityUtils.class)) {
+            mocked.when(SecurityUtils::currentUser).thenReturn(admin);
+
+            // Le refus doit tomber à l'émission du jeton, pas seulement au
+            // téléchargement : l'interface ne doit jamais recevoir un jeton
+            // valide pour une ressource « consultation seule ».
+            assertThatThrownBy(() -> service.issueToken(1L, CourseAccessTokenService.PURPOSE_DOWNLOAD))
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessageContaining("téléchargement");
+        }
+        verify(tokens, never()).issue(any(), any(), any(), anyLong());
+    }
+
+    @Test
+    @DisplayName("Un jeton de téléchargement est délivré quand la ressource l'autorise")
+    void jetonDownload_okSiTelechargementAutorise() {
+        User admin = user(1L, "SUPER_ADMIN");
+        CourseResource resource = resource(1L, CourseStatus.PUBLISHED, admin, schoolClass(2L, "6e A"));
+        resource.setDownloadable(true);
+        when(repository.findById(1L)).thenReturn(Optional.of(resource));
+        when(tokens.ttlSeconds()).thenReturn(7200L);
+        when(tokens.issue(1L, 1L, CourseAccessTokenService.PURPOSE_DOWNLOAD, 7200L)).thenReturn("jeton");
+
+        try (MockedStatic<SecurityUtils> mocked = mockStatic(SecurityUtils.class)) {
+            mocked.when(SecurityUtils::currentUser).thenReturn(admin);
+
+            var response = service.issueToken(1L, CourseAccessTokenService.PURPOSE_DOWNLOAD);
+            assertThat(response.getToken()).isEqualTo("jeton");
+            assertThat(response.getExpiresInSeconds()).isEqualTo(7200L);
+        }
     }
 }
