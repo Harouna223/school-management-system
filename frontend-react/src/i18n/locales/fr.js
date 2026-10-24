@@ -45,6 +45,7 @@ export const fr = {
   'nav.users': 'Utilisateurs & Rôles',
   'nav.audit': "Journal d'activité",
   'nav.settings': 'Paramètres',
+  'nav.appreciationScales': "Barèmes d'appréciation",
   'nav.logout': 'Déconnexion',
 
   // Rôles

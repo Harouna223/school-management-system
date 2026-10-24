@@ -45,6 +45,7 @@ export const en = {
   'nav.users': 'Users & Roles',
   'nav.audit': 'Activity log',
   'nav.settings': 'Settings',
+  'nav.appreciationScales': 'Grading scales',
   'nav.logout': 'Log out',
 
   // Roles

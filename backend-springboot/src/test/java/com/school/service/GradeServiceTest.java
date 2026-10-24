@@ -55,6 +55,8 @@ class GradeServiceTest {
     private AccessControlService accessControlService;
     @Mock
     private AcademicCalendarService academicCalendarService;
+    @Mock
+    private AppreciationScaleService appreciationScaleService;
 
     private GradeService service;
 
@@ -63,13 +65,17 @@ class GradeServiceTest {
         service = new GradeService(gradeRepository, studentRepository, bulletinRepository,
                 notificationRepository, examService, auditService, reportService,
                 whatsappService, emailService, smsService, accessControlService,
-                academicCalendarService);
+                academicCalendarService, appreciationScaleService);
         // L'année scolaire est résolue via la table academic_years : les tests qui
         // en dépendent la stubbent explicitement, les autres restent inchangés.
         org.mockito.Mockito.lenient().when(academicCalendarService.resolveYear(any(), any(), any()))
                 .thenReturn(com.school.entity.AcademicYear.builder().id(1L).label("2026-2027").build());
         org.mockito.Mockito.lenient().when(academicCalendarService.requireYearFor(any()))
                 .thenReturn(com.school.entity.AcademicYear.builder().id(1L).label("2026-2027").build());
+        // Le calcul du bulletin a besoin du cycle de l'élève : un élève par
+        // défaut suffit, les tests qui en exigent un précis le surchargent.
+        org.mockito.Mockito.lenient().when(studentRepository.findById(any()))
+                .thenReturn(java.util.Optional.of(eleveBulleting()));
     }
 
     private GradeRequest request(String value, String maxValue) {
@@ -251,6 +257,12 @@ class GradeServiceTest {
         return Subject.builder().id(id).name(nom).code("S" + id).coefficient(coefficient).build();
     }
 
+    private static Student eleveBulleting() {
+        return Student.builder().id(1L).firstName("Test").lastName("Eleve").matricule("ST-1")
+                .educationCycle(com.school.enums.EducationCycle.COLLEGE)
+                .build();
+    }
+
     private static Grade noteDe(Subject matiere, com.school.enums.ExamType type, int coefEvaluation,
                                 String valeur, String bareme) {
         Exam exam = Exam.builder().id(200L).name("E").type(type)
@@ -265,6 +277,8 @@ class GradeServiceTest {
     @DisplayName("bulletin : note/classe, note/compo, coefficient et appréciation")
     void bulletinCalculeLesSeptColonnes() {
         Subject maths = matiere(1L, "Mathématiques", 4);
+        when(studentRepository.findById(1L)).thenReturn(Optional.of(eleveBulleting()));
+        when(appreciationScaleService.resolveForScale(any(), any(), any())).thenReturn("Assez bien");
         when(gradeRepository.findByStudentIdAndTermAndYear(1L, Term.T1, "2026-2027")).thenReturn(List.of(
                 noteDe(maths, com.school.enums.ExamType.DEVOIR, 1, "12", "20"),
                 noteDe(maths, com.school.enums.ExamType.CONTROLE, 1, "16", "20"),
@@ -287,6 +301,8 @@ class GradeServiceTest {
     @DisplayName("bulletin : sans composition, la moyenne retient la note de classe")
     void bulletinSansCompositionNePenalisePas() {
         Subject svt = matiere(2L, "SVT", 2);
+        when(studentRepository.findById(1L)).thenReturn(Optional.of(eleveBulleting()));
+        when(appreciationScaleService.resolveForScale(any(), any(), any())).thenReturn("Bien");
         when(gradeRepository.findByStudentIdAndTermAndYear(1L, Term.T1, "2026-2027")).thenReturn(List.of(
                 noteDe(svt, com.school.enums.ExamType.DEVOIR, 1, "15", "20")));
 
@@ -302,6 +318,7 @@ class GradeServiceTest {
     @DisplayName("bulletin : une note sur 10 est ramenée sur 20")
     void bulletinNormaliseLeBareme() {
         Subject physique = matiere(3L, "Physique", 1);
+        when(studentRepository.findById(1L)).thenReturn(Optional.of(eleveBulleting()));
         when(gradeRepository.findByStudentIdAndTermAndYear(1L, Term.T1, "2026-2027")).thenReturn(List.of(
                 noteDe(physique, com.school.enums.ExamType.DEVOIR, 1, "8", "10")));
 
@@ -314,6 +331,7 @@ class GradeServiceTest {
     void moyenneGeneralePondereeParLesCoefficients() {
         Subject maths = matiere(1L, "Mathématiques", 4);
         Subject svt = matiere(2L, "SVT", 2);
+        when(studentRepository.findById(1L)).thenReturn(Optional.of(eleveBulleting()));
         when(gradeRepository.findByStudentIdAndTermAndYear(1L, Term.T1, "2026-2027")).thenReturn(List.of(
                 noteDe(maths, com.school.enums.ExamType.DEVOIR, 1, "12", "20"),
                 noteDe(maths, com.school.enums.ExamType.COMPOSITION, 1, "10", "20"),

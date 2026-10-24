@@ -474,3 +474,17 @@ export const coursePreviewUrl = (id, token) => `${apiBase}/courses/${id}/preview
 
 /** URL de téléchargement contrôlé. */
 export const courseDownloadUrl = (id, token) => `${apiBase}/courses/${id}/download?token=${encodeURIComponent(token)}`
+
+/**
+ * Endpoints des barèmes d'appréciation (configuration par cycle scolaire).
+ */
+export const appreciationScaleApi = {
+  list: (params) => api.get('/appreciation-scales', { params }),
+  get: (id) => api.get(`/appreciation-scales/${id}`),
+  create: (data) => api.post('/appreciation-scales', data),
+  update: (id, data) => api.put(`/appreciation-scales/${id}`, data),
+  activate: (id) => api.patch(`/appreciation-scales/${id}/activate`),
+  deactivate: (id) => api.patch(`/appreciation-scales/${id}/deactivate`),
+  duplicate: (id) => api.post(`/appreciation-scales/${id}/duplicate`),
+  preview: (data) => api.post('/appreciation-scales/preview', data),
+}

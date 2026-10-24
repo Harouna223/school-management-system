@@ -35,4 +35,11 @@ public interface BulletinRepository extends JpaRepository<Bulletin, Long> {
     String findLatestAcademicYear(@Param("classId") Long classId, @Param("term") Term term);
 
     List<Bulletin> findByStudentIdOrderByAcademicYearDescTermDesc(Long studentId);
+
+    /**
+     * Vrai si un barème d'appréciation a déjà servi à un bulletin.
+     * Un barème utilisé ne peut plus être modifié en place : le service en
+     * crée une nouvelle version pour ne pas réécrire l'historique.
+     */
+    boolean existsByAppreciationScaleId(Long appreciationScaleId);
 }

@@ -105,6 +105,12 @@ public class SecurityConfig {
                         .requestMatchers("/api/courses/**").hasAnyAuthority("PERM_COURSE_WRITE")
                         .requestMatchers(HttpMethod.GET, "/api/communication/**").hasAnyAuthority("PERM_COMMUNICATION_READ")
                         .requestMatchers("/api/communication/**").hasAnyAuthority("PERM_COMMUNICATION_WRITE")
+                        // Barèmes d'appréciation : configuration réservée aux administrateurs
+                        // autorisés (lecture : direction + secrétariat, écriture : direction).
+                        .requestMatchers(HttpMethod.GET, "/api/appreciation-scales/**")
+                        .hasAnyAuthority("PERM_APPRECIATION_READ")
+                        .requestMatchers("/api/appreciation-scales/**")
+                        .hasAnyAuthority("PERM_APPRECIATION_WRITE")
                         // Recherche globale : réservée aux rôles d'administration (expose données personnelles et financières)
                         .requestMatchers(HttpMethod.GET, "/api/search/**")
                         .hasAnyAuthority("PERM_REPORT_READ", "PERM_USER_READ")

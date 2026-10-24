@@ -53,6 +53,15 @@ public class Bulletin {
     @Column(length = 50)
     private String mention;
 
+    /**
+     * Version du barème d'appréciation utilisée lors de la génération.
+     *
+     * <p>Épingle l'appréciation imprimée : modifier ou remplacer le barème
+     * d'un cycle ne réécrit pas les bulletins déjà délivrés.</p>
+     */
+    @Column(name = "appreciation_scale_id")
+    private Long appreciationScaleId;
+
     @Enumerated(EnumType.STRING)
     @Column(length = 20)
     private DeliberationStatus decision;

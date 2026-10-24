@@ -11,6 +11,7 @@ import com.school.entity.Notification;
 import com.school.entity.Student;
 import com.school.entity.Subject;
 import com.school.enums.DeliberationStatus;
+import com.school.enums.EducationCycle;
 import com.school.enums.ExamType;
 import com.school.enums.NotificationType;
 import com.school.enums.Term;
@@ -21,7 +22,6 @@ import com.school.repository.GradeRepository;
 import com.school.repository.NotificationRepository;
 import com.school.repository.StudentRepository;
 import com.school.utils.CodeGenerator;
-import com.school.utils.GradeObservation;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -57,6 +57,8 @@ public class GradeService {
     private final SmsService smsService;
     private final AccessControlService accessControlService;
     private final AcademicCalendarService academicCalendarService;
+    /** Seule source des appréciations (barèmes configurables par cycle). */
+    private final AppreciationScaleService appreciationScaleService;
 
     @Transactional(readOnly = true)
     public List<GradeResponse> listByExam(Long examId) {
@@ -182,6 +184,19 @@ public class GradeService {
      */
     @Transactional(readOnly = true)
     public List<BulletinLineResponse> bulletinLines(Long studentId, Term term, String year) {
+        return bulletinLines(studentId, term, year, null);
+    }
+
+    /**
+     * Variante utilisée pour réimprimer un bulletin : {@code scaleId} est la
+     * version du barème épinglée sur ce bulletin. {@code null} = barème actif.
+     */
+    @Transactional(readOnly = true)
+    public List<BulletinLineResponse> bulletinLines(Long studentId, Term term, String year,
+                                                    Long scaleId) {
+        Student student = studentRepository.findById(studentId)
+                .orElseThrow(() -> ResourceNotFoundException.of("Élève", studentId));
+        EducationCycle cycle = cycleOf(student);
         List<Grade> grades = gradeRepository.findByStudentIdAndTermAndYear(studentId, term, year);
 
         Map<Long, List<Grade>> bySubject = new LinkedHashMap<>();
@@ -213,12 +228,28 @@ public class GradeService {
                     .noteCoef(moyenne == null ? null
                             : round2(moyenne.multiply(BigDecimal.valueOf(coefficient))))
                     .moyenne(moyenne)
-                    .observation(GradeObservation.of(moyenne))
+                    // Appréciation issue du barème configuré (cycle + version).
+                    .observation(appreciationScaleService.resolveForScale(scaleId, moyenne, cycle))
                     .build());
         }
         lines.sort(Comparator.comparing(BulletinLineResponse::getSubjectName,
                 String.CASE_INSENSITIVE_ORDER));
         return lines;
+    }
+
+    /**
+     * Cycle scolaire d'un élève : cycle explicite, sinon cycle de sa classe.
+     * {@code null} si l'information n'est pas renseignée (l'appréciation
+     * affichera « — » plutôt qu'une valeur inventée).
+     */
+    private EducationCycle cycleOf(Student student) {
+        if (student.getEducationCycle() != null) {
+            return student.getEducationCycle();
+        }
+        if (student.getSchoolClass() != null && student.getSchoolClass().getLevel() != null) {
+            return student.getSchoolClass().getLevel().getEducationCycle();
+        }
+        return null;
     }
 
     /** Moyenne générale = Σ(note/compo coef) / Σ(coef), sur les matières notées. */
@@ -280,9 +311,13 @@ public class GradeService {
     /**
      * Complète une réponse de bulletin avec ses lignes, ses totaux et son
      * appréciation générale. Utilisé par les exports PDF.
+     *
+     * @param scaleId version du barème épinglée sur le bulletin ({@code null}
+     *                = barème actif du cycle)
      */
-    private BulletinResponse enrich(BulletinResponse response, Long studentId, Term term, String year) {
-        List<BulletinLineResponse> lines = bulletinLines(studentId, term, year);
+    private BulletinResponse enrich(BulletinResponse response, Long studentId, Term term,
+                                    String year, Long scaleId) {
+        List<BulletinLineResponse> lines = bulletinLines(studentId, term, year, scaleId);
         int totalCoefficient = lines.stream()
                 .filter(line -> line.getMoyenne() != null)
                 .mapToInt(line -> line.getCoefficient() != null ? line.getCoefficient() : 1)
@@ -294,7 +329,10 @@ public class GradeService {
         response.setLines(lines);
         response.setTotalCoefficient(totalCoefficient);
         response.setTotalPoints(totalPoints);
-        response.setObservation(GradeObservation.of(response.getAverage()));
+        EducationCycle cycle = studentRepository.findById(studentId)
+                .map(this::cycleOf).orElse(null);
+        response.setObservation(appreciationScaleService.resolveForScale(
+                scaleId, response.getAverage(), cycle));
         return response;
     }
 
@@ -362,7 +400,13 @@ public class GradeService {
             bulletin.setClassMin(classMin);
             bulletin.setClassMax(classMax);
             bulletin.setRank(ranking.indexOf(rank) + 1);
-            bulletin.setMention(computeMention(rank.average()));
+            EducationCycle cycle = cycleOf(student);
+            // Épingle la version du barème : la réimpression de CE bulletin
+            // utilisera exactement la configuration qui l'a produit.
+            Long scaleId = appreciationScaleService.activeScaleId(cycle);
+            bulletin.setAppreciationScaleId(scaleId);
+            bulletin.setMention(appreciationScaleService.resolveForScale(
+                    scaleId, rank.average(), cycle));
             return bulletin;
         }).toList();
 
@@ -439,7 +483,8 @@ public class GradeService {
         // auquel il a accès, même en devinant un bulletinId.
         accessControlService.assertCanAccessStudent(bulletin.getStudent().getId());
         BulletinResponse responseData = enrich(BulletinResponse.from(bulletin),
-                bulletin.getStudent().getId(), bulletin.getTerm(), bulletin.getAcademicYear());
+                bulletin.getStudent().getId(), bulletin.getTerm(), bulletin.getAcademicYear(),
+                bulletin.getAppreciationScaleId());
         reportService.bulletinPdf(response, responseData);
     }
 
@@ -457,7 +502,7 @@ public class GradeService {
         }
         List<BulletinResponse> responses = bulletins.stream()
                 .map(b -> enrich(BulletinResponse.from(b), b.getStudent().getId(),
-                        b.getTerm(), b.getAcademicYear()))
+                        b.getTerm(), b.getAcademicYear(), b.getAppreciationScaleId()))
                 .toList();
         reportService.classBulletinsPdf(response, responses);
     }
@@ -553,10 +598,13 @@ public class GradeService {
         }
     }
 
-    public String computeMention(BigDecimal average) {
-        // Même échelle que la colonne « Observation » du bulletin : une seule
-        // définition pour la mention stockée et l'appréciation imprimée.
-        return GradeObservation.of(average);
+    /**
+     * Mention d'une moyenne pour un cycle, selon le barème actif.
+     * Conservée pour les appelants historiques ; le bulletin utilise
+     * directement le service avec la version épinglée.
+     */
+    public String computeMention(BigDecimal average, EducationCycle cycle) {
+        return appreciationScaleService.resolve(average, cycle);
     }
 
     public record StudentRank(Long studentId, String firstName, String lastName,
