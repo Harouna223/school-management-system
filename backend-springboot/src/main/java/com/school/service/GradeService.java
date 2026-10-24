@@ -1,6 +1,7 @@
 package com.school.service;
 
 import com.school.dto.request.GradeRequest;
+import com.school.dto.response.BulletinLineResponse;
 import com.school.dto.response.BulletinResponse;
 import com.school.dto.response.GradeResponse;
 import com.school.entity.Bulletin;
@@ -8,7 +9,9 @@ import com.school.entity.Exam;
 import com.school.entity.Grade;
 import com.school.entity.Notification;
 import com.school.entity.Student;
+import com.school.entity.Subject;
 import com.school.enums.DeliberationStatus;
+import com.school.enums.ExamType;
 import com.school.enums.NotificationType;
 import com.school.enums.Term;
 import com.school.exception.BusinessException;
@@ -18,6 +21,7 @@ import com.school.repository.GradeRepository;
 import com.school.repository.NotificationRepository;
 import com.school.repository.StudentRepository;
 import com.school.utils.CodeGenerator;
+import com.school.utils.GradeObservation;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,8 +30,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -144,26 +151,151 @@ public class GradeService {
     @Transactional(readOnly = true)
     public BigDecimal averageForStudent(Long studentId, Term term, Long yearId) {
         String year = academicCalendarService.resolveYear(yearId, null, null).getLabel();
+        // Une seule source de calcul : les lignes du bulletin. Rang, mention,
+        // décision et PDF restent donc TOUJOURS cohérents entre eux.
+        return generalAverage(bulletinLines(studentId, term, year));
+    }
+
+    // ==================================================================
+    // Bulletin à sept colonnes
+    // ==================================================================
+
+    /**
+     * Lignes du bulletin d'un élève pour un trimestre : une par matière.
+     *
+     * <p>Règles de calcul (validées par l'établissement) :</p>
+     * <ul>
+     *   <li><b>Note/classe</b> = moyenne des évaluations dont le type n'est PAS
+     *       {@code COMPOSITION}, pondérée par le coefficient de chaque
+     *       évaluation ;</li>
+     *   <li><b>Note/compo</b> = moyenne des évaluations de type
+     *       {@code COMPOSITION} ;</li>
+     *   <li><b>Moyenne</b> = (note/classe + note/compo) / 2 ; si l'une des deux
+     *       manque (élève absent, matière sans composition), la moyenne retient
+     *       la seule note disponible plutôt que de pénaliser l'élève ;</li>
+     *   <li><b>Note/compo coef</b> = moyenne × coefficient de la matière ;</li>
+     *   <li><b>Observation</b> = échelle officielle appliquée à la moyenne.</li>
+     * </ul>
+     *
+     * <p>Les notes sont ramenées sur 20 : un devoir noté sur 10 ou sur 40 ne
+     * fausse ni la moyenne ni le classement.</p>
+     */
+    @Transactional(readOnly = true)
+    public List<BulletinLineResponse> bulletinLines(Long studentId, Term term, String year) {
         List<Grade> grades = gradeRepository.findByStudentIdAndTermAndYear(studentId, term, year);
-        if (grades.isEmpty()) {
-            return null;
-        }
-        BigDecimal totalWeighted = BigDecimal.ZERO;
-        BigDecimal totalWeight = BigDecimal.ZERO;
-        for (Grade g : grades) {
-            BigDecimal weight = BigDecimal.valueOf(g.getExam().getCoefficient())
-                    .multiply(BigDecimal.valueOf(g.getExam().getSubject().getCoefficient()));
-            BigDecimal maxValue = g.getMaxValue() != null ? g.getMaxValue() : BigDecimal.valueOf(20);
-            if (maxValue.compareTo(BigDecimal.ZERO) <= 0) {
-                throw new BusinessException("Le barème d'une note doit être supérieur à zéro");
+
+        Map<Long, List<Grade>> bySubject = new LinkedHashMap<>();
+        for (Grade grade : grades) {
+            if (grade.getValue() == null || grade.getExam() == null
+                    || grade.getExam().getSubject() == null) {
+                continue;
             }
-            BigDecimal normalizedValue = g.getValue().multiply(BigDecimal.valueOf(20))
-                    .divide(maxValue, 8, RoundingMode.HALF_UP);
-            totalWeighted = totalWeighted.add(normalizedValue.multiply(weight));
-            totalWeight = totalWeight.add(weight);
+            bySubject.computeIfAbsent(grade.getExam().getSubject().getId(), k -> new ArrayList<>())
+                    .add(grade);
         }
-        return totalWeight.compareTo(BigDecimal.ZERO) == 0 ? null
-                : totalWeighted.divide(totalWeight, 2, RoundingMode.HALF_UP);
+
+        List<BulletinLineResponse> lines = new ArrayList<>();
+        for (List<Grade> subjectGrades : bySubject.values()) {
+            Subject subject = subjectGrades.get(0).getExam().getSubject();
+            BigDecimal noteClasse = weightedNote(subjectGrades, false);
+            BigDecimal noteCompo = weightedNote(subjectGrades, true);
+            BigDecimal moyenne = round2(subjectAverage(noteClasse, noteCompo));
+            int coefficient = subject.getCoefficient() != null ? subject.getCoefficient() : 1;
+
+            lines.add(BulletinLineResponse.builder()
+                    .subjectId(subject.getId())
+                    .subjectName(subject.getName())
+                    .noteClasse(round2(noteClasse))
+                    .noteComposition(round2(noteCompo))
+                    .coefficient(coefficient)
+                    // Calculé sur la moyenne AFFICHÉE : le bulletin imprimé doit
+                    // pouvoir être recompté à la main sans écart d'arrondi.
+                    .noteCoef(moyenne == null ? null
+                            : round2(moyenne.multiply(BigDecimal.valueOf(coefficient))))
+                    .moyenne(moyenne)
+                    .observation(GradeObservation.of(moyenne))
+                    .build());
+        }
+        lines.sort(Comparator.comparing(BulletinLineResponse::getSubjectName,
+                String.CASE_INSENSITIVE_ORDER));
+        return lines;
+    }
+
+    /** Moyenne générale = Σ(note/compo coef) / Σ(coef), sur les matières notées. */
+    private BigDecimal generalAverage(List<BulletinLineResponse> lines) {
+        BigDecimal points = BigDecimal.ZERO;
+        int coefficients = 0;
+        for (BulletinLineResponse line : lines) {
+            if (line.getMoyenne() == null || line.getNoteCoef() == null) {
+                continue;
+            }
+            points = points.add(line.getNoteCoef());
+            coefficients += line.getCoefficient() != null ? line.getCoefficient() : 1;
+        }
+        return coefficients == 0 ? null
+                : points.divide(BigDecimal.valueOf(coefficients), 2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Moyenne pondérée d'un sous-ensemble de notes, normalisée sur 20.
+     *
+     * @param composition {@code true} = compositions seules, {@code false} =
+     *                    toutes les autres évaluations
+     */
+    private BigDecimal weightedNote(List<Grade> grades, boolean composition) {
+        BigDecimal weighted = BigDecimal.ZERO;
+        BigDecimal weights = BigDecimal.ZERO;
+        for (Grade grade : grades) {
+            boolean isComposition = grade.getExam().getType() == ExamType.COMPOSITION;
+            if (isComposition != composition) {
+                continue;
+            }
+            BigDecimal maxValue = grade.getMaxValue() != null
+                    && grade.getMaxValue().signum() > 0
+                    ? grade.getMaxValue() : BigDecimal.valueOf(20);
+            BigDecimal normalized = grade.getValue().multiply(BigDecimal.valueOf(20))
+                    .divide(maxValue, 8, RoundingMode.HALF_UP);
+            BigDecimal weight = BigDecimal.valueOf(
+                    grade.getExam().getCoefficient() != null ? grade.getExam().getCoefficient() : 1);
+            weighted = weighted.add(normalized.multiply(weight));
+            weights = weights.add(weight);
+        }
+        return weights.signum() == 0 ? null : weighted.divide(weights, 8, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal subjectAverage(BigDecimal noteClasse, BigDecimal noteCompo) {
+        if (noteClasse == null) {
+            return noteCompo;
+        }
+        if (noteCompo == null) {
+            return noteClasse;
+        }
+        return noteClasse.add(noteCompo).divide(BigDecimal.valueOf(2), 8, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal round2(BigDecimal value) {
+        return value == null ? null : value.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Complète une réponse de bulletin avec ses lignes, ses totaux et son
+     * appréciation générale. Utilisé par les exports PDF.
+     */
+    private BulletinResponse enrich(BulletinResponse response, Long studentId, Term term, String year) {
+        List<BulletinLineResponse> lines = bulletinLines(studentId, term, year);
+        int totalCoefficient = lines.stream()
+                .filter(line -> line.getMoyenne() != null)
+                .mapToInt(line -> line.getCoefficient() != null ? line.getCoefficient() : 1)
+                .sum();
+        BigDecimal totalPoints = lines.stream()
+                .map(BulletinLineResponse::getNoteCoef)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        response.setLines(lines);
+        response.setTotalCoefficient(totalCoefficient);
+        response.setTotalPoints(totalPoints);
+        response.setObservation(GradeObservation.of(response.getAverage()));
+        return response;
     }
 
     /**
@@ -306,13 +438,9 @@ public class GradeService {
         // IDOR : un élève / parent ne peut télécharger que le bulletin d'un élève
         // auquel il a accès, même en devinant un bulletinId.
         accessControlService.assertCanAccessStudent(bulletin.getStudent().getId());
-        BulletinResponse responseData = BulletinResponse.from(bulletin);
-        // Les notes imprimées doivent être celles de l'ANNÉE du bulletin, pas
-        // celles de toutes les années confondues.
-        List<Grade> grades = gradeRepository
-                .findByStudentIdAndTermAndYear(bulletin.getStudent().getId(), bulletin.getTerm(),
-                        bulletin.getAcademicYear());
-        reportService.bulletinPdf(response, responseData, grades);
+        BulletinResponse responseData = enrich(BulletinResponse.from(bulletin),
+                bulletin.getStudent().getId(), bulletin.getTerm(), bulletin.getAcademicYear());
+        reportService.bulletinPdf(response, responseData);
     }
 
     /**
@@ -327,12 +455,11 @@ public class GradeService {
         if (bulletins.isEmpty()) {
             throw new com.school.exception.BusinessException("Aucun bulletin trouvé pour cette classe et ce trimestre");
         }
-        List<BulletinResponse> responses = bulletins.stream().map(BulletinResponse::from).toList();
-        List<List<Grade>> gradesList = bulletins.stream()
-                .map(b -> gradeRepository.findByStudentIdAndTermAndYear(b.getStudent().getId(), term,
-                        b.getAcademicYear()))
+        List<BulletinResponse> responses = bulletins.stream()
+                .map(b -> enrich(BulletinResponse.from(b), b.getStudent().getId(),
+                        b.getTerm(), b.getAcademicYear()))
                 .toList();
-        reportService.classBulletinsPdf(response, responses, gradesList);
+        reportService.classBulletinsPdf(response, responses);
     }
 
     /**
@@ -427,12 +554,9 @@ public class GradeService {
     }
 
     public String computeMention(BigDecimal average) {
-        double a = average.doubleValue();
-        if (a >= 16) return "Très bien";
-        if (a >= 14) return "Bien";
-        if (a >= 12) return "Assez bien";
-        if (a >= 10) return "Passable";
-        return "Insuffisant";
+        // Même échelle que la colonne « Observation » du bulletin : une seule
+        // définition pour la mention stockée et l'appréciation imprimée.
+        return GradeObservation.of(average);
     }
 
     public record StudentRank(Long studentId, String firstName, String lastName,

@@ -9,6 +9,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Data
 @Builder
@@ -31,6 +32,15 @@ public class BulletinResponse {
     private String mention;
     private DeliberationStatus decision;
     private String pdfPath;
+
+    /** Lignes du bulletin, une par matière (colonnes du bulletin officiel). */
+    private List<BulletinLineResponse> lines;
+    /** Somme des coefficients des matières évaluées. */
+    private Integer totalCoefficient;
+    /** Somme des « Note/compo coef ». */
+    private BigDecimal totalPoints;
+    /** Appréciation générale (échelle du bulletin), calculée sur {@code average}. */
+    private String observation;
 
     public static BulletinResponse from(Bulletin b) {
         return BulletinResponse.builder()

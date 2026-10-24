@@ -244,4 +244,82 @@ class GradeServiceTest {
         assertThat(captor.getValue().getMaxValue()).isEqualByComparingTo("10");
         assertThat(captor.getValue().getValue()).isEqualByComparingTo("8");
     }
+
+    // ============================================================ bulletin 7 colonnes
+
+    private static Subject matiere(long id, String nom, int coefficient) {
+        return Subject.builder().id(id).name(nom).code("S" + id).coefficient(coefficient).build();
+    }
+
+    private static Grade noteDe(Subject matiere, com.school.enums.ExamType type, int coefEvaluation,
+                                String valeur, String bareme) {
+        Exam exam = Exam.builder().id(200L).name("E").type(type)
+                .coefficient(coefEvaluation).subject(matiere).build();
+        return Grade.builder().id(1L).exam(exam)
+                .value(new BigDecimal(valeur))
+                .maxValue(bareme != null ? new BigDecimal(bareme) : null)
+                .build();
+    }
+
+    @Test
+    @DisplayName("bulletin : note/classe, note/compo, coefficient et appréciation")
+    void bulletinCalculeLesSeptColonnes() {
+        Subject maths = matiere(1L, "Mathématiques", 4);
+        when(gradeRepository.findByStudentIdAndTermAndYear(1L, Term.T1, "2026-2027")).thenReturn(List.of(
+                noteDe(maths, com.school.enums.ExamType.DEVOIR, 1, "12", "20"),
+                noteDe(maths, com.school.enums.ExamType.CONTROLE, 1, "16", "20"),
+                noteDe(maths, com.school.enums.ExamType.COMPOSITION, 1, "10", "20")));
+
+        var lignes = service.bulletinLines(1L, Term.T1, "2026-2027");
+
+        assertThat(lignes).hasSize(1);
+        var ligne = lignes.get(0);
+        assertThat(ligne.getSubjectName()).isEqualTo("Mathématiques");
+        assertThat(ligne.getNoteClasse()).isEqualByComparingTo("14.00");
+        assertThat(ligne.getNoteComposition()).isEqualByComparingTo("10.00");
+        assertThat(ligne.getMoyenne()).isEqualByComparingTo("12.00");
+        assertThat(ligne.getCoefficient()).isEqualTo(4);
+        assertThat(ligne.getNoteCoef()).isEqualByComparingTo("48.00");
+        assertThat(ligne.getObservation()).isEqualTo("Assez bien");
+    }
+
+    @Test
+    @DisplayName("bulletin : sans composition, la moyenne retient la note de classe")
+    void bulletinSansCompositionNePenalisePas() {
+        Subject svt = matiere(2L, "SVT", 2);
+        when(gradeRepository.findByStudentIdAndTermAndYear(1L, Term.T1, "2026-2027")).thenReturn(List.of(
+                noteDe(svt, com.school.enums.ExamType.DEVOIR, 1, "15", "20")));
+
+        var ligne = service.bulletinLines(1L, Term.T1, "2026-2027").get(0);
+
+        assertThat(ligne.getNoteComposition()).isNull();
+        assertThat(ligne.getMoyenne()).isEqualByComparingTo("15.00");
+        assertThat(ligne.getNoteCoef()).isEqualByComparingTo("30.00");
+        assertThat(ligne.getObservation()).isEqualTo("Bien");
+    }
+
+    @Test
+    @DisplayName("bulletin : une note sur 10 est ramenée sur 20")
+    void bulletinNormaliseLeBareme() {
+        Subject physique = matiere(3L, "Physique", 1);
+        when(gradeRepository.findByStudentIdAndTermAndYear(1L, Term.T1, "2026-2027")).thenReturn(List.of(
+                noteDe(physique, com.school.enums.ExamType.DEVOIR, 1, "8", "10")));
+
+        assertThat(service.bulletinLines(1L, Term.T1, "2026-2027").get(0).getNoteClasse())
+                .isEqualByComparingTo("16.00");
+    }
+
+    @Test
+    @DisplayName("moyenne générale = Σ(note coef) / Σ(coef)")
+    void moyenneGeneralePondereeParLesCoefficients() {
+        Subject maths = matiere(1L, "Mathématiques", 4);
+        Subject svt = matiere(2L, "SVT", 2);
+        when(gradeRepository.findByStudentIdAndTermAndYear(1L, Term.T1, "2026-2027")).thenReturn(List.of(
+                noteDe(maths, com.school.enums.ExamType.DEVOIR, 1, "12", "20"),
+                noteDe(maths, com.school.enums.ExamType.COMPOSITION, 1, "10", "20"),
+                noteDe(svt, com.school.enums.ExamType.DEVOIR, 1, "15", "20")));
+
+        // Maths : (12+10)/2 = 11 → ×4 = 44 ; SVT : 15 → ×2 = 30 ; (44+30)/6 = 12,33
+        assertThat(service.averageForStudent(1L, Term.T1, null)).isEqualByComparingTo("12.33");
+    }
 }

@@ -16,6 +16,7 @@ const TYPES = {
   DEVOIR: { icon: <Assignment sx={{ fontSize: 32 }} />, color: '#7c3aed', description: 'Travail écrit noté, portant sur une ou plusieurs séquences.' },
   EXAMEN: { icon: <School sx={{ fontSize: 32 }} />, color: '#d97706', description: 'Évaluation bilan de fin de trimestre ou de semestre, coefficient élevé.' },
   BACCALAUREAT: { icon: <WorkspacePremium sx={{ fontSize: 32 }} />, color: '#dc2626', description: 'Examen national officiel, sanctionnant la fin du cycle secondaire.' },
+  COMPOSITION: { icon: <Assignment sx={{ fontSize: 32 }} />, color: '#0891b2', description: 'Épreuve de synthèse du trimestre : alimente la colonne « Note/compo » du bulletin.' },
 }
 
 /**
@@ -29,7 +30,7 @@ export default function ExamTypesPage() {
     <>
       <PageHeader
         title="Types d'évaluation"
-        subtitle="Contrôle, Devoir, Examen, Baccalauréat — configurez et planifiez vos évaluations"
+        subtitle="Contrôle, Devoir, Examen, Baccalauréat, Composition — configurez et planifiez vos évaluations"
         actions={[
           { label: 'Planifier une évaluation', icon: <Add />, onClick: () => navigate('/exams') },
         ]}

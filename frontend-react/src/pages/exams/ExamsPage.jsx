@@ -209,6 +209,7 @@ export default function ExamsPage() {
                       <MenuItem value="DEVOIR">Devoir</MenuItem>
                       <MenuItem value="EXAMEN">Examen</MenuItem>
                       <MenuItem value="BACCALAUREAT">Baccalauréat</MenuItem>
+                      <MenuItem value="COMPOSITION">Composition (bulletin)</MenuItem>
                     </TextField>
                   </Grid>
                   <Grid item xs={12} sm={6}>

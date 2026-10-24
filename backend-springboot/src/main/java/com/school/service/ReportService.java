@@ -372,11 +372,10 @@ public class ReportService {
     }
 
     /**
-     * Bulletin scolaire trimestriel PDF d'un élève (notes par matière, moyennes, décision).
+     * Bulletin scolaire trimestriel PDF d'un élève (7 colonnes, moyennes, décision).
      */
     public void bulletinPdf(HttpServletResponse response,
-                            com.school.dto.response.BulletinResponse bulletin,
-                            List<com.school.entity.Grade> grades)
+                            com.school.dto.response.BulletinResponse bulletin)
             throws IOException {
         response.setContentType("application/pdf");
         response.setHeader("Content-Disposition",
@@ -387,7 +386,7 @@ public class ReportService {
                 + "-" + bulletin.getTerm(), document);
         document.open();
         try {
-            addBulletinContent(document, bulletin, grades);
+            addBulletinContent(document, bulletin);
         } finally {
             safeClose(document);
         }
@@ -397,8 +396,7 @@ public class ReportService {
      * Tous les bulletins d'une classe dans un document PDF unique (une page par élève).
      */
     public void classBulletinsPdf(HttpServletResponse response,
-                                  List<com.school.dto.response.BulletinResponse> bulletins,
-                                  List<List<com.school.entity.Grade>> gradesList)
+                                  List<com.school.dto.response.BulletinResponse> bulletins)
             throws IOException {
         String className = bulletins.isEmpty() ? "classe"
                 : (bulletins.get(0).getClassName() != null ? bulletins.get(0).getClassName() : "classe");
@@ -412,7 +410,7 @@ public class ReportService {
                 if (i > 0) {
                     document.newPage();
                 }
-                addBulletinContent(document, bulletins.get(i), gradesList.get(i));
+                addBulletinContent(document, bulletins.get(i));
             }
         } finally {
             safeClose(document);
@@ -420,8 +418,7 @@ public class ReportService {
     }
 
     private void addBulletinContent(Document document,
-                                    com.school.dto.response.BulletinResponse bulletin,
-                                    List<com.school.entity.Grade> grades) {
+                                    com.school.dto.response.BulletinResponse bulletin) {
         documentTheme.addHeader(document);
         documentTheme.addTitle(document, "BULLETIN DE NOTES",
                 bulletin.getStudentName() + "  •  " + bulletin.getClassName()
@@ -438,17 +435,66 @@ public class ReportService {
         document.add(Chunk.NEWLINE);
 
         documentTheme.sectionTitle(document, "NOTES PAR MATIÈRE");
+
+        // Sept colonnes : Matières | Note/classe | Note/compo | Coef |
+        // Note/compo coef | Moyenne générale | Observation.
         List<String[]> rows = new java.util.ArrayList<>();
-        for (com.school.entity.Grade g : grades) {
-            String subject = g.getExam().getSubject() != null ? g.getExam().getSubject().getName() : "—";
-            int coef = g.getExam().getCoefficient() != null ? g.getExam().getCoefficient() : 1;
-            rows.add(new String[]{subject, String.valueOf(coef),
-                    g.getValue() != null ? g.getValue().toString() : "—",
-                    g.getAppreciation() != null ? g.getAppreciation() : ""});
+        List<com.school.dto.response.BulletinLineResponse> lines =
+                bulletin.getLines() != null ? bulletin.getLines() : java.util.List.of();
+        for (com.school.dto.response.BulletinLineResponse line : lines) {
+            rows.add(new String[]{
+                    line.getSubjectName(),
+                    formatNote(line.getNoteClasse()),
+                    formatNote(line.getNoteComposition()),
+                    line.getCoefficient() != null ? String.valueOf(line.getCoefficient()) : "1",
+                    formatNote(line.getNoteCoef()),
+                    formatNote(line.getMoyenne()),
+                    line.getObservation() != null ? line.getObservation() : "—",
+            });
         }
-        PdfPTable table = documentTheme.dataTable(
-                new String[]{"Matière", "Coef.", "Note /20", "Appréciation"},
-                rows, new float[]{4, 1, 1.4f, 3f}, true);
+        // Ligne de synthèse : le bulletin doit pouvoir être recompté à la main.
+        rows.add(new String[]{
+                "TOTAL",
+                "",
+                "",
+                String.valueOf(bulletin.getTotalCoefficient() != null ? bulletin.getTotalCoefficient() : 0),
+                formatNote(bulletin.getTotalPoints()),
+                formatNote(bulletin.getAverage()),
+                bulletin.getObservation() != null ? bulletin.getObservation() : "—",
+        });
+
+        // Tableau construit à la main plutôt qu'avec dataTable() : les en-têtes
+        // sont longs (« Note/compo coef », « Moyenne générale ») et la police
+        // fixe de 9,5 pt les coupait en plein mot sur une largeur A4.
+        PdfPTable table = new PdfPTable(7);
+        table.setWidthPercentage(100);
+        table.setWidths(new float[]{3.0f, 1.5f, 1.5f, 0.7f, 1.9f, 1.8f, 1.7f});
+        for (String header : new String[]{"Matières", "Note/classe", "Note/compo", "Coef",
+                "Note/compo coef", "Moyenne générale", "Observation"}) {
+            PdfPCell cell = new PdfPCell(new Phrase(header, SchoolDocumentTheme.whiteBold(7.5f)));
+            cell.setBackgroundColor(SchoolDocumentTheme.PRIMARY);
+            cell.setBorder(0);
+            cell.setPadding(5);
+            cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+            cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+            table.addCell(cell);
+        }
+        boolean stripe = false;
+        for (String[] row : rows) {
+            for (int c = 0; c < row.length; c++) {
+                PdfPCell cell = new PdfPCell(new Phrase(row[c] != null ? row[c] : "",
+                        SchoolDocumentTheme.body(8.5f)));
+                cell.setPadding(5);
+                cell.setBorder(0);
+                cell.setBorderWidthBottom(0.6f);
+                cell.setBorderColor(SchoolDocumentTheme.BORDER);
+                if (stripe) {
+                    cell.setBackgroundColor(SchoolDocumentTheme.ZEBRA);
+                }
+                table.addCell(cell);
+            }
+            stripe = !stripe;
+        }
         table.setHeaderRows(1);
         document.add(table);
         document.add(Chunk.NEWLINE);
@@ -458,7 +504,7 @@ public class ReportService {
                 {"Moyenne de la classe", bulletin.getClassAverage() != null ? bulletin.getClassAverage().toString() : "—"},
                 {"Maximum", bulletin.getClassMax() != null ? bulletin.getClassMax().toString() : "—"},
                 {"Minimum", bulletin.getClassMin() != null ? bulletin.getClassMin().toString() : "—"},
-                {"Mention", bulletin.getMention() != null ? bulletin.getMention() : "—"},
+                {"Appréciation", bulletin.getObservation() != null ? bulletin.getObservation() : "—"},
                 {"Décision", bulletin.getDecision() != null ? bulletin.getDecision().name() : "—"},
         });
         document.add(summary);
@@ -951,6 +997,15 @@ public class ReportService {
             }
             workbook.write(response.getOutputStream());
         }
+    }
+
+    /**
+     * Note au format français (deux décimales, virgule), ou « — » si absente.
+     * Une case vide se lit mal sur un bulletin imprimé.
+     */
+    private String formatNote(java.math.BigDecimal value) {
+        return value == null ? "—"
+                : String.format(java.util.Locale.FRANCE, "%.2f", value);
     }
 
     private String sanitize(String name) {
