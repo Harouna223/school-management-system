@@ -52,9 +52,40 @@ public class SettingController {
     @Operation(summary = "Uploader le logo de l'établissement")
     public ResponseEntity<ApiResponse<String>> uploadLogo(@RequestPart("file") MultipartFile file,
                                                           HttpServletRequest httpRequest) {
+        // L'ancien logo n'est supprimé qu'APRÈS l'enregistrement du nouveau :
+        // un upload interrompu ne laisse jamais l'application sans logo.
+        String previous = settingService.value(SettingService.SCHOOL_LOGO, "");
         String url = fileStorageService.store(file, "school");
         settingService.updateAll(Map.of(SettingService.SCHOOL_LOGO, url), httpRequest);
+        if (previous != null && !previous.isBlank() && !previous.equals(url)) {
+            settingService.deleteReplacedLogo(previous);
+        }
         return ok("Logo mis à jour", url);
+    }
+
+    @DeleteMapping("/logo")
+    @Operation(summary = "Supprimer le logo de l'établissement")
+    public ResponseEntity<ApiResponse<Void>> deleteLogo(HttpServletRequest httpRequest) {
+        settingService.deleteLogo(httpRequest);
+        return ok("Logo supprimé", null);
+    }
+
+    // ------------------------------------------------------------------
+    // Informations de l'établissement (module dédié)
+    // ------------------------------------------------------------------
+
+    @GetMapping("/school")
+    @Operation(summary = "Informations officielles de l'établissement")
+    public ResponseEntity<ApiResponse<com.school.dto.response.SchoolInfoResponse>> schoolInfo() {
+        return ok("Informations de l'établissement", settingService.schoolInfo());
+    }
+
+    @PutMapping("/school")
+    @Operation(summary = "Enregistrer les informations de l'établissement")
+    public ResponseEntity<ApiResponse<com.school.dto.response.SchoolInfoResponse>> updateSchoolInfo(
+            @jakarta.validation.Valid @RequestBody com.school.dto.request.SchoolInfoRequest request,
+            HttpServletRequest httpRequest) {
+        return ok("Informations enregistrées", settingService.updateSchoolInfo(request, httpRequest));
     }
 
     @GetMapping("/cycles")

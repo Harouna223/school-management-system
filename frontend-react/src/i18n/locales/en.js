@@ -46,6 +46,7 @@ export const en = {
   'nav.audit': 'Activity log',
   'nav.settings': 'Settings',
   'nav.appreciationScales': 'Grading scales',
+  'nav.schoolInfo': 'School information',
   'nav.logout': 'Log out',
 
   // Roles

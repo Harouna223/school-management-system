@@ -46,6 +46,7 @@ export const fr = {
   'nav.audit': "Journal d'activité",
   'nav.settings': 'Paramètres',
   'nav.appreciationScales': "Barèmes d'appréciation",
+  'nav.schoolInfo': "Informations de l'établissement",
   'nav.logout': 'Déconnexion',
 
   // Rôles

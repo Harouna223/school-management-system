@@ -288,6 +288,12 @@ class SettingServiceTest {
         assertThat(defauts.get(SettingService.SCHOOL_NAME)).isEqualTo("Sahel Edu");
         assertThat(defauts.get(SettingService.SCHOOL_PHONE)).isEqualTo("+237600000000");
         assertThat(defauts.get(SettingService.WHATSAPP_ENABLED)).isEqualTo("true");
-        assertThat(defauts).hasSize(11);
+        // 11 réglages d'origine + 16 champs du module « Informations de l'établissement »
+        assertThat(defauts).hasSize(27);
+        assertThat(defauts).containsKeys(
+                SettingService.SCHOOL_SHORT_NAME, SettingService.SCHOOL_CITY,
+                SettingService.SCHOOL_COUNTRY, SettingService.SCHOOL_DIRECTOR,
+                SettingService.SCHOOL_ACCREDITATION, SettingService.SCHOOL_ADDITIONAL_INFO);
+        assertThat(defauts.get(SettingService.SCHOOL_COUNTRY)).isEqualTo("Mali");
     }
 }

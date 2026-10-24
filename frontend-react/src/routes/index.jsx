@@ -50,6 +50,7 @@ const TeacherPortalPage = lazy(() => import('../pages/teachers/TeacherPortalPage
 const AuditPage = lazy(() => import('../pages/audit/AuditPage'))
 const SettingsPage = lazy(() => import('../pages/settings/SettingsPage'))
 const AppreciationScalesPage = lazy(() => import('../pages/appreciations/AppreciationScalesPage'))
+const SchoolInfoPage = lazy(() => import('../pages/school/SchoolInfoPage'))
 const ReportsPage = lazy(() => import('../pages/reports/ReportsPage'))
 const ProfilePage = lazy(() => import('../pages/ProfilePage'))
 
@@ -128,6 +129,8 @@ export default function AppRoutes() {
               <Route path="/settings" element={<RoleRoute roles={['SUPER_ADMIN']}><SettingsPage /></RoleRoute>} />
               {/* Barèmes d'appréciation : configuration pédagogique par cycle */}
               <Route path="/appreciation-scales" element={<RoleRoute roles={['SUPER_ADMIN', 'DIRECTEUR']}><AppreciationScalesPage /></RoleRoute>} />
+              {/* Informations officielles de l'établissement (nom, coordonnées, logo) */}
+              <Route path="/school-info" element={<RoleRoute roles={['SUPER_ADMIN']}><SchoolInfoPage /></RoleRoute>} />
             </Route>
           </Route>
 

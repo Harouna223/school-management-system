@@ -29,6 +29,7 @@ import {
   Shield,
   Settings as SettingsIcon,
   Tune as ScalesIcon,
+  Apartment as SchoolInfoIcon,
   ChevronLeft,
   ChevronRight,
   Assessment as ReportsIcon,
@@ -181,6 +182,7 @@ export default function Sidebar({ open, onClose, collapsed, onCollapseToggle, va
     navGroups.push({
       label: 'nav.group.system',
       items: [
+        { key: 'school-info', label: 'nav.schoolInfo', icon: <SchoolInfoIcon />, to: '/school-info', roles: ['SUPER_ADMIN'] },
         { key: 'users', label: 'nav.users', icon: <ManageAccounts />, to: '/users', roles: ['SUPER_ADMIN', 'DIRECTEUR'] },
         { key: 'appreciation-scales', label: 'nav.appreciationScales', icon: <ScalesIcon />, to: '/appreciation-scales', roles: ['SUPER_ADMIN', 'DIRECTEUR'] },
         { key: 'audit', label: 'nav.audit', icon: <Shield />, to: '/audit', roles: ['SUPER_ADMIN'] },

@@ -266,6 +266,10 @@ export const settingsApi = {
   },
   cycles: () => api.get('/settings/cycles'),
   updateCycles: (cycles) => api.put('/settings/cycles', cycles),
+  // Informations de l'établissement (module dédié)
+  schoolInfo: () => api.get('/settings/school'),
+  updateSchoolInfo: (values) => api.put('/settings/school', values),
+  deleteLogo: () => api.delete('/settings/logo'),
 }
 
 /**
