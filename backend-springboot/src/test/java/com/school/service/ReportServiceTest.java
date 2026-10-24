@@ -111,13 +111,19 @@ class ReportServiceTest {
      * reçu : le PDF est réellement généré, et les autres appels restent vérifiables.
      */
     private void themeReel() throws Exception {
-        when(documentTheme.init(any(), anyString(), any(Document.class)))
+        // Le thème résolu est fourni par le service de configuration : on rend
+        // la charte par défaut, ce qui reproduit exactement l'ancien rendu.
+        lenient().when(documentTheme.styleFor(anyString()))
+                .thenReturn(com.school.pdf.DocumentStyle.defaults());
+        when(documentTheme.init(any(), anyString(), any(Document.class), any()))
                 .thenAnswer(inv -> PdfWriter.getInstance(inv.getArgument(2), pdfBytes));
         lenient().when(documentTheme.academicYear()).thenReturn("2025-2026");
-        lenient().when(documentTheme.generatedOn()).thenReturn(new Paragraph("Genere le 01/01/2026"));
-        lenient().when(documentTheme.dataTable(any(), any(), any(), anyBoolean()))
+        lenient().when(documentTheme.generatedOn(any()))
+                .thenReturn(new Paragraph("Genere le 01/01/2026"));
+        lenient().when(documentTheme.dataTable(any(), any(), any(), anyBoolean(), any()))
                 .thenReturn(new PdfPTable(2));
-        lenient().when(documentTheme.totalRow(any(), any(), any())).thenReturn(new PdfPTable(2));
+        lenient().when(documentTheme.totalRow(any(), any(), any(), any()))
+                .thenReturn(new PdfPTable(2));
     }
 
     private Workbook excelLu() throws Exception {
@@ -268,7 +274,7 @@ class ReportServiceTest {
                     "Periode", "Janvier 2026", null);
 
             verify(documentTheme).addTitle(any(Document.class), eq("Rapport de presences"),
-                    eq("Periode : Janvier 2026"));
+                    eq("Periode : Janvier 2026"), any());
         }
 
         @Test
@@ -276,7 +282,7 @@ class ReportServiceTest {
             service.exportTablePdf(response, "Rapport", new String[]{"A"}, List.of(),
                     null, "Janvier 2026", null);
 
-            verify(documentTheme).addTitle(any(Document.class), eq("Rapport"), isNull());
+            verify(documentTheme).addTitle(any(Document.class), eq("Rapport"), isNull(), any());
         }
 
         @Test
@@ -284,7 +290,7 @@ class ReportServiceTest {
             service.exportTablePdf(response, "Rapport", new String[]{"A"}, List.of(),
                     "Periode", null, null);
 
-            verify(documentTheme).addTitle(any(Document.class), eq("Rapport"), isNull());
+            verify(documentTheme).addTitle(any(Document.class), eq("Rapport"), isNull(), any());
         }
 
         @Test
@@ -292,7 +298,7 @@ class ReportServiceTest {
             service.exportTablePdf(response, "Rapport", new String[]{"A"}, List.of(),
                     null, null, null);
 
-            verify(documentTheme, never()).totalRow(any(), any(), any());
+            verify(documentTheme, never()).totalRow(any(), any(), any(), any());
         }
 
         @Test
@@ -300,7 +306,8 @@ class ReportServiceTest {
             service.exportTablePdf(response, "Bilan financier", new String[]{"A"}, List.of(),
                     null, null, new String[]{"TOTAL", "1 250 000 FCFA"});
 
-            verify(documentTheme).totalRow("TOTAL", "1 250 000 FCFA", SchoolDocumentTheme.PRIMARY);
+            verify(documentTheme).totalRow(eq("TOTAL"), eq("1 250 000 FCFA"),
+                    eq(com.school.pdf.DocumentStyle.defaults().primary), any());
         }
 
         @Test
@@ -310,7 +317,7 @@ class ReportServiceTest {
 
             service.exportTablePdf(response, "Rapport", headers, rows, null, null, null);
 
-            verify(documentTheme).dataTable(same(headers), same(rows), isNull(), eq(true));
+            verify(documentTheme).dataTable(same(headers), same(rows), isNull(), eq(true), any());
         }
 
         @Test
@@ -318,7 +325,7 @@ class ReportServiceTest {
             service.exportTablePdf(response, "Etat Mensuel", new String[]{"A"}, List.of(),
                     null, null, null);
 
-            verify(documentTheme).init(same(response), eq("etat-mensuel"), any(Document.class));
+            verify(documentTheme).init(same(response), eq("etat-mensuel"), any(Document.class), any());
         }
 
         @Test
@@ -347,14 +354,14 @@ class ReportServiceTest {
                     "Liste des eleves");
 
             verify(documentTheme).addTitle(any(Document.class), eq("Liste des eleves"),
-                    eq("Année scolaire 2025-2026"));
+                    eq("Année scolaire 2025-2026"), any());
         }
 
         @Test
         void assainitLeNomDuFichier() throws Exception {
             service.exportStudentsPdf(response, List.of(), new String[]{"A"}, "Liste des eleves");
 
-            verify(documentTheme).init(same(response), eq("liste-des-eleves"), any(Document.class));
+            verify(documentTheme).init(same(response), eq("liste-des-eleves"), any(Document.class), any());
         }
 
         @Test

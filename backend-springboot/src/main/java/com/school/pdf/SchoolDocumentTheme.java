@@ -25,12 +25,18 @@ import java.util.List;
  * (logo + coordonnées), pied de page numéroté, style des tableaux,
  * blocs d'information, signatures et badges de statut.
  * Tous les documents PDF de l'application utilisent ce thème.
+ * <p>
+ * <b>Personnalisation</b> : les constantes publiques (palette, polices)
+ * restent la charte d'origine et servent de repli. Chaque appel accepte un
+ * {@link DocumentStyle} résolu par {@link DocumentStyleService} : le rendu
+ * suit alors la configuration enregistrée par l'administrateur. Un document
+ * généré sans style explicite sort exactement comme avant.
  */
 @Component
 @RequiredArgsConstructor
 public class SchoolDocumentTheme {
 
-    // ---------- Palette institutionnelle ----------
+    // ---------- Palette institutionnelle (charte d'origine) ----------
 
     public static final Color PRIMARY = new Color(30, 58, 138);        // bleu institutionnel #1e3a8a
     public static final Color ACCENT = new Color(59, 130, 246);        // bleu clair #3b82f6
@@ -43,7 +49,7 @@ public class SchoolDocumentTheme {
     public static final Color WARNING = new Color(180, 83, 9);         // orange
     public static final Color DANGER = new Color(185, 28, 28);         // rouge
 
-    // ---------- Typographie ----------
+    // ---------- Typographie (charte d'origine) ----------
 
     public static Font body(float size) {
         return FontFactory.getFont(FontFactory.HELVETICA, size, TEXT_DARK);
@@ -68,6 +74,24 @@ public class SchoolDocumentTheme {
     private final SettingService settingService;
     private final AppProperties appProperties;
     private final com.school.service.AcademicCalendarService academicCalendarService;
+    private final DocumentStyleService documentStyleService;
+
+    // ---------- Résolution du style ----------
+
+    /** Style d'un type de document (thème actif + option de ce type). */
+    public DocumentStyle styleFor(String documentType) {
+        return documentStyleService.resolve(documentType);
+    }
+
+    /** Thème actif, sans option de type de document. */
+    public DocumentStyle style() {
+        return documentStyleService.activeStyle();
+    }
+
+    /** Version du thème utilisée — épinglée sur les documents délivrés. */
+    public Long activeVersionId() {
+        return documentStyleService.activeVersionId();
+    }
 
     // ---------- Métadonnées établissement ----------
 
@@ -101,99 +125,182 @@ public class SchoolDocumentTheme {
         return academicCalendarService.yearLabel(null);
     }
 
+    // ---------- Initialisation ----------
+
     /**
      * Initialise un document PDF : en-tête HTTP, pied de page numéroté.
      */
     public PdfWriter init(HttpServletResponse response, String filename, Document document)
             throws IOException {
-        response.setContentType("application/pdf");
-        response.setHeader("Content-Disposition", "attachment; filename=\"" + filename + ".pdf\"");
-        PdfWriter writer = PdfWriter.getInstance(document, response.getOutputStream());
-        writer.setPageEvent(new DocumentFooter(schoolName()));
-        return writer;
+        return init(response, filename, document, DocumentStyle.defaults());
     }
 
     /**
-     * En-tête officiel : logo à gauche, identité de l'établissement à droite,
-     * double filet bleu sous l'en-tête.
+     * Initialise un document PDF avec la charte donnée.
      */
+    public PdfWriter init(HttpServletResponse response, String filename, Document document,
+                          DocumentStyle style) throws IOException {
+        response.setContentType("application/pdf");
+        response.setHeader("Content-Disposition", "attachment; filename=\"" + filename + ".pdf\"");
+        PdfWriter writer = PdfWriter.getInstance(document, response.getOutputStream());
+        DocumentStyle s = style != null ? style : DocumentStyle.defaults();
+        writer.setPageEvent(new DocumentFooter(schoolName(), s));
+        return writer;
+    }
+
+    // ---------- En-tête ----------
+
+    /** En-tête avec la charte d'origine. */
     public void addHeader(Document document) {
-        PdfPTable header = new PdfPTable(2);
+        addHeader(document, DocumentStyle.defaults());
+    }
+
+    /**
+     * En-tête officiel : logo, identité de l'établissement et filet de
+     * séparation. Position du logo, éléments affichés et couleur du filet
+     * viennent de la configuration ; le modèle « Moderne » centre l'ensemble.
+     */
+    public void addHeader(Document document, DocumentStyle style) {
+        DocumentStyle s = style != null ? style : DocumentStyle.defaults();
+        boolean centered = s.logoPosition == DocumentStyle.LogoPosition.CENTER;
+
+        PdfPTable header = new PdfPTable(centered ? 1 : 2);
         header.setWidthPercentage(100);
-        header.setWidths(new float[]{1.1f, 3.4f});
+        if (!centered) {
+            header.setWidths(s.logoPosition == DocumentStyle.LogoPosition.LEFT
+                    ? new float[]{1.1f, 3.4f}
+                    : new float[]{3.4f, 1.1f});
+        }
         header.setKeepTogether(true);
 
-        // Cellule logo
-        PdfPCell logoCell = new PdfPCell();
-        logoCell.setBorder(0);
-        logoCell.setVerticalAlignment(Element.ALIGN_MIDDLE);
-        logoCell.setHorizontalAlignment(Element.ALIGN_CENTER);
-        Image logo = loadLogo();
-        if (logo != null) {
-            try {
-                logo.scaleAbsolute(56f, 56f);
-                logoCell.addElement(logo);
-            } catch (Exception ignored) {
-                logoCell.addElement(initialsFallback());
+        Element logoElement = null;
+        if (s.showLogo) {
+            Image logo = loadLogo();
+            if (logo != null) {
+                try {
+                    logo.scaleAbsolute(56f, 56f);
+                    logoElement = logo;
+                } catch (Exception ignored) {
+                    logoElement = initialsFallback(s);
+                }
+            } else {
+                logoElement = initialsFallback(s);
             }
-        } else {
-            logoCell.addElement(initialsFallback());
         }
-        header.addCell(logoCell);
 
-        // Cellule identité
         PdfPCell infoCell = new PdfPCell();
         infoCell.setBorder(0);
         infoCell.setVerticalAlignment(Element.ALIGN_MIDDLE);
-        infoCell.setPaddingLeft(8);
-        Paragraph name = new Paragraph(schoolName() != null ? schoolName() : "Établissement scolaire",
-                heading(15));
-        name.setSpacingAfter(2);
-        infoCell.addElement(name);
+        infoCell.setPaddingLeft(centered ? 0 : 8);
+        infoCell.setHorizontalAlignment(centered ? Element.ALIGN_CENTER : Element.ALIGN_LEFT);
+        if (s.showSchoolName) {
+            Paragraph name = new Paragraph(
+                    schoolName() != null ? schoolName() : "Établissement scolaire",
+                    s.heading(centered ? s.titleSize - 2 : 15));
+            name.setSpacingAfter(2);
+            if (centered) {
+                name.setAlignment(Element.ALIGN_CENTER);
+            }
+            infoCell.addElement(name);
+        }
         String slogan = schoolSlogan();
         if (slogan != null && !slogan.isBlank()) {
-            Paragraph slog = new Paragraph(slogan, muted(8.5f));
+            Paragraph slog = new Paragraph(slogan, s.muted(8.5f));
             slog.setSpacingAfter(3);
+            if (centered) {
+                slog.setAlignment(Element.ALIGN_CENTER);
+            }
             infoCell.addElement(slog);
         }
-        StringBuilder line = new StringBuilder();
-        String address = schoolAddress();
-        if (address != null && !address.isBlank()) {
-            line.append(address);
+        if (s.showContact || s.showAddress) {
+            StringBuilder line = new StringBuilder();
+            if (s.showAddress) {
+                String address = schoolAddress();
+                if (address != null && !address.isBlank()) {
+                    line.append(address);
+                }
+            }
+            if (s.showContact) {
+                String phone = schoolPhone();
+                String email = schoolEmail();
+                if (phone != null && !phone.isBlank()) {
+                    if (line.length() > 0) line.append("  •  ");
+                    line.append("Tél : ").append(phone);
+                }
+                if (email != null && !email.isBlank()) {
+                    if (line.length() > 0) line.append("  •  ");
+                    line.append(email);
+                }
+            }
+            if (line.length() > 0) {
+                Paragraph contact = new Paragraph(line.toString(), s.muted(7.5f));
+                contact.setSpacingAfter(1);
+                if (centered) {
+                    contact.setAlignment(Element.ALIGN_CENTER);
+                }
+                infoCell.addElement(contact);
+            }
+            String website = schoolWebsite();
+            if (s.showContact && website != null && !website.isBlank()) {
+                Paragraph web = new Paragraph(website, s.muted(7f));
+                if (centered) {
+                    web.setAlignment(Element.ALIGN_CENTER);
+                }
+                infoCell.addElement(web);
+            }
         }
-        String phone = schoolPhone();
-        String email = schoolEmail();
-        if (phone != null && !phone.isBlank()) {
-            if (line.length() > 0) line.append("  •  ");
-            line.append("Tél : ").append(phone);
+
+        if (centered) {
+            if (logoElement != null) {
+                header.addCell(centeredLogoCell(logoElement));
+            }
+            header.addCell(infoCell);
+        } else if (s.logoPosition == DocumentStyle.LogoPosition.LEFT) {
+            header.addCell(sideLogoCell(logoElement));
+            header.addCell(infoCell);
+        } else {
+            header.addCell(infoCell);
+            header.addCell(sideLogoCell(logoElement));
         }
-        if (email != null && !email.isBlank()) {
-            if (line.length() > 0) line.append("  •  ");
-            line.append(email);
-        }
-        if (line.length() > 0) {
-            Paragraph contact = new Paragraph(line.toString(), muted(7.5f));
-            contact.setSpacingAfter(1);
-            infoCell.addElement(contact);
-        }
-        String website = schoolWebsite();
-        if (website != null && !website.isBlank()) {
-            infoCell.addElement(new Paragraph(website, muted(7f)));
-        }
-        header.addCell(infoCell);
         document.add(header);
 
-        // Double filet bleu sous l'en-tête
-        PdfPTable rule = new PdfPTable(1);
-        rule.setWidthPercentage(100);
-        PdfPCell ruleCell = new PdfPCell();
-        ruleCell.setBorder(0);
-        ruleCell.setBorderWidthBottom(1.6f);
-        ruleCell.setBorderColorBottom(PRIMARY);
-        ruleCell.setPaddingBottom(3);
-        rule.addCell(ruleCell);
-        document.add(rule);
+        // Filet de séparation
+        if (s.headerRule) {
+            PdfPTable rule = new PdfPTable(1);
+            rule.setWidthPercentage(100);
+            PdfPCell ruleCell = new PdfPCell();
+            ruleCell.setBorder(0);
+            ruleCell.setBorderWidthBottom(s.template == DocumentStyle.Template.MINIMAL ? 0.8f : 1.6f);
+            ruleCell.setBorderColorBottom(s.primary);
+            ruleCell.setPaddingBottom(3);
+            rule.addCell(ruleCell);
+            document.add(rule);
+        }
         document.add(Chunk.NEWLINE);
+    }
+
+    /** Cellule du logo dans un en-tête à deux colonnes. */
+    private PdfPCell sideLogoCell(Element logoElement) {
+        PdfPCell cell = new PdfPCell();
+        cell.setBorder(0);
+        cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+        cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+        if (logoElement != null) {
+            cell.addElement(logoElement);
+        }
+        return cell;
+    }
+
+    /** Cellule du logo au-dessus de l'identité (modèle centré). */
+    private PdfPCell centeredLogoCell(Element logoElement) {
+        PdfPCell cell = new PdfPCell();
+        cell.setBorder(0);
+        cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+        cell.setPaddingBottom(4);
+        if (logoElement != null) {
+            cell.addElement(logoElement);
+        }
+        return cell;
     }
 
     /**
@@ -223,11 +330,15 @@ public class SchoolDocumentTheme {
     }
 
     private Element initialsFallback() {
+        return initialsFallback(DocumentStyle.defaults());
+    }
+
+    private Element initialsFallback(DocumentStyle s) {
         String initials = initialsFor(schoolName());
         PdfPTable box = new PdfPTable(1);
         box.setWidthPercentage(100);
-        PdfPCell cell = new PdfPCell(new Phrase(initials, whiteBold(18)));
-        cell.setBackgroundColor(PRIMARY);
+        PdfPCell cell = new PdfPCell(new Phrase(initials, s.whiteBold(18)));
+        cell.setBackgroundColor(s.primary);
         cell.setBorder(0);
         cell.setFixedHeight(56f);
         cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
@@ -236,59 +347,152 @@ public class SchoolDocumentTheme {
         return box;
     }
 
-    /**
-     * Bloc titre du document : type de document + sous-titre.
-     */
+    // ---------- Titres ----------
+
+    /** Bloc titre du document (charte d'origine). */
     public void addTitle(Document document, String title, String subtitle) {
-        Paragraph t = new Paragraph(title, heading(16));
-        t.setSpacingAfter(subtitle != null && !subtitle.isBlank() ? 2 : 8);
+        addTitle(document, title, subtitle, DocumentStyle.defaults());
+    }
+
+    /**
+     * Bloc titre du document : type de document + sous-titre, alignés selon la
+     * configuration. Le modèle « Moderne » souligne le titre ; « Premium »
+     * l'encadre.
+     */
+    public void addTitle(Document document, String title, String subtitle, DocumentStyle style) {
+        DocumentStyle s = style != null ? style : DocumentStyle.defaults();
+        boolean hasSubtitle = subtitle != null && !subtitle.isBlank();
+
+        Paragraph t = new Paragraph(title, s.heading(s.titleSize));
+        t.setAlignment(s.titleAlign.iText());
+        t.setSpacingAfter(hasSubtitle ? 2 : 8);
+        if (s.template == DocumentStyle.Template.MODERN) {
+            t.setSpacingBefore(4);
+        }
         document.add(t);
-        if (subtitle != null && !subtitle.isBlank()) {
-            Paragraph st = new Paragraph(subtitle, muted(9.5f));
-            st.setSpacingAfter(8);
-            document.add(st);
+
+        if (s.template == DocumentStyle.Template.MODERN) {
+            // Filet d'accent sous le titre, centré ou aligné avec lui.
+            PdfPTable underline = new PdfPTable(1);
+            underline.setWidthPercentage(s.titleAlign == DocumentStyle.TitleAlign.CENTER ? 24 : 34);
+            if (s.titleAlign != DocumentStyle.TitleAlign.CENTER) {
+                underline.setHorizontalAlignment(
+                        s.titleAlign == DocumentStyle.TitleAlign.RIGHT ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT);
+            } else {
+                underline.setHorizontalAlignment(Element.ALIGN_CENTER);
+            }
+            PdfPCell c = new PdfPCell();
+            c.setBorder(0);
+            c.setBorderWidthBottom(2f);
+            c.setBorderColorBottom(s.accent);
+            c.setFixedHeight(4f);
+            underline.addCell(c);
+            document.add(underline);
+        }
+
+        if (hasSubtitle) {
+            if (s.template == DocumentStyle.Template.PREMIUM) {
+                PdfPTable box = new PdfPTable(1);
+                box.setWidthPercentage(100);
+                PdfPCell c = new PdfPCell(new Phrase(subtitle, s.muted(s.subtitleSize)));
+                c.setBorder(0);
+                c.setBorderWidthLeft(2.5f);
+                c.setBorderColorLeft(s.accent);
+                c.setPaddingLeft(6);
+                c.setPaddingTop(3);
+                c.setPaddingBottom(3);
+                c.setBackgroundColor(s.sectionBackground);
+                c.setHorizontalAlignment(s.titleAlign.iText());
+                box.addCell(c);
+                box.setSpacingAfter(6);
+                document.add(box);
+            } else {
+                Paragraph st = new Paragraph(subtitle, s.muted(s.subtitleSize));
+                st.setAlignment(s.titleAlign.iText());
+                st.setSpacingAfter(8);
+                document.add(st);
+            }
         }
     }
 
-    /**
-     * Titre de section.
-     */
+    /** Titre de section (charte d'origine). */
     public void sectionTitle(Document document, String text) {
-        Paragraph p = new Paragraph(text, bold(10.5f));
-        p.setSpacingBefore(10);
-        p.setSpacingAfter(5);
-        document.add(p);
+        sectionTitle(document, text, DocumentStyle.defaults());
     }
 
     /**
-     * Tableau de données stylisé : en-tête bleu, texte blanc, zébrures, bordures discrètes.
-     * Les colonnes numériques sont alignées à droite (heuristique : dernière colonne).
+     * Titre de section. « Moderne » l'écrit dans la couleur d'accent,
+     * « Premium » le fait précéder d'un filet fin.
      */
+    public void sectionTitle(Document document, String text, DocumentStyle style) {
+        DocumentStyle s = style != null ? style : DocumentStyle.defaults();
+        Font sectionFont = s.template == DocumentStyle.Template.MODERN
+                ? DocumentStyle.font(s.fontFamily, 10.5f, com.lowagie.text.Font.BOLD, s.accent)
+                : s.bold(10.5f);
+        Paragraph p = new Paragraph(text, sectionFont);
+        p.setSpacingBefore(Math.max(6, s.sectionSpacing));
+        p.setSpacingAfter(Math.max(4, s.sectionSpacing / 2f));
+        if (s.template == DocumentStyle.Template.MINIMAL) {
+            p.setSpacingBefore(6);
+        }
+        document.add(p);
+    }
+
+    // ---------- Tableaux ----------
+
+    /** Tableau de données (charte d'origine). */
     public PdfPTable dataTable(String[] headers, List<String[]> rows, float[] widths, boolean zebra) {
+        return dataTable(headers, rows, widths, zebra, DocumentStyle.defaults());
+    }
+
+    /**
+     * Tableau de données stylisé : en-tête plein, texte de contraste, zébrures
+     * et bordures optionnelles. Le zébrage n'est appliqué que si le style
+     * l'autorise <b>et</b> que l'appelant le demande.
+     */
+    public PdfPTable dataTable(String[] headers, List<String[]> rows, float[] widths,
+                               boolean zebra, DocumentStyle style) {
+        DocumentStyle s = style != null ? style : DocumentStyle.defaults();
         PdfPTable table = new PdfPTable(headers.length);
         table.setWidthPercentage(100);
         if (widths != null) {
             table.setWidths(widths);
         }
+        boolean borderlessHeaders = s.template == DocumentStyle.Template.PREMIUM
+                || s.template == DocumentStyle.Template.MINIMAL;
         for (String header : headers) {
-            PdfPCell cell = new PdfPCell(new Phrase(header, whiteBold(9.5f)));
-            cell.setBackgroundColor(PRIMARY);
+            PdfPCell cell = new PdfPCell(new Phrase(header, s.tableHeaderFont()));
+            if (borderlessHeaders) {
+                cell.setBackgroundColor(s.sectionBackground);
+                cell.setBorderWidthBottom(1f);
+                cell.setBorderColorBottom(s.primary);
+                cell.setBorderWidthTop(0);
+                cell.setBorderWidthLeft(0);
+                cell.setBorderWidthRight(0);
+            } else {
+                cell.setBackgroundColor(s.tableHeader);
+                cell.setBorder(0);
+            }
             cell.setPadding(6);
-            cell.setBorder(0);
-            cell.setBorderColor(BORDER);
+            cell.setBorderColor(s.border);
             table.addCell(cell);
         }
         boolean stripe = false;
         for (String[] row : rows) {
             for (int c = 0; c < row.length; c++) {
-                Phrase ph = new Phrase(row[c] != null ? row[c] : "", body(9f));
+                Phrase ph = new Phrase(row[c] != null ? row[c] : "", s.tableBodyFont());
                 PdfPCell cell = new PdfPCell(ph);
                 cell.setPadding(5);
-                cell.setBorder(0);
-                cell.setBorderColor(BORDER);
-                cell.setBorderWidthBottom(0.6f);
-                if (zebra && stripe) {
-                    cell.setBackgroundColor(ZEBRA);
+                if (s.tableBorders) {
+                    cell.setBorderWidth(0.5f);
+                    cell.setBorderColor(s.border);
+                } else {
+                    cell.setBorder(0);
+                    cell.setBorderWidthBottom(0.6f);
+                    cell.setBorderColor(s.border);
+                }
+                if (zebra && stripe && s.zebraStripes) {
+                    cell.setBackgroundColor(s.sectionBackground);
                 }
                 table.addCell(cell);
             }
@@ -297,18 +501,24 @@ public class SchoolDocumentTheme {
         return table;
     }
 
+    /** Tableau clé/valeur (charte d'origine). */
+    public PdfPTable infoTable(String[][] rows) {
+        return infoTable(rows, DocumentStyle.defaults());
+    }
+
     /**
      * Tableau d'informations clé/valeur (élève, facture, etc.).
      */
-    public PdfPTable infoTable(String[][] rows) {
+    public PdfPTable infoTable(String[][] rows, DocumentStyle style) {
+        DocumentStyle s = style != null ? style : DocumentStyle.defaults();
         PdfPTable table = new PdfPTable(2);
         table.setWidthPercentage(100);
         for (String[] row : rows) {
-            PdfPCell label = new PdfPCell(new Phrase(row[0], bold(9f)));
+            PdfPCell label = new PdfPCell(new Phrase(row[0], s.bold(s.tableSize)));
             label.setBorder(0);
             label.setPadding(4);
-            label.setBackgroundColor(HEADER_BG);
-            PdfPCell value = new PdfPCell(new Phrase(row[1] != null ? row[1] : "—", body(9f)));
+            label.setBackgroundColor(s.sectionBackground);
+            PdfPCell value = new PdfPCell(new Phrase(row[1] != null ? row[1] : "—", s.tableBodyFont()));
             value.setBorder(0);
             value.setPadding(4);
             table.addCell(label);
@@ -317,15 +527,21 @@ public class SchoolDocumentTheme {
         return table;
     }
 
+    /** Bloc signatures (charte d'origine). */
+    public PdfPTable signatureBlock(String... labels) {
+        return signatureBlock(DocumentStyle.defaults(), labels);
+    }
+
     /**
      * Bloc signatures alignées (enseignants, direction, cachet).
      */
-    public PdfPTable signatureBlock(String... labels) {
+    public PdfPTable signatureBlock(DocumentStyle style, String... labels) {
+        DocumentStyle s = style != null ? style : DocumentStyle.defaults();
         PdfPTable table = new PdfPTable(labels.length);
         table.setWidthPercentage(100);
         for (String label : labels) {
             PdfPCell cell = new PdfPCell(new Phrase("\n\n\n\n" + label + "\n\n(Signature et cachet)",
-                    muted(8.5f)));
+                    s.muted(8.5f)));
             cell.setBorder(0);
             cell.setHorizontalAlignment(Element.ALIGN_CENTER);
             table.addCell(cell);
@@ -333,48 +549,66 @@ public class SchoolDocumentTheme {
         return table;
     }
 
+    /** Badge de statut (charte d'origine). */
+    public Phrase badge(String text, Color bg) {
+        return badge(text, bg, DocumentStyle.defaults());
+    }
+
     /**
      * Badge de statut (pillule colorée discrète).
      */
-    public Phrase badge(String text, Color bg) {
+    public Phrase badge(String text, Color bg, DocumentStyle style) {
+        DocumentStyle s = style != null ? style : DocumentStyle.defaults();
         Chunk c = new Chunk(" " + text + " ",
-                FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8.5f, Color.WHITE));
+                DocumentStyle.font(s.fontFamily, 8.5f, com.lowagie.text.Font.BOLD, s.headerText));
         c.setBackground(bg, 4f, 2.5f, 4f, 2.5f);
         return new Phrase(c);
+    }
+
+    /** Ligne de total (charte d'origine). */
+    public PdfPTable totalRow(String label, String value, Color color) {
+        return totalRow(label, value, color, DocumentStyle.defaults());
     }
 
     /**
      * Ligne de total mise en évidence.
      */
-    public PdfPTable totalRow(String label, String value, Color color) {
+    public PdfPTable totalRow(String label, String value, Color color, DocumentStyle style) {
+        DocumentStyle s = style != null ? style : DocumentStyle.defaults();
         PdfPTable table = new PdfPTable(2);
         table.setWidthPercentage(60);
         table.setHorizontalAlignment(Element.ALIGN_RIGHT);
-        PdfPCell lbl = new PdfPCell(new Phrase(label, bold(11f)));
+        PdfPCell lbl = new PdfPCell(new Phrase(label, s.bold(11f)));
         lbl.setBorder(0);
         lbl.setPadding(5);
         lbl.setHorizontalAlignment(Element.ALIGN_RIGHT);
-        PdfPCell val = new PdfPCell(new Phrase(value, bold(11f)));
+        PdfPCell val = new PdfPCell(new Phrase(value, s.bold(11f)));
         val.setBorder(0);
         val.setPadding(5);
         val.setHorizontalAlignment(Element.ALIGN_RIGHT);
         if (color != null) {
             val.setBackgroundColor(color);
-            val.setPhrase(new Phrase(value, whiteBold(11f)));
+            val.setPhrase(new Phrase(value, s.whiteBold(11f)));
         } else {
-            val.setBackgroundColor(HEADER_BG);
+            val.setBackgroundColor(s.sectionBackground);
         }
         table.addCell(lbl);
         table.addCell(val);
         return table;
     }
 
-    /**
-     * Libellé "Généré le ..." discret.
-     */
+    /** « Généré le … » (charte d'origine). */
     public Paragraph generatedOn() {
+        return generatedOn(DocumentStyle.defaults());
+    }
+
+    /**
+     * Libellé « Généré le … » discret.
+     */
+    public Paragraph generatedOn(DocumentStyle style) {
+        DocumentStyle s = style != null ? style : DocumentStyle.defaults();
         String when = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"));
-        Paragraph p = new Paragraph("Document généré le " + when, muted(7.5f));
+        Paragraph p = new Paragraph("Document généré le " + when, s.muted(7.5f));
         p.setAlignment(Element.ALIGN_RIGHT);
         return p;
     }
@@ -409,10 +643,16 @@ public class SchoolDocumentTheme {
     public static class DocumentFooter extends PdfPageEventHelper {
 
         private final String schoolName;
+        private final DocumentStyle style;
         private PdfTemplate total;
 
         public DocumentFooter(String schoolName) {
+            this(schoolName, DocumentStyle.defaults());
+        }
+
+        public DocumentFooter(String schoolName, DocumentStyle style) {
             this.schoolName = schoolName != null ? schoolName : "";
+            this.style = style != null ? style : DocumentStyle.defaults();
         }
 
         @Override
@@ -423,41 +663,52 @@ public class SchoolDocumentTheme {
         @Override
         public void onEndPage(PdfWriter writer, Document document) {
             PdfContentByte cb = writer.getDirectContent();
-            float pageWidth = document.right() - document.left();
             float y = 28;
 
             // Ligne discrète
             cb.saveState();
-            cb.setColorStroke(TEXT_MUTED);
+            cb.setColorStroke(style.footerText);
             cb.setLineWidth(0.5f);
             cb.moveTo(document.left(), y + 14);
             cb.lineTo(document.right(), y + 14);
             cb.stroke();
             cb.restoreState();
 
-            // Nom + page
+            // Nom + pied de page personnalisé + numéro de page
             try {
                 BaseFont bf = BaseFont.createFont(BaseFont.HELVETICA, BaseFont.CP1252, BaseFont.NOT_EMBEDDED);
                 cb.beginText();
                 cb.setFontAndSize(bf, 7.5f);
-                cb.setColorFill(TEXT_MUTED);
+                cb.setColorFill(style.footerText);
                 cb.showTextAligned(Element.ALIGN_LEFT, schoolName, document.left(), y, 0);
-                cb.showTextAligned(Element.ALIGN_RIGHT, "Page " + writer.getPageNumber() + " / ", document.right() - 14, y, 0);
+                String custom = style.footerText2;
+                if (custom != null && !custom.isBlank()) {
+                    cb.showTextAligned(Element.ALIGN_CENTER, custom, (document.left() + document.right()) / 2f, y, 0);
+                }
+                if (style.pageNumbers) {
+                    cb.showTextAligned(Element.ALIGN_RIGHT,
+                            "Page " + writer.getPageNumber() + " / ", document.right() - 14, y, 0);
+                }
                 cb.endText();
             } catch (Exception ignored) {
                 // police ou texte non disponible : ignorer
             }
 
             // Total pages
-            cb.addTemplate(total, document.right() - 14 + 20, y);
+            if (style.pageNumbers) {
+                cb.addTemplate(total, document.right() - 14 + 20, y);
+            }
         }
 
         @Override
         public void onCloseDocument(PdfWriter writer, Document document) {
+            if (!style.pageNumbers) {
+                return;
+            }
             try {
                 total.beginText();
                 total.setFontAndSize(BaseFont.createFont(BaseFont.HELVETICA, BaseFont.CP1252, BaseFont.NOT_EMBEDDED), 7.5f);
-                total.setColorFill(TEXT_MUTED);
+                total.setColorFill(style.footerText);
                 total.showText(String.valueOf(writer.getPageNumber() - 1));
                 total.endText();
             } catch (Exception ignored) {

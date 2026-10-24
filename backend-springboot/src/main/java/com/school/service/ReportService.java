@@ -1,6 +1,7 @@
 package com.school.service;
 
 import com.school.config.AppProperties;
+import com.school.pdf.DocumentStyle;
 import com.school.pdf.SchoolDocumentTheme;
 import com.lowagie.text.*;
 import com.lowagie.text.pdf.BaseFont;
@@ -107,17 +108,19 @@ public class ReportService {
     public void exportStudentsPdf(HttpServletResponse response,
                                   List<String[]> rows, String[] headers, String title)
             throws IOException {
-        Document document = new Document(PageSize.A4.rotate(), 32, 32, 32, 70);
-        PdfWriter writer = documentTheme.init(response, sanitize(title), document);
+        DocumentStyle style = documentTheme.styleFor("STUDENT_LIST");
+        Document document = new Document(style.pageSize(),
+                style.marginLeft, style.marginRight, style.marginTop, style.marginBottom);
+        PdfWriter writer = documentTheme.init(response, sanitize(title), document, style);
         document.open();
         try {
-            documentTheme.addHeader(document);
-            documentTheme.addTitle(document, title, "Année scolaire " + documentTheme.academicYear());
-            PdfPTable table = documentTheme.dataTable(headers, rows, null, true);
+            documentTheme.addHeader(document, style);
+            documentTheme.addTitle(document, title, "Année scolaire " + documentTheme.academicYear(), style);
+            PdfPTable table = documentTheme.dataTable(headers, rows, null, true, style);
             table.setHeaderRows(1);
             document.add(table);
             document.add(Chunk.NEWLINE);
-            document.add(documentTheme.generatedOn());
+            document.add(documentTheme.generatedOn(style));
         } finally {
             safeClose(document);
         }
@@ -131,13 +134,15 @@ public class ReportService {
                                   String amount, String method, String date, String note,
                                   String amountInWords, String remainingAmount)
             throws IOException {
-        Document document = new Document(PageSize.A5, 28, 28, 28, 55);
-        PdfWriter writer = documentTheme.init(response, "recu-" + receiptNo, document);
+        DocumentStyle style = documentTheme.styleFor("PAYMENT_RECEIPT");
+        Document document = new Document(style.pageSize(),
+                style.marginLeft, style.marginRight, style.marginTop, style.marginBottom);
+        PdfWriter writer = documentTheme.init(response, "recu-" + receiptNo, document, style);
         document.open();
-        documentTheme.addHeader(document);
+        documentTheme.addHeader(document, style);
 
         documentTheme.addTitle(document, "REÇU DE PAIEMENT",
-                "N° " + receiptNo + "  •  " + date);
+                "N° " + receiptNo + "  •  " + date, style);
 
         try {
 
@@ -204,8 +209,10 @@ public class ReportService {
                                          String reference, String recordedBy,
                                          String remainingAmount, String amountInWords)
             throws IOException {
-        Document document = new Document(PageSize.A5, 28, 28, 28, 55);
-        PdfWriter writer = documentTheme.init(response, "recu-enseignant-" + receiptNo, document);
+        DocumentStyle tStyle = documentTheme.styleFor("TEACHER_PAYMENT_RECEIPT");
+        Document document = new Document(tStyle.pageSize(),
+                tStyle.marginLeft, tStyle.marginRight, tStyle.marginTop, tStyle.marginBottom);
+        PdfWriter writer = documentTheme.init(response, "recu-enseignant-" + receiptNo, document, tStyle);
         document.open();
         documentTheme.addHeader(document);
 
@@ -277,31 +284,47 @@ public class ReportService {
     /**
      * Tableau imprimable PDF avec en-tête école, lignes de données et ligne de total.
      */
+    /** Rapport tabulaire générique (type {@code GENERIC_REPORT}). */
     public void exportTablePdf(HttpServletResponse response, String title,
                                String[] headers, List<String[]> rows,
                                String subtitleLabel, String subtitleValue,
                                String[] totalRow) throws IOException {
-        Document document = new Document(PageSize.A4.rotate(), 28, 28, 28, 70);
-        PdfWriter writer = documentTheme.init(response, sanitize(title), document);
+        exportTablePdf(response, title, headers, rows, subtitleLabel, subtitleValue,
+                totalRow, "GENERIC_REPORT");
+    }
+
+    /**
+     * @param reportType type de document (catalogue {@code DocumentTypes}) : détermine
+     *                   les options spécifiques appliquées sans changer le rendu des appels
+     *                   qui passent déjà par cette méthode.
+     */
+    public void exportTablePdf(HttpServletResponse response, String title,
+                               String[] headers, List<String[]> rows,
+                               String subtitleLabel, String subtitleValue,
+                               String[] totalRow, String reportType) throws IOException {
+        DocumentStyle style = documentTheme.styleFor(reportType);
+        Document document = new Document(style.pageSize(),
+                style.marginLeft, style.marginRight, style.marginTop, style.marginBottom);
+        PdfWriter writer = documentTheme.init(response, sanitize(title), document, style);
         document.open();
         try {
-            documentTheme.addHeader(document);
+            documentTheme.addHeader(document, style);
 
             String subtitle = subtitleLabel != null && subtitleValue != null
                     ? subtitleLabel + " : " + subtitleValue : null;
-            documentTheme.addTitle(document, title, subtitle);
+            documentTheme.addTitle(document, title, subtitle, style);
 
-            PdfPTable table = documentTheme.dataTable(headers, rows, null, true);
+            PdfPTable table = documentTheme.dataTable(headers, rows, null, true, style);
             table.setHeaderRows(1);
             document.add(table);
 
             if (totalRow != null) {
                 document.add(Chunk.NEWLINE);
-                document.add(documentTheme.totalRow(totalRow[0], totalRow[1], SchoolDocumentTheme.PRIMARY));
+                document.add(documentTheme.totalRow(totalRow[0], totalRow[1], style.primary, style));
             }
 
             document.add(Chunk.NEWLINE);
-            document.add(documentTheme.generatedOn());
+            document.add(documentTheme.generatedOn(style));
         } finally {
             safeClose(document);
         }
@@ -319,17 +342,19 @@ public class ReportService {
     public void schoolCertificatePdf(HttpServletResponse response,
                                      com.school.dto.response.StudentResponse student)
             throws IOException {
-        Document document = new Document(PageSize.A4, 40, 40, 40, 70);
+        DocumentStyle style = documentTheme.styleFor("SCHOOL_CERTIFICATE");
+        Document document = new Document(style.pageSize(),
+                style.marginLeft, style.marginRight, style.marginTop, style.marginBottom);
         PdfWriter writer = documentTheme.init(response,
-                "certificat-scolarite-" + student.getMatricule(), document);
+                "certificat-scolarite-" + student.getMatricule(), document, style);
         document.open();
         try {
             String schoolName = settingService.value(SettingService.SCHOOL_NAME,
                     appProperties.getSchool().getName());
 
-            documentTheme.addHeader(document);
+            documentTheme.addHeader(document, style);
             documentTheme.addTitle(document, "CERTIFICAT DE SCOLARITÉ",
-                    "Année scolaire " + documentTheme.academicYear());
+                    "Année scolaire " + documentTheme.academicYear(), style);
 
             Paragraph intro = new Paragraph("Je soussigné, Directeur de " + schoolName
                             + ", certifie que l'élève ci-dessous est régulièrement inscrit dans notre établissement :",
@@ -381,12 +406,14 @@ public class ReportService {
         response.setHeader("Content-Disposition",
                 "attachment; filename=\"bulletin-" + bulletin.getMatricule() + "-"
                         + bulletin.getTerm() + ".pdf\"");
-        Document document = new Document(PageSize.A4, 32, 32, 32, 70);
+        DocumentStyle style = documentTheme.styleFor("BULLETIN");
+        Document document = new Document(style.pageSize(),
+                style.marginLeft, style.marginRight, style.marginTop, style.marginBottom);
         PdfWriter writer = documentTheme.init(response, "bulletin-" + bulletin.getMatricule()
-                + "-" + bulletin.getTerm(), document);
+                + "-" + bulletin.getTerm(), document, style);
         document.open();
         try {
-            addBulletinContent(document, bulletin);
+            addBulletinContent(document, bulletin, style);
         } finally {
             safeClose(document);
         }
@@ -401,16 +428,18 @@ public class ReportService {
         String className = bulletins.isEmpty() ? "classe"
                 : (bulletins.get(0).getClassName() != null ? bulletins.get(0).getClassName() : "classe");
         String term = bulletins.isEmpty() ? "TERM" : bulletins.get(0).getTerm().name();
-        Document document = new Document(PageSize.A4, 32, 32, 32, 70);
+        DocumentStyle style = documentTheme.styleFor("CLASS_BULLETINS");
+        Document document = new Document(style.pageSize(),
+                style.marginLeft, style.marginRight, style.marginTop, style.marginBottom);
         PdfWriter writer = documentTheme.init(response, "bulletins-" + sanitize(className)
-                + "-" + term, document);
+                + "-" + term, document, style);
         document.open();
         try {
             for (int i = 0; i < bulletins.size(); i++) {
                 if (i > 0) {
                     document.newPage();
                 }
-                addBulletinContent(document, bulletins.get(i));
+                addBulletinContent(document, bulletins.get(i), style);
             }
         } finally {
             safeClose(document);
@@ -418,11 +447,14 @@ public class ReportService {
     }
 
     private void addBulletinContent(Document document,
-                                    com.school.dto.response.BulletinResponse bulletin) {
-        documentTheme.addHeader(document);
+                                    com.school.dto.response.BulletinResponse bulletin,
+                                    DocumentStyle style) {
+        DocumentStyle s = style != null ? style : DocumentStyle.defaults();
+        documentTheme.addHeader(document, s);
         documentTheme.addTitle(document, "BULLETIN DE NOTES",
                 bulletin.getStudentName() + "  •  " + bulletin.getClassName()
-                        + "  •  Trimestre " + bulletin.getTerm() + "  •  " + bulletin.getAcademicYear());
+                        + "  •  Trimestre " + bulletin.getTerm() + "  •  " + bulletin.getAcademicYear(),
+                s);
 
         PdfPTable info = documentTheme.infoTable(new String[][]{
                 {"Élève", bulletin.getStudentName()},
@@ -430,11 +462,11 @@ public class ReportService {
                 {"Classe", bulletin.getClassName()},
                 {"Trimestre", bulletin.getTerm().name()},
                 {"Année scolaire", bulletin.getAcademicYear()},
-        });
+        }, s);
         document.add(info);
         document.add(Chunk.NEWLINE);
 
-        documentTheme.sectionTitle(document, "NOTES PAR MATIÈRE");
+        documentTheme.sectionTitle(document, "NOTES PAR MATIÈRE", s);
 
         // Sept colonnes : Matières | Note/classe | Note/compo | Coef |
         // Note/compo coef | Moyenne générale | Observation.
@@ -469,10 +501,11 @@ public class ReportService {
         PdfPTable table = new PdfPTable(7);
         table.setWidthPercentage(100);
         table.setWidths(new float[]{3.0f, 1.5f, 1.5f, 0.7f, 1.9f, 1.8f, 1.7f});
+        float headerSize = Math.min(7.5f, Math.max(6.5f, s.tableSize - 1.5f));
         for (String header : new String[]{"Matières", "Note/classe", "Note/compo", "Coef",
                 "Note/compo coef", "Moyenne générale", "Observation"}) {
-            PdfPCell cell = new PdfPCell(new Phrase(header, SchoolDocumentTheme.whiteBold(7.5f)));
-            cell.setBackgroundColor(SchoolDocumentTheme.PRIMARY);
+            PdfPCell cell = new PdfPCell(new Phrase(header, s.whiteBold(headerSize)));
+            cell.setBackgroundColor(s.tableHeader);
             cell.setBorder(0);
             cell.setPadding(5);
             cell.setHorizontalAlignment(Element.ALIGN_CENTER);
@@ -483,13 +516,13 @@ public class ReportService {
         for (String[] row : rows) {
             for (int c = 0; c < row.length; c++) {
                 PdfPCell cell = new PdfPCell(new Phrase(row[c] != null ? row[c] : "",
-                        SchoolDocumentTheme.body(8.5f)));
+                        s.body(Math.max(7.5f, s.tableSize - 0.5f))));
                 cell.setPadding(5);
                 cell.setBorder(0);
                 cell.setBorderWidthBottom(0.6f);
-                cell.setBorderColor(SchoolDocumentTheme.BORDER);
-                if (stripe) {
-                    cell.setBackgroundColor(SchoolDocumentTheme.ZEBRA);
+                cell.setBorderColor(s.border);
+                if (stripe && s.zebraStripes) {
+                    cell.setBackgroundColor(s.sectionBackground);
                 }
                 table.addCell(cell);
             }
@@ -499,14 +532,14 @@ public class ReportService {
         document.add(table);
         document.add(Chunk.NEWLINE);
 
-        documentTheme.sectionTitle(document, "SYNTHÈSE");
+        documentTheme.sectionTitle(document, "SYNTHÈSE", s);
         PdfPTable summary = documentTheme.infoTable(new String[][]{
                 {"Moyenne de la classe", bulletin.getClassAverage() != null ? bulletin.getClassAverage().toString() : "—"},
                 {"Maximum", bulletin.getClassMax() != null ? bulletin.getClassMax().toString() : "—"},
                 {"Minimum", bulletin.getClassMin() != null ? bulletin.getClassMin().toString() : "—"},
                 {"Appréciation", bulletin.getObservation() != null ? bulletin.getObservation() : "—"},
                 {"Décision", bulletin.getDecision() != null ? bulletin.getDecision().name() : "—"},
-        });
+        }, s);
         document.add(summary);
         document.add(Chunk.NEWLINE);
 
@@ -516,30 +549,31 @@ public class ReportService {
         highlight.setHorizontalAlignment(Element.ALIGN_CENTER);
         String avg = bulletin.getAverage() != null ? bulletin.getAverage().toString() : "—";
         PdfPCell avgBox = new PdfPCell();
-        avgBox.setBackgroundColor(SchoolDocumentTheme.PRIMARY);
+        avgBox.setBackgroundColor(s.primary);
         avgBox.setBorder(0);
         avgBox.setPadding(10);
         avgBox.setHorizontalAlignment(Element.ALIGN_CENTER);
-        avgBox.addElement(new Paragraph("MOYENNE GÉNÉRALE", SchoolDocumentTheme.muted(8f)));
-        avgBox.addElement(new Paragraph(avg + "/20", SchoolDocumentTheme.whiteBold(18f)));
+        avgBox.addElement(new Paragraph("MOYENNE GÉNÉRALE",
+                DocumentStyle.fontOf(s.fontFamily, 8f, com.lowagie.text.Font.NORMAL, s.headerText)));
+        avgBox.addElement(new Paragraph(avg + "/20", s.whiteBold(18f)));
         String rank = bulletin.getRank() != null ? String.valueOf(bulletin.getRank()) : "—";
         PdfPCell rankBox = new PdfPCell();
-        rankBox.setBackgroundColor(SchoolDocumentTheme.HEADER_BG);
+        rankBox.setBackgroundColor(s.sectionBackground);
         rankBox.setBorder(0);
         rankBox.setPadding(10);
         rankBox.setHorizontalAlignment(Element.ALIGN_CENTER);
-        rankBox.addElement(new Paragraph("RANG", SchoolDocumentTheme.muted(8f)));
-        rankBox.addElement(new Paragraph(rank + "ᵉ", SchoolDocumentTheme.heading(18f)));
+        rankBox.addElement(new Paragraph("RANG", s.muted(8f)));
+        rankBox.addElement(new Paragraph(rank + "ᵉ", s.heading(18f)));
         highlight.addCell(avgBox);
         highlight.addCell(rankBox);
         document.add(highlight);
         document.add(Chunk.NEWLINE);
 
-        document.add(documentTheme.signatureBlock("Le Responsable Pédagogique", "Le Directeur"));
+        document.add(documentTheme.signatureBlock(s, "Le Responsable Pédagogique", "Le Directeur"));
         document.add(Chunk.NEWLINE);
         document.add(new Paragraph(settingService.value(SettingService.RECEIPT_FOOTER,
                 "Merci de votre confiance."),
-                FontFactory.getFont(FontFactory.HELVETICA_OBLIQUE, 9, SchoolDocumentTheme.TEXT_MUTED)));
+                s.italic(9f)));
     }
 
     // ---------- Carte scolaire (format ID-1 / CR80) ----------
@@ -556,6 +590,9 @@ public class ReportService {
         response.setContentType("application/pdf");
         response.setHeader("Content-Disposition",
                 "attachment; filename=\"carte-" + student.getMatricule() + ".pdf\"");
+        // Carte ID-1 : format normalisé (85,6 x 54 mm). Le type de document
+        // existe au catalogue pour ses options de contenu, mais sa géométrie
+        // n'est pas pilotable — un format libre la rendrait illisible.
         float w = 242.65f, h = 153.07f;
         Document document = new Document(new Rectangle(w, h), 0, 0, 0, 0);
         PdfWriter writer = PdfWriter.getInstance(document, response.getOutputStream());
@@ -693,6 +730,9 @@ public class ReportService {
         response.setContentType("application/pdf");
         response.setHeader("Content-Disposition",
                 "attachment; filename=\"certificat_" + student.getMatricule() + ".pdf\"");
+        // Certificat de fréquentation : mise en page A5 dessinée au calque
+        // (bordures, QR, photo). Le thème y intervient par la charte du type
+        // de document mais pas par le format de page.
         Document document = new Document(PageSize.A5, 0, 0, 0, 0);
         PdfWriter writer = PdfWriter.getInstance(document, response.getOutputStream());
         document.open();

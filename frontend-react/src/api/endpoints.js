@@ -273,6 +273,34 @@ export const settingsApi = {
 }
 
 /**
+ * Modèles et apparence des documents (réservé à l'administrateur).
+ *
+ * La prévisualisation renvoie un PDF (blob) construit avec des données de
+ * démonstration : elle ne lit ni n'écrit aucune donnée réelle.
+ */
+export const documentThemeApi = {
+  get: () => api.get('/settings/document-theme'),
+  defaults: () => api.get('/settings/document-theme/defaults'),
+  preset: (template) => api.get(`/settings/document-theme/presets/${template}`),
+  analyze: (config) => api.post('/settings/document-theme/preview-config', config),
+  save: (payload) => api.post('/settings/document-theme', payload),
+  activate: (id) => api.post(`/settings/document-theme/${id}/activate`),
+  restoreDefault: () => api.delete('/settings/document-theme'),
+  history: () => api.get('/settings/document-theme/history'),
+  historyDetail: (id) => api.get(`/settings/document-theme/history/${id}`),
+  overrides: () => api.get('/settings/document-theme/overrides'),
+  saveOverride: (documentType, config) =>
+    api.put(`/settings/document-theme/overrides/${documentType}`, config),
+  deleteOverride: (documentType) =>
+    api.delete(`/settings/document-theme/overrides/${documentType}`),
+  preview: (documentType, config) =>
+    api.post('/settings/document-theme/preview', config, {
+      params: { documentType },
+      responseType: 'blob',
+    }),
+}
+
+/**
  * Endpoints du module années scolaires.
  */
 export const academicYearApi = {
