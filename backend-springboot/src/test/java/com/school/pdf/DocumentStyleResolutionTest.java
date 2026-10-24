@@ -167,4 +167,145 @@ class DocumentStyleResolutionTest {
                     com.lowagie.text.Font.BOLD | com.lowagie.text.Font.ITALIC, Color.BLACK)).isNotNull();
         }
     }
+
+    // ------------------------------------------------------------------
+    // Rendu du texte institutionnel
+    // ------------------------------------------------------------------
+
+    /**
+     * Le texte institutionnel optionnel doit réellement sortir sur le PDF.
+     * Ce test a été ajouté après avoir constaté qu'il était enregistré et
+     * décodé mais jamais dessiné : un réglage invisible est un bug, pas une
+     * fonctionnalité.
+     */
+    @Nested
+    @DisplayName("Texte institutionnel")
+    class InstitutionalText {
+
+        private String rendre(DocumentStyle style) throws Exception {
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            com.lowagie.text.Document document = new com.lowagie.text.Document(
+                    style.pageSize(), style.marginLeft, style.marginRight,
+                    style.marginTop, style.marginBottom);
+            com.lowagie.text.pdf.PdfWriter.getInstance(document, out);
+            document.open();
+            new SchoolDocumentTheme(null, null, null, null)
+                    .addTitle(document, "BULLETIN DE NOTES", "Aminata TRAORÉ",
+                            style, style.institutionalText);
+            document.close();
+            return extraireTexte(out.toByteArray());
+        }
+
+        private String extraireTexte(byte[] pdf) throws Exception {
+            StringBuilder sb = new StringBuilder();
+            try (com.lowagie.text.pdf.PdfReader reader =
+                         new com.lowagie.text.pdf.PdfReader(pdf)) {
+                // OpenPDF 1.3.39 : l'extracteur est une instance portée par le lecteur.
+                com.lowagie.text.pdf.parser.PdfTextExtractor extracteur =
+                        new com.lowagie.text.pdf.parser.PdfTextExtractor(reader);
+                int pages = reader.getNumberOfPages();
+                for (int i = 1; i <= pages; i++) {
+                    sb.append(extracteur.getTextFromPage(i));
+                }
+            }
+            return sb.toString();
+        }
+
+        @Test
+        @DisplayName("le texte institutionnel est dessiné sous le sous-titre")
+        void texteRendu() throws Exception {
+            // Texte volontairement sans apostrophe typographique : la police
+            // par défaut du document d'essai est encodée en CP1252 côté test,
+            // et un caractère hors jeu ferait échouer l'extraction, pas le rendu.
+            DocumentStyle style = DocumentStyle.defaults().toBuilder()
+                    .institutionalText("Reconnu par le ministere de l'Education nationale")
+                    .build();
+
+            String texte = rendre(style);
+
+            assertThat(texte).contains("BULLETIN DE NOTES");
+            assertThat(texte).contains("Aminata");
+            assertThat(texte).contains("Reconnu par le ministere de l'Education nationale");
+        }
+
+        @Test
+        @DisplayName("le texte institutionnel suit le sous-titre dans l'ordre de lecture")
+        void textePlaceApresLeSousTitre() throws Exception {
+            DocumentStyle style = DocumentStyle.defaults().toBuilder()
+                    .institutionalText("MENTION INSTITUTIONNELLE")
+                    .build();
+
+            String texte = rendre(style);
+
+            assertThat(texte.indexOf("Aminata"))
+                    .as("la mention vient après le sous-titre")
+                    .isLessThan(texte.indexOf("MENTION INSTITUTIONNELLE"));
+        }
+
+        @Test
+        @DisplayName("un texte vide n'ajoute rien au document")
+        void texteVideIgnore() throws Exception {
+            String sansTexte = rendre(DocumentStyle.defaults());
+            assertThat(sansTexte).doesNotContain("MENTION INSTITUTIONNELLE");
+            assertThat(sansTexte).contains("BULLETIN DE NOTES");
+        }
+
+        @Test
+        @DisplayName("une séquence d'échappement ne peut pas sortir de la chaîne PDF")
+        void injectionNeutrlisee() throws Exception {
+            DocumentStyle style = DocumentStyle.defaults().toBuilder()
+                    .institutionalText(") Tj ET Q 0 0 1 rg (INJECTE) Tj")
+                    .build();
+
+            String texte = rendre(style);
+
+            // La chaîne reste une chaîne : rien n'est interprété comme opérateur.
+            // Le texte extrait contient donc la séquence « brute », preuve qu'elle a
+            // été échappée ; c'est le flux PDF qui ne doit contenir aucun opérateur
+            // de remplissage ni de commande de positionnement injectés.
+            assertThat(texte).contains("INJECTE");
+
+            byte[] pdf = rendreEnOctets(style);
+            assertThat(fluxDecompresse(pdf))
+                    .as("aucun opérateur PDF injecté dans le flux de contenu")
+                    .doesNotContain("0 0 1 rg");
+        }
+
+        private byte[] rendreEnOctets(DocumentStyle style) throws Exception {
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            com.lowagie.text.Document document = new com.lowagie.text.Document(
+                    style.pageSize(), style.marginLeft, style.marginRight,
+                    style.marginTop, style.marginBottom);
+            com.lowagie.text.pdf.PdfWriter.getInstance(document, out);
+            document.open();
+            new SchoolDocumentTheme(null, null, null, null)
+                    .addTitle(document, "BULLETIN DE NOTES", "Aminata TRAORÉ",
+                            style, style.institutionalText);
+            document.close();
+            return out.toByteArray();
+        }
+
+        /** Concatène les flux de contenu décompressés (flate) du PDF. */
+        private String fluxDecompresse(byte[] pdf) throws Exception {
+            com.lowagie.text.pdf.PdfReader reader = new com.lowagie.text.pdf.PdfReader(pdf);
+            StringBuilder sb = new StringBuilder();
+            try {
+                for (int i = 1; i <= reader.getXrefSize(); i++) {
+                    com.lowagie.text.pdf.PdfObject obj = reader.getPdfObjectRelease(i);
+                    if (obj instanceof com.lowagie.text.pdf.PRStream stream
+                            && stream.getBytes() != null) {
+                        String s = new String(stream.getBytes(),
+                                java.nio.charset.StandardCharsets.ISO_8859_1);
+                        // Seuls les flux de contenu nous intéressent.
+                        if (s.contains("BT") || s.contains("Tf")) {
+                            sb.append(s);
+                        }
+                    }
+                }
+            } finally {
+                reader.close();
+            }
+            return sb.toString();
+        }
+    }
 }

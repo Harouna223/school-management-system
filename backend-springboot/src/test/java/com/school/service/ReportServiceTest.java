@@ -274,7 +274,7 @@ class ReportServiceTest {
                     "Periode", "Janvier 2026", null);
 
             verify(documentTheme).addTitle(any(Document.class), eq("Rapport de presences"),
-                    eq("Periode : Janvier 2026"), any());
+                    eq("Periode : Janvier 2026"), any(), any());
         }
 
         @Test
@@ -282,7 +282,7 @@ class ReportServiceTest {
             service.exportTablePdf(response, "Rapport", new String[]{"A"}, List.of(),
                     null, "Janvier 2026", null);
 
-            verify(documentTheme).addTitle(any(Document.class), eq("Rapport"), isNull(), any());
+            verify(documentTheme).addTitle(any(Document.class), eq("Rapport"), isNull(), any(), any());
         }
 
         @Test
@@ -290,7 +290,7 @@ class ReportServiceTest {
             service.exportTablePdf(response, "Rapport", new String[]{"A"}, List.of(),
                     "Periode", null, null);
 
-            verify(documentTheme).addTitle(any(Document.class), eq("Rapport"), isNull(), any());
+            verify(documentTheme).addTitle(any(Document.class), eq("Rapport"), isNull(), any(), any());
         }
 
         @Test
@@ -354,7 +354,7 @@ class ReportServiceTest {
                     "Liste des eleves");
 
             verify(documentTheme).addTitle(any(Document.class), eq("Liste des eleves"),
-                    eq("Année scolaire 2025-2026"), any());
+                    eq("Année scolaire 2025-2026"), any(), any());
         }
 
         @Test

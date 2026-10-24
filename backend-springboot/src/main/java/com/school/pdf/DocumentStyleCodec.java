@@ -115,9 +115,20 @@ public final class DocumentStyleCodec {
         }
 
         // 6. En-tête / pied de page
+        //
+        // ⚠️ Deux emplacements sont lus : le bloc « header » produit par
+        // encode()/describe() et le format historique à plat. Sans cette
+        // tolérance, l'aller-retour enregistrer → relire perdait le pied de
+        // page et le texte institutionnel : l'interface les renvoyait dans
+        // « header », le décodeur ne cherchait qu'à la racine, et le document
+        // sortait sans eux alors que la version enregistrée les contenait.
+        JsonNode header = root.get("header");
+        boolean hasHeaderBlock = header != null && header.isObject();
+        JsonNode headerSource = hasHeaderBlock ? header : root;
+
         DocumentStyle current = b.build();
-        b.showLogo(bool(root, "showLogo", current.showLogo));
-        String logo = text(root, "logoPosition", null);
+        b.showLogo(bool(headerSource, "showLogo", current.showLogo));
+        String logo = text(headerSource, "logoPosition", null);
         if (logo != null) {
             try {
                 b.logoPosition(DocumentStyle.LogoPosition.valueOf(logo.toUpperCase(Locale.ROOT)));
@@ -125,13 +136,13 @@ public final class DocumentStyleCodec {
                 // position inconnue : on garde celle du modèle
             }
         }
-        b.showSchoolName(bool(root, "showSchoolName", current.showSchoolName));
-        b.showContact(bool(root, "showContact", current.showContact));
-        b.showAddress(bool(root, "showAddress", current.showAddress));
-        b.headerRule(bool(root, "headerRule", current.headerRule));
-        b.footerText2(text(root, "footerText", current.footerText2));
-        b.institutionalText(text(root, "institutionalText", current.institutionalText));
-        String align = text(root, "titleAlign", null);
+        b.showSchoolName(bool(headerSource, "showSchoolName", current.showSchoolName));
+        b.showContact(bool(headerSource, "showContact", current.showContact));
+        b.showAddress(bool(headerSource, "showAddress", current.showAddress));
+        b.headerRule(bool(headerSource, "headerRule", current.headerRule));
+        b.footerText2(text(headerSource, "footerText", current.footerText2));
+        b.institutionalText(text(headerSource, "institutionalText", current.institutionalText));
+        String align = text(headerSource, "titleAlign", null);
         if (align != null) {
             try {
                 b.titleAlign(DocumentStyle.TitleAlign.valueOf(align.toUpperCase(Locale.ROOT)));

@@ -115,7 +115,8 @@ public class ReportService {
         document.open();
         try {
             documentTheme.addHeader(document, style);
-            documentTheme.addTitle(document, title, "Année scolaire " + documentTheme.academicYear(), style);
+            documentTheme.addTitle(document, title, "Année scolaire " + documentTheme.academicYear(), style,
+                    style.institutionalText);
             PdfPTable table = documentTheme.dataTable(headers, rows, null, true, style);
             table.setHeaderRows(1);
             document.add(table);
@@ -142,7 +143,7 @@ public class ReportService {
         documentTheme.addHeader(document, style);
 
         documentTheme.addTitle(document, "REÇU DE PAIEMENT",
-                "N° " + receiptNo + "  •  " + date, style);
+                "N° " + receiptNo + "  •  " + date, style, style.institutionalText);
 
         try {
 
@@ -312,7 +313,7 @@ public class ReportService {
 
             String subtitle = subtitleLabel != null && subtitleValue != null
                     ? subtitleLabel + " : " + subtitleValue : null;
-            documentTheme.addTitle(document, title, subtitle, style);
+            documentTheme.addTitle(document, title, subtitle, style, style.institutionalText);
 
             PdfPTable table = documentTheme.dataTable(headers, rows, null, true, style);
             table.setHeaderRows(1);
@@ -354,7 +355,7 @@ public class ReportService {
 
             documentTheme.addHeader(document, style);
             documentTheme.addTitle(document, "CERTIFICAT DE SCOLARITÉ",
-                    "Année scolaire " + documentTheme.academicYear(), style);
+                    "Année scolaire " + documentTheme.academicYear(), style, style.institutionalText);
 
             Paragraph intro = new Paragraph("Je soussigné, Directeur de " + schoolName
                             + ", certifie que l'élève ci-dessous est régulièrement inscrit dans notre établissement :",
@@ -454,7 +455,7 @@ public class ReportService {
         documentTheme.addTitle(document, "BULLETIN DE NOTES",
                 bulletin.getStudentName() + "  •  " + bulletin.getClassName()
                         + "  •  Trimestre " + bulletin.getTerm() + "  •  " + bulletin.getAcademicYear(),
-                s);
+                s, s.institutionalText);
 
         PdfPTable info = documentTheme.infoTable(new String[][]{
                 {"Élève", bulletin.getStudentName()},

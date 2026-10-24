@@ -652,7 +652,7 @@ export default function DocumentThemePage() {
                     size="small" fullWidth label="Texte institutionnel (facultatif)"
                     value={config.header.institutionalText || ''}
                     onChange={(e) => patch('header.institutionalText', e.target.value)}
-                    helperText="Mention ajoutée sous les signatures"
+                    helperText="Mention officielle (agrément, devise) imprimée sous le sous-titre du document"
                     inputProps={{ maxLength: 300 }}
                   />
                 </Grid>

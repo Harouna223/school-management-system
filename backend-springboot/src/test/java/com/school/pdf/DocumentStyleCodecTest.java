@@ -292,5 +292,42 @@ class DocumentStyleCodecTest {
             assertThat(relu.footerText2).isEqualTo("Texte du pied");
             assertThat(relu.tableBorders).isEqualTo(original.tableBorders);
         }
+
+        @Test
+        @DisplayName("le bloc « header » de l'interface est relu (pied de page, mention)")
+        void blocHeaderRelu() {
+            // L'interface renvoie l'en-tête dans un sous-objet « header »
+            // (forme produite par describe()). Ce test verrouille la régression
+            // qui faisait perdre le pied de page et le texte institutionnel.
+            var json = json("""
+                    {"template":"CLASSIC",
+                     "header":{"showLogo":true,"logoPosition":"LEFT",
+                               "showSchoolName":true,"showContact":true,"showAddress":true,
+                               "headerRule":true,"titleAlign":"CENTER",
+                               "footerText":"Document officiel",
+                               "institutionalText":"Agree par le ministere"}}
+                    """);
+
+            DocumentStyle style = DocumentStyleCodec.decode(json);
+
+            assertThat(style.footerText2).isEqualTo("Document officiel");
+            assertThat(style.institutionalText).isEqualTo("Agree par le ministere");
+            assertThat(style.titleAlign).isEqualTo(DocumentStyle.TitleAlign.CENTER);
+        }
+
+        @Test
+        @DisplayName("le format à plat reste relu (configurations déjà stockées)")
+        void formatPlatRelu() {
+            var json = json("""
+                    {"template":"CLASSIC","footerText":"Ancienne version",
+                     "institutionalText":"Mention historique","titleAlign":"RIGHT"}
+                    """);
+
+            DocumentStyle style = DocumentStyleCodec.decode(json);
+
+            assertThat(style.footerText2).isEqualTo("Ancienne version");
+            assertThat(style.institutionalText).isEqualTo("Mention historique");
+            assertThat(style.titleAlign).isEqualTo(DocumentStyle.TitleAlign.RIGHT);
+        }
     }
 }

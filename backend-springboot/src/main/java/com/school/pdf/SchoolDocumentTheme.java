@@ -355,13 +355,36 @@ public class SchoolDocumentTheme {
     }
 
     /**
+     * Bloc titre du document, surcharges optionnelles comprises.
+     *
+     * <p>C'est le point d'entrée à privilégier : c'est le seul qui affiche le
+     * <b>texte institutionnel</b> optionnel ({@code institutionalText}), placé
+     * juste après le sous-titre. Le laisser hors de {@code addTitle(...,4 args)}
+     * rendrait le réglage enregistré mais invisible sur le papier.</p>
+     */
+    public void addTitle(Document document, String title, DocumentStyle style) {
+        addTitle(document, title, null, style, null);
+    }
+
+    /**
      * Bloc titre du document : type de document + sous-titre, alignés selon la
      * configuration. Le modèle « Moderne » souligne le titre ; « Premium »
      * l'encadre.
      */
     public void addTitle(Document document, String title, String subtitle, DocumentStyle style) {
+        addTitle(document, title, subtitle, style, null);
+    }
+
+    /**
+     * Bloc titre complet : {@code subtitle} et {@code optionalText} peuvent être
+     * nuls. Le second correspond au texte institutionnel libre défini dans les
+     * options d'en-tête (slogan ou mention officielle).
+     */
+    public void addTitle(Document document, String title, String subtitle,
+                         DocumentStyle style, String optionalText) {
         DocumentStyle s = style != null ? style : DocumentStyle.defaults();
         boolean hasSubtitle = subtitle != null && !subtitle.isBlank();
+        boolean hasOptional = optionalText != null && !optionalText.isBlank();
 
         Paragraph t = new Paragraph(title, s.heading(s.titleSize));
         t.setAlignment(s.titleAlign.iText());
@@ -412,6 +435,16 @@ public class SchoolDocumentTheme {
                 st.setSpacingAfter(8);
                 document.add(st);
             }
+        }
+
+        // Texte institutionnel libre : rendu comme une mention distincte, sous le
+        // sous-titre, dans un corps plus petit. Il ne remplace jamais le titre.
+        if (hasOptional) {
+            Paragraph note = new Paragraph(optionalText, s.muted(Math.max(7f, s.subtitleSize - 1f)));
+            note.setAlignment(s.titleAlign.iText());
+            note.setSpacingBefore(hasSubtitle ? 2 : 4);
+            note.setSpacingAfter(6);
+            document.add(note);
         }
     }
 

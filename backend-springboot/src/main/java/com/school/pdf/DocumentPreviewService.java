@@ -68,7 +68,7 @@ public class DocumentPreviewService {
         try {
             theme.addHeader(document, s);
             theme.addTitle(document, "APERÇU DU MODÈLE",
-                    "Exemple de rendu — " + s.template.label(), s);
+                    "Exemple de rendu — " + s.template.label(), s, s.institutionalText);
 
             Paragraph banner = new Paragraph(DEMO_BANNER, s.bold(8f));
             banner.setAlignment(Element.ALIGN_CENTER);
@@ -167,7 +167,7 @@ public class DocumentPreviewService {
             theme.addHeader(document, s);
             theme.addTitle(document, "BULLETIN DE NOTES",
                     bulletin.getStudentName() + "  •  " + bulletin.getClassName()
-                            + "  •  " + bulletin.getAcademicYear(), s);
+                            + "  •  " + bulletin.getAcademicYear(), s, s.institutionalText);
 
             Paragraph banner = new Paragraph(DEMO_BANNER, s.bold(8f));
             banner.setAlignment(Element.ALIGN_CENTER);
@@ -273,7 +273,7 @@ public class DocumentPreviewService {
         try {
             theme.addHeader(document, s);
             theme.addTitle(document, "CERTIFICAT DE SCOLARITÉ",
-                    "Année scolaire 2025-2026", s);
+                    "Année scolaire 2025-2026", s, s.institutionalText);
 
             Paragraph banner = new Paragraph(DEMO_BANNER, s.bold(8f));
             banner.setAlignment(Element.ALIGN_CENTER);
@@ -332,7 +332,8 @@ public class DocumentPreviewService {
             theme.addHeader(document, s);
             theme.addTitle(document, "REÇU DE PAIEMENT",
                     "N° SE-REC-2026-0187  •  "
-                            + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")), s);
+                            + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")),
+                    s, s.institutionalText);
 
             Paragraph banner = new Paragraph(DEMO_BANNER, s.bold(8f));
             banner.setAlignment(Element.ALIGN_CENTER);
@@ -427,7 +428,7 @@ public class DocumentPreviewService {
         try {
             theme.addHeader(document, s);
             theme.addTitle(document, "CERTIFICAT DE FRÉQUENTATION",
-                    "Année scolaire 2025-2026", s);
+                    "Année scolaire 2025-2026", s, s.institutionalText);
 
             Paragraph banner = new Paragraph(DEMO_BANNER, s.bold(7f));
             banner.setAlignment(Element.ALIGN_CENTER);
