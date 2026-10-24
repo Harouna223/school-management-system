@@ -4,16 +4,14 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, Chip, IconButton,
 } from '@mui/material'
 import { Save, School, Receipt, WhatsApp, CalendarMonth, Add, Edit, Delete, Star, StarBorder, Backup, CloudDownload, CloudUpload, AccountTree } from '@mui/icons-material'
+import { Link as RouterLink } from 'react-router-dom'
 import PageHeader from '../../components/PageHeader'
 import { useToast } from '../../hooks/useToast'
 import { settingsApi, academicYearApi, backupApi, communicationApi } from '../../api/endpoints'
 import { extractError } from '../../api/axios'
 import { formatDate } from '../../utils/format'
-import FileImage from '../../components/FileImage'
-import defaultLogo from '../../assets/logo.svg'
 
 const KEYS = [
-  'SCHOOL_NAME', 'SCHOOL_ADDRESS', 'SCHOOL_PHONE', 'SCHOOL_EMAIL',
   'RECEIPT_FOOTER', 'WHATSAPP_ENABLED', 'WHATSAPP_DEFAULT_NUMBER',
 ]
 
@@ -30,10 +28,6 @@ const CYCLES_OPTIONS = [
 ]
 
 const LABELS = {
-  SCHOOL_NAME: 'Nom de l\'établissement',
-  SCHOOL_ADDRESS: 'Adresse',
-  SCHOOL_PHONE: 'Téléphone',
-  SCHOOL_EMAIL: 'Email',
   RECEIPT_FOOTER: 'Pied de page des reçus',
   WHATSAPP_ENABLED: 'Activer WhatsApp',
   WHATSAPP_DEFAULT_NUMBER: 'Indicatif par défaut',
@@ -51,8 +45,6 @@ export default function SettingsPage() {
   const [yearDialog, setYearDialog] = useState(false)
   const [yearForm, setYearForm] = useState({ label: '', startDate: '', endDate: '' })
   const [editingYear, setEditingYear] = useState(null)
-  const logoRef = useRef(null)
-  const [logoFileName, setLogoFileName] = useState(null)
   const [messageLogs, setMessageLogs] = useState([])
   const [cycles, setCycles] = useState([])
 
@@ -95,7 +87,6 @@ export default function SettingsPage() {
         ;(savedRes.data.data || []).forEach((s) => { saved[s.key] = s.value })
         const merged = {}
         KEYS.forEach((k) => { merged[k] = saved[k] ?? defaults[k] ?? '' })
-        merged.SCHOOL_LOGO = saved.SCHOOL_LOGO ?? ''
         setValues(merged)
       })
       .catch((err) => toastError(extractError(err)))
@@ -121,23 +112,6 @@ export default function SettingsPage() {
     try {
       await settingsApi.update(values)
       success('Paramètres enregistrés')
-    } catch (err) {
-      toastError(extractError(err))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const uploadLogo = async () => {
-    const file = logoRef.current
-    if (!file) return
-    setSaving(true)
-    try {
-      const res = await settingsApi.uploadLogo(file)
-      setValues((v) => ({ ...v, SCHOOL_LOGO: res.data.data }))
-      logoRef.current = null
-      setLogoFileName(null)
-      success('Logo mis à jour')
     } catch (err) {
       toastError(extractError(err))
     } finally {
@@ -247,64 +221,15 @@ export default function SettingsPage() {
         <Typography variant="body2" color="text.secondary">Chargement…</Typography>
       ) : (
         <>
-          {section(<School color="primary" />, 'Établissement', (
-            <>
-              <Grid item xs={12} md={6}>
-                <TextField fullWidth label={LABELS.SCHOOL_NAME} value={values.SCHOOL_NAME ?? ''}
-                  onChange={(e) => set('SCHOOL_NAME', e.target.value)} />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField fullWidth label={LABELS.SCHOOL_ADDRESS} value={values.SCHOOL_ADDRESS ?? ''}
-                  onChange={(e) => set('SCHOOL_ADDRESS', e.target.value)} />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField fullWidth label={LABELS.SCHOOL_PHONE} value={values.SCHOOL_PHONE ?? ''}
-                  onChange={(e) => set('SCHOOL_PHONE', e.target.value)} />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField fullWidth label={LABELS.SCHOOL_EMAIL} value={values.SCHOOL_EMAIL ?? ''}
-                  onChange={(e) => set('SCHOOL_EMAIL', e.target.value)} />
-              </Grid>
-            </>
-          ))}
-
-          {section(<School color="primary" />, 'Logo de l\'établissement', (
+          {section(<School color="primary" />, "Informations de l'établissement", (
             <Grid item xs={12}>
-              <Box display="flex" alignItems="center" gap={2} flexWrap="wrap">
-                {values.SCHOOL_LOGO ? (
-                  /* Logo téléversé : servi derrière l'authentification → FileImage. */
-                  <FileImage
-                    src={values.SCHOOL_LOGO}
-                    alt="Logo"
-                    sx={{ width: 72, height: 72, objectFit: 'contain', border: '1px dashed', borderColor: 'divider', borderRadius: 2, p: 0.5, bgcolor: '#fff' }}
-                  />
-                ) : (
-                  /* Logo par défaut embarqué dans le bundle : aucun contrôle d'accès requis. */
-                  <Box
-                    component="img"
-                    src={defaultLogo}
-                    alt="Logo"
-                    sx={{ width: 72, height: 72, objectFit: 'contain', border: '1px dashed', borderColor: 'divider', borderRadius: 2, p: 0.5, bgcolor: '#fff' }}
-                  />
-                )}
-                <Box>
-                  <Button variant="outlined" component="label" startIcon={<CloudUpload />}>
-                    Choisir un logo
-                    <input type="file" hidden accept="image/*" onChange={(e) => { const f = e.target.files?.[0] || null; logoRef.current = f; setLogoFileName(f ? f.name : null) }} />
-                  </Button>
-                  <Button variant="contained" onClick={uploadLogo} disabled={!logoFileName || saving} sx={{ ml: 1 }}>
-                    Envoyer
-                  </Button>
-                  {logoFileName && (
-                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
-                      {logoFileName}
-                    </Typography>
-                  )}
-                </Box>
-              </Box>
-              <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
-                Le logo apparaît en entête des documents officiels (carte scolaire, certificat de fréquentation).
+              <Typography variant="body2" color="text.secondary" mb={2}>
+                Le nom, les coordonnées, le responsable et le logo de l'établissement se gèrent
+                désormais dans un module dédié, avec validation et prévisualisation.
               </Typography>
+              <Button variant="contained" component={RouterLink} to="/school-info" startIcon={<School />}>
+                Ouvrir « Informations de l'établissement »
+              </Button>
             </Grid>
           ))}
 
