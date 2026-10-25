@@ -415,6 +415,7 @@ export const memoireApi = {
 export const alumnusApi = {
   list: (fieldName) => api.get('/alumni', { params: { fieldName } }),
   create: (data) => api.post('/alumni', data),
+  update: (id, data) => api.put(`/alumni/${id}`, data),
   delete: (id) => api.delete(`/alumni/${id}`),
 }
 

@@ -1,13 +1,14 @@
 package com.school.controller;
 
+import com.school.dto.request.StageRequest;
 import com.school.dto.response.ApiResponse;
 import com.school.dto.response.StageResponse;
-import com.school.entity.Stage;
 import com.school.service.AccessControlService;
 import com.school.service.StageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -36,15 +37,17 @@ public class StageController {
 
     @PostMapping
     @Operation(summary = "Créer un stage")
-    public ResponseEntity<ApiResponse<StageResponse>> create(@RequestBody Stage stage, HttpServletRequest httpRequest) {
-        return ok("Stage créé", stageService.create(stage, httpRequest));
+    public ResponseEntity<ApiResponse<StageResponse>> create(@Valid @RequestBody StageRequest request,
+                                                             HttpServletRequest httpRequest) {
+        return ok("Stage créé", stageService.create(request, httpRequest));
     }
 
     @PutMapping("/{id}")
     @Operation(summary = "Modifier un stage (rapport, soutenance, note)")
-    public ResponseEntity<ApiResponse<StageResponse>> update(@PathVariable Long id, @RequestBody Stage stage,
-                                                     HttpServletRequest httpRequest) {
-        return ok("Stage modifié", stageService.update(id, stage, httpRequest));
+    public ResponseEntity<ApiResponse<StageResponse>> update(@PathVariable Long id,
+                                                             @Valid @RequestBody StageRequest request,
+                                                             HttpServletRequest httpRequest) {
+        return ok("Stage modifié", stageService.update(id, request, httpRequest));
     }
 
     @DeleteMapping("/{id}")

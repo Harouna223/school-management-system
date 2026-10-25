@@ -1,16 +1,17 @@
 package com.school.controller;
 
+import com.school.dto.request.CandidatureRequest;
 import com.school.dto.response.ApiResponse;
 import com.school.dto.response.CandidatureResponse;
 import com.school.dto.response.PageResponse;
-import com.school.entity.Candidature;
 import com.school.enums.CandidatureStatus;
 import com.school.service.CandidatureService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.validation.constraints.Min;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -43,16 +44,16 @@ public class CandidatureController {
 
     @PostMapping
     @Operation(summary = "Déposer une candidature")
-    public ResponseEntity<ApiResponse<CandidatureResponse>> create(@RequestBody Candidature candidature,
-                                                           HttpServletRequest httpRequest) {
-        return ok("Candidature déposée", candidatureService.create(candidature, httpRequest));
+    public ResponseEntity<ApiResponse<CandidatureResponse>> create(@Valid @RequestBody CandidatureRequest request,
+                                                                   HttpServletRequest httpRequest) {
+        return ok("Candidature déposée", candidatureService.create(request, httpRequest));
     }
 
     @PatchMapping("/{id}/status")
     @Operation(summary = "Mettre à jour le statut (sélection, liste d'attente, refus)")
     public ResponseEntity<ApiResponse<CandidatureResponse>> updateStatus(@PathVariable Long id,
-                                                                 @RequestParam CandidatureStatus status,
-                                                                 HttpServletRequest httpRequest) {
+                                                                         @RequestParam CandidatureStatus status,
+                                                                         HttpServletRequest httpRequest) {
         return ok("Statut mis à jour", candidatureService.updateStatus(id, status, httpRequest));
     }
 

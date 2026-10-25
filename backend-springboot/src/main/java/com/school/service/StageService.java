@@ -1,5 +1,6 @@
 package com.school.service;
 
+import com.school.dto.request.StageRequest;
 import com.school.dto.response.StageResponse;
 import com.school.entity.Stage;
 import com.school.entity.Student;
@@ -47,8 +48,8 @@ public class StageService {
     }
 
     @Transactional
-    public StageResponse create(Stage stage, HttpServletRequest httpRequest) {
-        validateAndResolve(stage);
+    public StageResponse create(StageRequest request, HttpServletRequest httpRequest) {
+        Stage stage = resolve(request);
         Stage saved = stageRepository.save(stage);
         auditService.log("CREATE", "Stage", saved.getId(),
                 "Stage " + saved.getCompany() + " pour " + saved.getStudent().getFullName(), httpRequest);
@@ -56,10 +57,10 @@ public class StageService {
     }
 
     @Transactional
-    public StageResponse update(Long id, Stage stage, HttpServletRequest httpRequest) {
+    public StageResponse update(Long id, StageRequest request, HttpServletRequest httpRequest) {
         Stage existing = stageRepository.findById(id)
                 .orElseThrow(() -> ResourceNotFoundException.of("Stage", id));
-        validateAndResolve(stage);
+        Stage stage = resolve(request);
         stage.setId(id);
         Stage saved = stageRepository.save(stage);
         auditService.log("UPDATE", "Stage", id,
@@ -75,20 +76,35 @@ public class StageService {
         stageRepository.delete(stage);
     }
 
-    private void validateAndResolve(Stage stage) {
-        if (stage.getCompany() == null || stage.getCompany().isBlank()) {
+    /** Construit le stage et vérifie que l'élève et l'encadrant existent. */
+    private Stage resolve(StageRequest request) {
+        if (request.getCompany() == null || request.getCompany().isBlank()) {
             throw new BusinessException("L'entreprise est obligatoire");
         }
-        if (stage.getStudent() == null || stage.getStudent().getId() == null) {
+        if (request.getStudentId() == null) {
             throw new BusinessException("L'étudiant est obligatoire");
         }
-        Student student = studentRepository.findById(stage.getStudent().getId())
-                .orElseThrow(() -> ResourceNotFoundException.of("Élève", stage.getStudent().getId()));
-        stage.setStudent(student);
-        if (stage.getSupervisor() != null && stage.getSupervisor().getId() != null) {
-            Teacher supervisor = teacherRepository.findById(stage.getSupervisor().getId())
-                    .orElseThrow(() -> ResourceNotFoundException.of("Enseignant", stage.getSupervisor().getId()));
-            stage.setSupervisor(supervisor);
+        Student student = studentRepository.findById(request.getStudentId())
+                .orElseThrow(() -> ResourceNotFoundException.of("Élève", request.getStudentId()));
+        Teacher supervisor = null;
+        if (request.getSupervisorId() != null) {
+            supervisor = teacherRepository.findById(request.getSupervisorId())
+                    .orElseThrow(() -> ResourceNotFoundException.of("Enseignant", request.getSupervisorId()));
         }
+        return Stage.builder()
+                .student(student)
+                .company(request.getCompany().trim())
+                .companyContact(request.getCompanyContact())
+                .subject(request.getSubject())
+                .startDate(request.getStartDate())
+                .endDate(request.getEndDate())
+                .supervisor(supervisor)
+                .conventionRef(request.getConventionRef())
+                .reportSubmitted(request.isReportSubmitted())
+                .defenseDate(request.getDefenseDate())
+                .grade(request.getGrade())
+                .evaluation(request.getEvaluation())
+                .status(request.getStatus())
+                .build();
     }
 }

@@ -272,29 +272,33 @@ Le numéro du parent est utilisé tel que saisi (normalisation automatique : `6X
 | GET | `/api/dashboard/stats` | Statistiques globales (élèves, finances, présences, livres…) |
 | GET | `/api/dashboard/audit-logs` | Journal d'audit paginé (`?username=`) |
 
-## Université LMD — `/api/lmd`
+## Universitaire — stages, mémoires, alumni, admission
+
+> Le cursus LMD (facultés, filières, UE, crédits, délibérations) a été retiré du produit par la
+> migration Flyway `V2__suppression_universite_lmd.sql`. Les routes `/api/lmd/**` n'existent plus
+> et la filière est désormais un texte libre (`fieldName`).
 
 | Méthode | Route | Description |
 |---|---|---|
-| GET | `/api/lmd/faculties`, `/programs`, `/semesters`, `/groups` | Structure universitaire |
-| GET | `/api/lmd/result?studentId=&fieldId=&semester=&session=` | Résultat d'un semestre (moyenne, crédits, UE à repasser). **Accès vérifié** (IDOR : un étudiant ne voit que son résultat) |
-| POST | `/api/lmd/deliberate?fieldId=&semester=&session=` | Délibération d'une filière. Seuls les étudiants dont le **semestre courant** correspond sont traités |
-| GET | `/api/lmd/deliberations?fieldId=&semester=` | Délibérations enregistrées |
-| GET | `/api/lmd/releve/pdf` · `/releve/excel` | Relevé universitaire (programme et niveau renseignés) |
-| GET | `/api/lmd/attestation/pdf` | Attestation de réussite PDF avec QR code |
-| GET | `/api/lmd/attestation/verify?token=` | **Public** : vérifie l'authenticité d'une attestation (jeton HMAC signé, non forgeable) |
+| GET | `/api/stages?studentId=` | Stages (`PERM_LMD_READ`) |
+| POST · PUT · DELETE | `/api/stages` · `/api/stages/{id}` | Gestion des stages (`PERM_LMD_WRITE`) |
+| GET | `/api/memoires?studentId=` | Mémoires et soutenances (`PERM_LMD_READ`) |
+| POST · PUT · DELETE | `/api/memoires` · `/api/memoires/{id}` | Gestion des mémoires (`PERM_LMD_WRITE`) |
+| GET | `/api/candidatures?fieldName=&status=&page=&size=` | Candidatures d'admission, paginées (`PERM_LMD_READ`) |
+| POST · PATCH `/api/candidatures/{id}/status` · DELETE | `/api/candidatures` | Dépôt, sélection, suppression (`PERM_LMD_WRITE`) |
+| GET | `/api/alumni?fieldName=` | Diplômés (`PERM_LMD_READ`) |
+| POST · PUT · DELETE | `/api/alumni` · `/api/alumni/{id}` | Gestion des diplômés (`PERM_LMD_WRITE`) |
 
-**Règles de calcul** (correctifs de fiabilité) :
+**Contrats** :
 
-- La **session** demandée est réellement appliquée : en session 1 (normale), seule la note
-  de session normale compte ; en session 2 (rattrapage), la meilleure note des deux sessions
-  est retenue.
-- La délibération ne concerne que les étudiants inscrits au **semestre visé** (un étudiant
-  passé en S4 n'est plus délibéré pour S1).
-- Le **total de crédits** n'inclut que les UE réellement suivies (les UE optionnelles non
-  choisies sont exclues).
-- Le **jeton d'attestation** est signé (HMAC-SHA256 du secret d'application) et expire après
-  1 an : il ne peut pas être forgé à partir du matricule et de l'horodatage.
+- Les réponses sont des DTO (`StageResponse`, `MemoireResponse`, `CandidatureResponse`,
+  `AlumnusResponse`) : les rattachements sont aplatis (`studentId`, `studentName`, `matricule`,
+  `supervisorName`, `directorName`). Les entités JPA ne sont jamais exposées — les exposer
+  provoquait un `LazyInitializationException` en 500, `open-in-view` étant désactivé.
+- Les corps de requête sont validés (`StageRequest`, `MemoireRequest`, `CandidatureRequest`,
+  `AlumnusRequest`) : les notes sont bornées à 0–20, et ni la référence d'une candidature ni son
+  statut initial ne peuvent être imposés par le client (le serveur les attribue).
+- Les permissions `LMD_READ` / `LMD_WRITE` sont conservées pour ces modules annexes.
 
 ## Fichiers
 

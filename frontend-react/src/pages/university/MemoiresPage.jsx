@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   Grid,
   Card,
@@ -17,6 +17,7 @@ import {
 } from '@mui/material'
 import { Add, Delete, Edit, MenuBook, Event, Group } from '@mui/icons-material'
 import PageHeader from '../../components/PageHeader'
+import ConfirmDialog from '../../components/ConfirmDialog'
 import { useToast } from '../../hooks/useToast'
 import { memoireApi, studentApi, teacherApi } from '../../api/endpoints'
 import { extractError } from '../../api/axios'
@@ -39,21 +40,26 @@ export default function MemoiresPage() {
   const [teachers, setTeachers] = useState([])
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState(null)
+  const [toDelete, setToDelete] = useState(null)
   const [form, setForm] = useState({
     studentId: '', subject: '', directorId: '', defenseDate: '', jury: '',
     defenseLocation: '', grade: '', decision: '', status: 'EN_REDACTION',
   })
 
-  const load = () => {
-    memoireApi.list().then((r) => setRows(r.data.data || [])).catch(() => {})
-  }
+  // L'erreur est remontée : sans cela un échec serveur se confondait avec une
+  // liste vide, ce qui masquait les 500 de sérialisation.
+  const load = useCallback(() => {
+    memoireApi.list()
+      .then((r) => setRows(r.data.data || []))
+      .catch((err) => toastError(extractError(err)))
+  }, [toastError])
 
   useEffect(() => {
     studentApi.search({ page: 0, size: 100 }).then((r) => setStudents(r.data.data.content || [])).catch(() => {})
     teacherApi.search({ page: 0, size: 100 }).then((r) => setTeachers(r.data.data.content || [])).catch(() => {})
   }, [])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [load])
 
   const resetForm = () => setForm({
     studentId: '', subject: '', directorId: '', defenseDate: '', jury: '',
@@ -66,9 +72,9 @@ export default function MemoiresPage() {
       return
     }
     const payload = {
-      student: { id: Number(form.studentId) },
+      studentId: Number(form.studentId),
       subject: form.subject,
-      director: form.directorId ? { id: Number(form.directorId) } : undefined,
+      directorId: form.directorId ? Number(form.directorId) : undefined,
       defenseDate: form.defenseDate || undefined,
       jury: form.jury || undefined,
       defenseLocation: form.defenseLocation || undefined,
@@ -89,10 +95,11 @@ export default function MemoiresPage() {
     }
   }
 
-  const handleDelete = async (id) => {
+  const handleDelete = async () => {
     try {
-      await memoireApi.delete(id)
+      await memoireApi.delete(toDelete.id)
       success('Mémoire supprimé')
+      setToDelete(null)
       load()
     } catch (err) {
       toastError(extractError(err))
@@ -141,7 +148,7 @@ export default function MemoiresPage() {
 
               <Box display="flex" justifyContent="flex-end" gap={0.5} mt={1.5}>
                 <IconButton size="small" color="primary" onClick={() => openEdit(m)}><Edit fontSize="small" /></IconButton>
-                <IconButton size="small" color="error" onClick={() => handleDelete(m.id)}><Delete fontSize="small" /></IconButton>
+                <IconButton size="small" color="error" onClick={() => setToDelete(m)}><Delete fontSize="small" /></IconButton>
               </Box>
             </Card>
           </Grid>
@@ -180,6 +187,14 @@ export default function MemoiresPage() {
           <Button variant="contained" onClick={handleSave}>{editing ? 'Enregistrer' : 'Créer'}</Button>
         </DialogActions>
       </Dialog>
+
+      <ConfirmDialog
+        open={Boolean(toDelete)}
+        title="Supprimer le mémoire"
+        message={`Supprimer le mémoire « ${toDelete?.subject} » de ${toDelete?.studentName} ?`}
+        onConfirm={handleDelete}
+        onClose={() => setToDelete(null)}
+      />
     </>
   )
 }

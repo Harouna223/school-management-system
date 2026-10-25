@@ -1,5 +1,6 @@
 package com.school.service;
 
+import com.school.dto.request.CandidatureRequest;
 import com.school.dto.response.CandidatureResponse;
 import com.school.entity.Candidature;
 import com.school.enums.CandidatureStatus;
@@ -14,8 +15,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.concurrent.atomic.AtomicLong;
-
 /**
  * Gestion des candidatures d'admission universitaire.
  */
@@ -23,21 +22,30 @@ import java.util.concurrent.atomic.AtomicLong;
 @RequiredArgsConstructor
 public class CandidatureService {
 
+    /** Préfixe du compteur persisté des références de candidature. */
+    private static final String REFERENCE_PREFIX = "CAND-";
+
     private final CandidatureRepository candidatureRepository;
+    private final NumberSequenceService numberSequenceService;
     private final AuditService auditService;
 
-    private static final AtomicLong SEQUENCE = new AtomicLong(System.currentTimeMillis() % 100000);
-
     @Transactional
-    public CandidatureResponse create(Candidature candidature, HttpServletRequest httpRequest) {
-        if (candidature.getFieldName() == null || candidature.getFieldName().isBlank()) {
-            throw new com.school.exception.BusinessException("La filière est obligatoire");
-        }
-        candidature.setFieldName(candidature.getFieldName().trim());
-        candidature.setReference("CAND-" + String.format("%06d", SEQUENCE.incrementAndGet()));
-        if (candidature.getStatus() == null) {
-            candidature.setStatus(CandidatureStatus.EN_ATTENTE);
-        }
+    public CandidatureResponse create(CandidatureRequest request, HttpServletRequest httpRequest) {
+        Candidature candidature = Candidature.builder()
+                .firstName(request.getFirstName().trim())
+                .lastName(request.getLastName().trim())
+                .birthDate(request.getBirthDate())
+                .email(request.getEmail())
+                .phone(request.getPhone())
+                .fieldName(request.getFieldName().trim())
+                .level(request.getLevel())
+                .notes(request.getNotes())
+                .status(CandidatureStatus.EN_ATTENTE)
+                .build();
+        // Compteur persisté et verrouillé : un compteur en mémoire repartait de
+        // zéro à chaque redémarrage et pouvait réémettre la même référence.
+        candidature.setReference(REFERENCE_PREFIX
+                + String.format("%06d", numberSequenceService.next(REFERENCE_PREFIX)));
         Candidature saved = candidatureRepository.save(candidature);
         auditService.log("CREATE", "Candidature", saved.getId(),
                 "Candidature " + saved.getReference() + " " + saved.getFirstName() + " " + saved.getLastName(), httpRequest);

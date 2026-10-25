@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   Grid,
   Card,
@@ -17,6 +17,7 @@ import {
 } from '@mui/material'
 import { Add, Delete, Edit, Business, Event, MenuBook } from '@mui/icons-material'
 import PageHeader from '../../components/PageHeader'
+import ConfirmDialog from '../../components/ConfirmDialog'
 import { useToast } from '../../hooks/useToast'
 import { stageApi, studentApi, teacherApi } from '../../api/endpoints'
 import { extractError } from '../../api/axios'
@@ -35,22 +36,27 @@ export default function StagesPage() {
   const [teachers, setTeachers] = useState([])
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState(null)
+  const [toDelete, setToDelete] = useState(null)
   const [form, setForm] = useState({
     studentId: '', company: '', companyContact: '', subject: '',
     startDate: '', endDate: '', supervisorId: '', conventionRef: '',
     reportSubmitted: false, defenseDate: '', grade: '', evaluation: '', status: 'EN_COURS',
   })
 
-  const load = () => {
-    stageApi.list().then((r) => setRows(r.data.data || [])).catch(() => {})
-  }
+  // L'erreur est remontée : sans cela un échec serveur se confondait avec une
+  // liste vide, ce qui masquait les 500 de sérialisation.
+  const load = useCallback(() => {
+    stageApi.list()
+      .then((r) => setRows(r.data.data || []))
+      .catch((err) => toastError(extractError(err)))
+  }, [toastError])
 
   useEffect(() => {
     studentApi.search({ page: 0, size: 100 }).then((r) => setStudents(r.data.data.content || [])).catch(() => {})
     teacherApi.search({ page: 0, size: 100 }).then((r) => setTeachers(r.data.data.content || [])).catch(() => {})
   }, [])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [load])
 
   const resetForm = () => setForm({
     studentId: '', company: '', companyContact: '', subject: '',
@@ -64,13 +70,13 @@ export default function StagesPage() {
       return
     }
     const payload = {
-      student: { id: Number(form.studentId) },
+      studentId: Number(form.studentId),
       company: form.company,
       companyContact: form.companyContact || undefined,
       subject: form.subject || undefined,
       startDate: form.startDate || undefined,
       endDate: form.endDate || undefined,
-      supervisor: form.supervisorId ? { id: Number(form.supervisorId) } : undefined,
+      supervisorId: form.supervisorId ? Number(form.supervisorId) : undefined,
       conventionRef: form.conventionRef || undefined,
       reportSubmitted: form.reportSubmitted,
       defenseDate: form.defenseDate || undefined,
@@ -91,10 +97,11 @@ export default function StagesPage() {
     }
   }
 
-  const handleDelete = async (id) => {
+  const handleDelete = async () => {
     try {
-      await stageApi.delete(id)
+      await stageApi.delete(toDelete.id)
       success('Stage supprimé')
+      setToDelete(null)
       load()
     } catch (err) {
       toastError(extractError(err))
@@ -163,7 +170,7 @@ export default function StagesPage() {
 
               <Box display="flex" justifyContent="flex-end" gap={0.5} mt={1.5}>
                 <IconButton size="small" color="primary" onClick={() => openEdit(s)} title="Modifier"><Edit fontSize="small" /></IconButton>
-                <IconButton size="small" color="error" onClick={() => handleDelete(s.id)} title="Supprimer"><Delete fontSize="small" /></IconButton>
+                <IconButton size="small" color="error" onClick={() => setToDelete(s)} title="Supprimer"><Delete fontSize="small" /></IconButton>
               </Box>
             </Card>
           </Grid>
@@ -241,6 +248,14 @@ export default function StagesPage() {
           <Button variant="contained" onClick={handleSave}>{editing ? 'Enregistrer' : 'Créer'}</Button>
         </DialogActions>
       </Dialog>
+
+      <ConfirmDialog
+        open={Boolean(toDelete)}
+        title="Supprimer le stage"
+        message={`Supprimer le stage « ${toDelete?.company} » de ${toDelete?.studentName} ?`}
+        onConfirm={handleDelete}
+        onClose={() => setToDelete(null)}
+      />
     </>
   )
 }

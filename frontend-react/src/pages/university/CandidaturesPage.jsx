@@ -18,6 +18,7 @@ import {
 } from '@mui/material'
 import { Add, Delete, Person, School } from '@mui/icons-material'
 import PageHeader from '../../components/PageHeader'
+import ConfirmDialog from '../../components/ConfirmDialog'
 import { useToast } from '../../hooks/useToast'
 import { candidatureApi } from '../../api/endpoints'
 import { extractError } from '../../api/axios'
@@ -39,6 +40,7 @@ export default function CandidaturesPage() {
   const [size, setSize] = useState(10)
   const [statusFilter, setStatusFilter] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [toDelete, setToDelete] = useState(null)
   const [form, setForm] = useState({
     firstName: '', lastName: '', birthDate: '', email: '', phone: '',
     fieldName: '', level: 'L1', notes: '',
@@ -88,10 +90,11 @@ export default function CandidaturesPage() {
     }
   }
 
-  const handleDelete = async (id) => {
+  const handleDelete = async () => {
     try {
-      await candidatureApi.delete(id)
+      await candidatureApi.delete(toDelete.id)
       success('Candidature supprimée')
+      setToDelete(null)
       load()
     } catch (err) {
       toastError(extractError(err))
@@ -141,7 +144,7 @@ export default function CandidaturesPage() {
                 <Button size="small" color="success" variant="outlined" onClick={() => handleStatus(c.id, 'ACCEPTEE')}>Accepter</Button>
                 <Button size="small" color="warning" variant="outlined" onClick={() => handleStatus(c.id, 'LISTE_ATTENTE')}>Liste d'attente</Button>
                 <Button size="small" color="error" variant="outlined" onClick={() => handleStatus(c.id, 'REFUSEE')}>Refuser</Button>
-                <IconButton size="small" color="error" onClick={() => handleDelete(c.id)}><Delete fontSize="small" /></IconButton>
+                <IconButton size="small" color="error" onClick={() => setToDelete(c)}><Delete fontSize="small" /></IconButton>
               </Box>
             </Card>
           </Grid>
@@ -184,6 +187,14 @@ export default function CandidaturesPage() {
           <Button variant="contained" onClick={handleCreate}>Déposer</Button>
         </DialogActions>
       </Dialog>
+
+      <ConfirmDialog
+        open={Boolean(toDelete)}
+        title="Supprimer la candidature"
+        message={`Supprimer la candidature de ${toDelete?.firstName} ${toDelete?.lastName} (${toDelete?.reference}) ?`}
+        onConfirm={handleDelete}
+        onClose={() => setToDelete(null)}
+      />
     </>
   )
 }

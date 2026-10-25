@@ -14,11 +14,17 @@ import {
   IconButton,
   Avatar
 } from '@mui/material'
-import { Add, Delete, Person, School, Work } from '@mui/icons-material'
+import { Add, Delete, Edit, Person, School, Work } from '@mui/icons-material'
 import PageHeader from '../../components/PageHeader'
+import ConfirmDialog from '../../components/ConfirmDialog'
 import { useToast } from '../../hooks/useToast'
 import { alumnusApi } from '../../api/endpoints'
 import { extractError } from '../../api/axios'
+
+const EMPTY_FORM = {
+  firstName: '', lastName: '', fieldName: '', diploma: '', academicYear: '',
+  email: '', phone: '', currentJob: '', company: '', notes: '',
+}
 
 /**
  * Module diplômés (alumni).
@@ -29,43 +35,66 @@ export default function AlumniPage() {
   const [rows, setRows] = useState([])
   const [fieldFilter, setFieldFilter] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [form, setForm] = useState({
-    firstName: '', lastName: '', fieldName: '', diploma: '', academicYear: '',
-    email: '', phone: '', currentJob: '', company: '', notes: '',
-  })
+  const [editing, setEditing] = useState(null)
+  const [toDelete, setToDelete] = useState(null)
+  const [form, setForm] = useState(EMPTY_FORM)
 
+  // L'erreur est remontée : un échec serveur ne doit pas ressembler à une liste vide.
   const load = useCallback(() => {
-    alumnusApi.list(fieldFilter || undefined).then((r) => setRows(r.data.data || [])).catch(() => {})
-  }, [fieldFilter])
+    alumnusApi.list(fieldFilter || undefined)
+      .then((r) => setRows(r.data.data || []))
+      .catch((err) => toastError(extractError(err)))
+  }, [fieldFilter, toastError])
 
   useEffect(() => { load() }, [load])
 
-  const handleCreate = async () => {
+  const openCreate = () => {
+    setEditing(null)
+    setForm(EMPTY_FORM)
+    setDialogOpen(true)
+  }
+
+  const openEdit = (a) => {
+    setEditing(a)
+    setForm({
+      firstName: a.firstName || '', lastName: a.lastName || '', fieldName: a.fieldName || '',
+      diploma: a.diploma || '', academicYear: a.academicYear || '', email: a.email || '',
+      phone: a.phone || '', currentJob: a.currentJob || '', company: a.company || '', notes: a.notes || '',
+    })
+    setDialogOpen(true)
+  }
+
+  const handleSave = async () => {
     if (!form.firstName || !form.lastName) {
       toastError('Prénom et nom sont obligatoires')
       return
     }
+    const payload = {
+      firstName: form.firstName, lastName: form.lastName,
+      fieldName: form.fieldName || undefined,
+      diploma: form.diploma || undefined, academicYear: form.academicYear || undefined,
+      email: form.email || undefined, phone: form.phone || undefined,
+      currentJob: form.currentJob || undefined, company: form.company || undefined,
+      notes: form.notes || undefined,
+    }
     try {
-      await alumnusApi.create({
-        firstName: form.firstName, lastName: form.lastName,
-        fieldName: form.fieldName || undefined,
-        diploma: form.diploma || undefined, academicYear: form.academicYear || undefined,
-        email: form.email || undefined, phone: form.phone || undefined,
-        currentJob: form.currentJob || undefined, company: form.company || undefined, notes: form.notes || undefined,
-      })
-      success('Diplômé ajouté')
+      if (editing) await alumnusApi.update(editing.id, payload)
+      else await alumnusApi.create(payload)
+      success(editing ? 'Diplômé mis à jour' : 'Diplômé ajouté')
       setDialogOpen(false)
-      setForm({ firstName: '', lastName: '', fieldName: '', diploma: '', academicYear: '', email: '', phone: '', currentJob: '', company: '', notes: '' })
+      setEditing(null)
+      setForm(EMPTY_FORM)
       load()
     } catch (err) {
       toastError(extractError(err))
     }
   }
 
-  const handleDelete = async (id) => {
+  const handleDelete = async () => {
     try {
-      await alumnusApi.delete(id)
+      await alumnusApi.delete(toDelete.id)
       success('Diplômé supprimé')
+      setToDelete(null)
       load()
     } catch (err) {
       toastError(extractError(err))
@@ -77,7 +106,7 @@ export default function AlumniPage() {
       <PageHeader
         title="Diplômés (Alumni)"
         subtitle="Anciens étudiants, diplômes et parcours professionnel"
-        actions={[{ label: 'Ajouter un diplômé', icon: <Add />, onClick: () => setDialogOpen(true) }]}
+        actions={[{ label: 'Ajouter un diplômé', icon: <Add />, onClick: openCreate }]}
       />
 
       <Card sx={{ p: 2, borderRadius: '16px', mb: 3 }}>
@@ -95,7 +124,8 @@ export default function AlumniPage() {
                   <Typography variant="subtitle1" fontWeight={700}>{a.firstName} {a.lastName}</Typography>
                   <Typography variant="caption" color="text.secondary">{a.academicYear || '—'}</Typography>
                 </Box>
-                <IconButton size="small" color="error" onClick={() => handleDelete(a.id)}><Delete fontSize="small" /></IconButton>
+                <IconButton size="small" color="primary" onClick={() => openEdit(a)} title="Modifier"><Edit fontSize="small" /></IconButton>
+                <IconButton size="small" color="error" onClick={() => setToDelete(a)} title="Supprimer"><Delete fontSize="small" /></IconButton>
               </Box>
               <Box display="flex" alignItems="center" gap={1} mt={1}>
                 <School color="action" sx={{ fontSize: 18 }} />
@@ -120,7 +150,7 @@ export default function AlumniPage() {
       </Grid>
 
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Ajouter un diplômé</DialogTitle>
+        <DialogTitle>{editing ? 'Modifier le diplômé' : 'Ajouter un diplômé'}</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 0.5 }}>
             <Grid item xs={6}><TextField fullWidth size="small" label="Prénom" value={form.firstName} onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))} /></Grid>
@@ -137,9 +167,17 @@ export default function AlumniPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialogOpen(false)}>Annuler</Button>
-          <Button variant="contained" onClick={handleCreate}>Ajouter</Button>
+          <Button variant="contained" onClick={handleSave}>{editing ? 'Enregistrer' : 'Ajouter'}</Button>
         </DialogActions>
       </Dialog>
+
+      <ConfirmDialog
+        open={Boolean(toDelete)}
+        title="Supprimer le diplômé"
+        message={`Supprimer « ${toDelete?.firstName} ${toDelete?.lastName} » de la liste des diplômés ?`}
+        onConfirm={handleDelete}
+        onClose={() => setToDelete(null)}
+      />
     </>
   )
 }

@@ -1,13 +1,14 @@
 package com.school.controller;
 
+import com.school.dto.request.MemoireRequest;
 import com.school.dto.response.ApiResponse;
 import com.school.dto.response.MemoireResponse;
-import com.school.entity.Memoire;
 import com.school.service.AccessControlService;
 import com.school.service.MemoireService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -36,15 +37,17 @@ public class MemoireController {
 
     @PostMapping
     @Operation(summary = "Créer un mémoire")
-    public ResponseEntity<ApiResponse<MemoireResponse>> create(@RequestBody Memoire memoire, HttpServletRequest httpRequest) {
-        return ok("Mémoire créé", memoireService.create(memoire, httpRequest));
+    public ResponseEntity<ApiResponse<MemoireResponse>> create(@Valid @RequestBody MemoireRequest request,
+                                                               HttpServletRequest httpRequest) {
+        return ok("Mémoire créé", memoireService.create(request, httpRequest));
     }
 
     @PutMapping("/{id}")
     @Operation(summary = "Modifier un mémoire (jury, note, décision)")
-    public ResponseEntity<ApiResponse<MemoireResponse>> update(@PathVariable Long id, @RequestBody Memoire memoire,
-                                                       HttpServletRequest httpRequest) {
-        return ok("Mémoire modifié", memoireService.update(id, memoire, httpRequest));
+    public ResponseEntity<ApiResponse<MemoireResponse>> update(@PathVariable Long id,
+                                                               @Valid @RequestBody MemoireRequest request,
+                                                               HttpServletRequest httpRequest) {
+        return ok("Mémoire modifié", memoireService.update(id, request, httpRequest));
     }
 
     @DeleteMapping("/{id}")

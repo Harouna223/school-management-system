@@ -1,12 +1,13 @@
 package com.school.controller;
 
+import com.school.dto.request.AlumnusRequest;
 import com.school.dto.response.AlumnusResponse;
 import com.school.dto.response.ApiResponse;
-import com.school.entity.Alumnus;
 import com.school.service.AlumnusService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -33,8 +34,17 @@ public class AlumnusController {
 
     @PostMapping
     @Operation(summary = "Ajouter un diplômé")
-    public ResponseEntity<ApiResponse<AlumnusResponse>> create(@RequestBody Alumnus alumnus, HttpServletRequest httpRequest) {
-        return ok("Diplômé ajouté", alumnusService.create(alumnus, httpRequest));
+    public ResponseEntity<ApiResponse<AlumnusResponse>> create(@Valid @RequestBody AlumnusRequest request,
+                                                               HttpServletRequest httpRequest) {
+        return ok("Diplômé ajouté", alumnusService.create(request, httpRequest));
+    }
+
+    @PutMapping("/{id}")
+    @Operation(summary = "Mettre à jour le parcours d'un diplômé")
+    public ResponseEntity<ApiResponse<AlumnusResponse>> update(@PathVariable Long id,
+                                                               @Valid @RequestBody AlumnusRequest request,
+                                                               HttpServletRequest httpRequest) {
+        return ok("Diplômé mis à jour", alumnusService.update(id, request, httpRequest));
     }
 
     @DeleteMapping("/{id}")
