@@ -39,6 +39,22 @@ git -C "$APP_DIR" pull --ff-only origin "$BRANCH"
 AFTER="$(git -C "$APP_DIR" rev-parse --short HEAD)"
 log "version : $BEFORE -> $AFTER"
 
+# ------------------------------------------------------------------
+# Garde-fou JWT : depuis REQUIRE_SECURE_SECRETS=true, un .env encore muni du
+# secret par defaut du depot (public), vide, ou trop court pour HS256 fait
+# ECHOUER le demarrage du backend. On le regenere ici, sinon une mise a jour
+# laisserait la production en panne.
+# ------------------------------------------------------------------
+[[ -f "$ENV_FILE" ]] || die "docker/.env introuvable ($ENV_FILE) : lancer d'abord deploy/install.sh."
+
+DEFAULT_JWT_SECRET="Y2hhbmdlLXRoaXMtc2VjcmV0LWtleS1pbi1wcm9kdWN0aW9uLXdpdGgtYTM3LWNyYXdhbGxlbg=="
+CURRENT_JWT_SECRET="$(env_get JWT_SECRET)"
+if [[ -z "$CURRENT_JWT_SECRET" || "$CURRENT_JWT_SECRET" == "$DEFAULT_JWT_SECRET" || "${#CURRENT_JWT_SECRET}" -lt 44 ]]; then
+  warn "JWT_SECRET absent, par defaut ou trop court : generation d'une nouvelle valeur."
+  warn "changer ce secret invalide les sessions en cours (les utilisateurs devront se reconnecter)."
+  env_set JWT_SECRET "$(openssl rand -base64 48 | tr -d '\n')"
+fi
+
 log "reconstruction des images (les migrations Flyway s'appliquent au demarrage)"
 compose build
 compose up -d --remove-orphans
