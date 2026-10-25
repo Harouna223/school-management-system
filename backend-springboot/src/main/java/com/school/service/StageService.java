@@ -1,5 +1,6 @@
 package com.school.service;
 
+import com.school.dto.response.StageResponse;
 import com.school.entity.Stage;
 import com.school.entity.Student;
 import com.school.entity.Teacher;
@@ -17,6 +18,10 @@ import java.util.List;
 
 /**
  * Gestion des stages universitaires.
+ *
+ * <p>Le service expose des {@link StageResponse} : la conversion a lieu dans la
+ * transaction, seule façon d'accéder aux rattachements paresseux puisque
+ * {@code open-in-view} est désactivé.</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -28,26 +33,30 @@ public class StageService {
     private final AuditService auditService;
 
     @Transactional(readOnly = true)
-    public List<Stage> listAll() {
-        return stageRepository.findAll();
+    public List<StageResponse> listAll() {
+        return stageRepository.findAllByOrderByStartDateDesc().stream()
+                .map(StageResponse::from)
+                .toList();
     }
 
     @Transactional(readOnly = true)
-    public List<Stage> listByStudent(Long studentId) {
-        return stageRepository.findByStudentIdOrderByStartDateDesc(studentId);
+    public List<StageResponse> listByStudent(Long studentId) {
+        return stageRepository.findByStudentIdOrderByStartDateDesc(studentId).stream()
+                .map(StageResponse::from)
+                .toList();
     }
 
     @Transactional
-    public Stage create(Stage stage, HttpServletRequest httpRequest) {
+    public StageResponse create(Stage stage, HttpServletRequest httpRequest) {
         validateAndResolve(stage);
         Stage saved = stageRepository.save(stage);
         auditService.log("CREATE", "Stage", saved.getId(),
                 "Stage " + saved.getCompany() + " pour " + saved.getStudent().getFullName(), httpRequest);
-        return saved;
+        return StageResponse.from(saved);
     }
 
     @Transactional
-    public Stage update(Long id, Stage stage, HttpServletRequest httpRequest) {
+    public StageResponse update(Long id, Stage stage, HttpServletRequest httpRequest) {
         Stage existing = stageRepository.findById(id)
                 .orElseThrow(() -> ResourceNotFoundException.of("Stage", id));
         validateAndResolve(stage);
@@ -55,7 +64,7 @@ public class StageService {
         Stage saved = stageRepository.save(stage);
         auditService.log("UPDATE", "Stage", id,
                 "Mise à jour stage " + existing.getCompany(), httpRequest);
-        return saved;
+        return StageResponse.from(saved);
     }
 
     @Transactional

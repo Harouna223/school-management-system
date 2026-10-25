@@ -1,6 +1,7 @@
 package com.school.controller;
 
 import com.school.dto.response.ApiResponse;
+import com.school.dto.response.CandidatureResponse;
 import com.school.dto.response.PageResponse;
 import com.school.entity.Candidature;
 import com.school.enums.CandidatureStatus;
@@ -31,7 +32,7 @@ public class CandidatureController {
 
     @GetMapping
     @Operation(summary = "Liste paginée des candidatures")
-    public ResponseEntity<ApiResponse<PageResponse<Candidature>>> list(
+    public ResponseEntity<ApiResponse<PageResponse<CandidatureResponse>>> list(
             @RequestParam(required = false) String fieldName,
             @RequestParam(required = false) CandidatureStatus status,
             @Min(value = 0, message = "Le numéro de page ne peut pas être négatif") @RequestParam(defaultValue = "0") int page,
@@ -42,14 +43,14 @@ public class CandidatureController {
 
     @PostMapping
     @Operation(summary = "Déposer une candidature")
-    public ResponseEntity<ApiResponse<Candidature>> create(@RequestBody Candidature candidature,
+    public ResponseEntity<ApiResponse<CandidatureResponse>> create(@RequestBody Candidature candidature,
                                                            HttpServletRequest httpRequest) {
         return ok("Candidature déposée", candidatureService.create(candidature, httpRequest));
     }
 
     @PatchMapping("/{id}/status")
     @Operation(summary = "Mettre à jour le statut (sélection, liste d'attente, refus)")
-    public ResponseEntity<ApiResponse<Candidature>> updateStatus(@PathVariable Long id,
+    public ResponseEntity<ApiResponse<CandidatureResponse>> updateStatus(@PathVariable Long id,
                                                                  @RequestParam CandidatureStatus status,
                                                                  HttpServletRequest httpRequest) {
         return ok("Statut mis à jour", candidatureService.updateStatus(id, status, httpRequest));

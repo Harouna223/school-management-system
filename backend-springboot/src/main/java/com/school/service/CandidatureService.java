@@ -1,5 +1,6 @@
 package com.school.service;
 
+import com.school.dto.response.CandidatureResponse;
 import com.school.entity.Candidature;
 import com.school.enums.CandidatureStatus;
 import com.school.exception.ResourceNotFoundException;
@@ -28,7 +29,7 @@ public class CandidatureService {
     private static final AtomicLong SEQUENCE = new AtomicLong(System.currentTimeMillis() % 100000);
 
     @Transactional
-    public Candidature create(Candidature candidature, HttpServletRequest httpRequest) {
+    public CandidatureResponse create(Candidature candidature, HttpServletRequest httpRequest) {
         if (candidature.getFieldName() == null || candidature.getFieldName().isBlank()) {
             throw new com.school.exception.BusinessException("La filière est obligatoire");
         }
@@ -40,28 +41,32 @@ public class CandidatureService {
         Candidature saved = candidatureRepository.save(candidature);
         auditService.log("CREATE", "Candidature", saved.getId(),
                 "Candidature " + saved.getReference() + " " + saved.getFirstName() + " " + saved.getLastName(), httpRequest);
-        return saved;
+        return CandidatureResponse.from(saved);
     }
 
     @Transactional
-    public Candidature updateStatus(Long id, CandidatureStatus status, HttpServletRequest httpRequest) {
+    public CandidatureResponse updateStatus(Long id, CandidatureStatus status, HttpServletRequest httpRequest) {
         Candidature candidature = candidatureRepository.findById(id)
                 .orElseThrow(() -> ResourceNotFoundException.of("Candidature", id));
         candidature.setStatus(status);
         Candidature saved = candidatureRepository.save(candidature);
         auditService.log("UPDATE", "Candidature", id,
                 "Statut candidature " + saved.getReference() + " → " + status, httpRequest);
-        return saved;
+        return CandidatureResponse.from(saved);
     }
 
     @Transactional(readOnly = true)
-    public Page<Candidature> list(String fieldName, CandidatureStatus status, int page, int size) {
+    public Page<CandidatureResponse> list(String fieldName, CandidatureStatus status, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        if (status != null) return candidatureRepository.findByStatus(status, pageable);
-        if (fieldName != null && !fieldName.isBlank()) {
-            return candidatureRepository.findByFieldNameContainingIgnoreCase(fieldName.trim(), pageable);
+        Page<Candidature> result;
+        if (status != null) {
+            result = candidatureRepository.findByStatus(status, pageable);
+        } else if (fieldName != null && !fieldName.isBlank()) {
+            result = candidatureRepository.findByFieldNameContainingIgnoreCase(fieldName.trim(), pageable);
+        } else {
+            result = candidatureRepository.findAll(pageable);
         }
-        return candidatureRepository.findAll(pageable);
+        return result.map(CandidatureResponse::from);
     }
 
     @Transactional

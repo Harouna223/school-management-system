@@ -1,5 +1,6 @@
 package com.school.service;
 
+import com.school.dto.response.AlumnusResponse;
 import com.school.entity.Alumnus;
 import com.school.exception.BusinessException;
 import com.school.exception.ResourceNotFoundException;
@@ -22,19 +23,19 @@ public class AlumnusService {
     private final AuditService auditService;
 
     @Transactional(readOnly = true)
-    public List<Alumnus> listAll() {
-        return alumnusRepository.findAll();
+    public List<AlumnusResponse> listAll() {
+        return mapAll(alumnusRepository.findAll());
     }
 
     @Transactional(readOnly = true)
-    public List<Alumnus> listByField(String fieldName) {
-        return (fieldName != null && !fieldName.isBlank())
+    public List<AlumnusResponse> listByField(String fieldName) {
+        return mapAll((fieldName != null && !fieldName.isBlank())
                 ? alumnusRepository.findByFieldNameContainingIgnoreCase(fieldName.trim())
-                : alumnusRepository.findAll();
+                : alumnusRepository.findAll());
     }
 
     @Transactional
-    public Alumnus create(Alumnus alumnus, HttpServletRequest httpRequest) {
+    public AlumnusResponse create(Alumnus alumnus, HttpServletRequest httpRequest) {
         if (alumnus.getFirstName() == null || alumnus.getLastName() == null) {
             throw new BusinessException("Le prénom et le nom sont obligatoires");
         }
@@ -44,7 +45,7 @@ public class AlumnusService {
         Alumnus saved = alumnusRepository.save(alumnus);
         auditService.log("CREATE", "Alumnus", saved.getId(),
                 "Alumni " + saved.getFirstName() + " " + saved.getLastName(), httpRequest);
-        return saved;
+        return AlumnusResponse.from(saved);
     }
 
     @Transactional
@@ -53,5 +54,9 @@ public class AlumnusService {
                 .orElseThrow(() -> ResourceNotFoundException.of("Alumni", id));
         auditService.log("DELETE", "Alumnus", id, "Suppression alumni " + alumnus.getFirstName(), httpRequest);
         alumnusRepository.delete(alumnus);
+    }
+
+    private List<AlumnusResponse> mapAll(List<Alumnus> alumni) {
+        return alumni.stream().map(AlumnusResponse::from).toList();
     }
 }

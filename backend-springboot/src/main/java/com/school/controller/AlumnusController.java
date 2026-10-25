@@ -1,5 +1,6 @@
 package com.school.controller;
 
+import com.school.dto.response.AlumnusResponse;
 import com.school.dto.response.ApiResponse;
 import com.school.entity.Alumnus;
 import com.school.service.AlumnusService;
@@ -26,13 +27,13 @@ public class AlumnusController {
 
     @GetMapping
     @Operation(summary = "Liste des diplômés")
-    public ResponseEntity<ApiResponse<List<Alumnus>>> list(@RequestParam(required = false) String fieldName) {
+    public ResponseEntity<ApiResponse<List<AlumnusResponse>>> list(@RequestParam(required = false) String fieldName) {
         return ok("Diplômés", alumnusService.listByField(fieldName));
     }
 
     @PostMapping
     @Operation(summary = "Ajouter un diplômé")
-    public ResponseEntity<ApiResponse<Alumnus>> create(@RequestBody Alumnus alumnus, HttpServletRequest httpRequest) {
+    public ResponseEntity<ApiResponse<AlumnusResponse>> create(@RequestBody Alumnus alumnus, HttpServletRequest httpRequest) {
         return ok("Diplômé ajouté", alumnusService.create(alumnus, httpRequest));
     }
 

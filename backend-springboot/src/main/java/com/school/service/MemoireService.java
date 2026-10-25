@@ -1,5 +1,6 @@
 package com.school.service;
 
+import com.school.dto.response.MemoireResponse;
 import com.school.entity.Memoire;
 import com.school.exception.BusinessException;
 import com.school.exception.ResourceNotFoundException;
@@ -15,6 +16,10 @@ import java.util.List;
 
 /**
  * Gestion des mémoires et soutenances universitaires.
+ *
+ * <p>Le service expose des {@link MemoireResponse} pour la même raison que
+ * {@link StageService} : les rattachements paresseux ne sont lisibles que
+ * dans la transaction.</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -26,17 +31,21 @@ public class MemoireService {
     private final AuditService auditService;
 
     @Transactional(readOnly = true)
-    public List<Memoire> listAll() {
-        return memoireRepository.findAll();
+    public List<MemoireResponse> listAll() {
+        return memoireRepository.findAllByOrderByDefenseDateDesc().stream()
+                .map(MemoireResponse::from)
+                .toList();
     }
 
     @Transactional(readOnly = true)
-    public List<Memoire> listByStudent(Long studentId) {
-        return memoireRepository.findByStudentIdOrderByDefenseDateDesc(studentId);
+    public List<MemoireResponse> listByStudent(Long studentId) {
+        return memoireRepository.findByStudentIdOrderByDefenseDateDesc(studentId).stream()
+                .map(MemoireResponse::from)
+                .toList();
     }
 
     @Transactional
-    public Memoire create(Memoire memoire, HttpServletRequest httpRequest) {
+    public MemoireResponse create(Memoire memoire, HttpServletRequest httpRequest) {
         if (memoire.getSubject() == null || memoire.getSubject().isBlank()) {
             throw new BusinessException("Le sujet est obligatoire");
         }
@@ -52,11 +61,11 @@ public class MemoireService {
         Memoire saved = memoireRepository.save(memoire);
         auditService.log("CREATE", "Memoire", saved.getId(),
                 "Mémoire : " + saved.getSubject(), httpRequest);
-        return saved;
+        return MemoireResponse.from(saved);
     }
 
     @Transactional
-    public Memoire update(Long id, Memoire memoire, HttpServletRequest httpRequest) {
+    public MemoireResponse update(Long id, Memoire memoire, HttpServletRequest httpRequest) {
         Memoire existing = memoireRepository.findById(id)
                 .orElseThrow(() -> ResourceNotFoundException.of("Mémoire", id));
         if (memoire.getSubject() != null) existing.setSubject(memoire.getSubject());
@@ -73,7 +82,7 @@ public class MemoireService {
         }
         Memoire saved = memoireRepository.save(existing);
         auditService.log("UPDATE", "Memoire", id, "Mise à jour mémoire", httpRequest);
-        return saved;
+        return MemoireResponse.from(saved);
     }
 
     @Transactional

@@ -102,8 +102,8 @@ export default function MemoiresPage() {
   const openEdit = (m) => {
     setEditing(m)
     setForm({
-      studentId: String(m.student?.id || ''), subject: m.subject || '',
-      directorId: m.director ? String(m.director.id) : '', defenseDate: m.defenseDate || '',
+      studentId: String(m.studentId || ''), subject: m.subject || '',
+      directorId: m.directorId ? String(m.directorId) : '', defenseDate: m.defenseDate || '',
       jury: m.jury || '', defenseLocation: m.defenseLocation || '',
       grade: m.grade || '', decision: m.decision || '', status: m.status || 'EN_REDACTION',
     })
@@ -132,9 +132,9 @@ export default function MemoiresPage() {
               </Box>
               <Box display="flex" alignItems="center" gap={1} mt={1.5}>
                 <Avatar sx={{ width: 28, height: 28, bgcolor: 'primary.main' }}><Group sx={{ fontSize: 15 }} /></Avatar>
-                <Typography variant="body2" fontWeight={600}>{m.student?.firstName} {m.student?.lastName}</Typography>
+                <Typography variant="body2" fontWeight={600}>{m.studentName}</Typography>
               </Box>
-              {m.director && <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>Directeur : {m.director.firstName} {m.director.lastName}</Typography>}
+              {m.directorName && <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>Directeur : {m.directorName}</Typography>}
               {m.defenseDate && <Typography variant="body2" mt={1}><Event sx={{ fontSize: 15, verticalAlign: 'middle', mr: 0.5 }} />Soutenance : {formatDate(m.defenseDate)}</Typography>}
               {m.jury && <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>Jury : {m.jury}</Typography>}
               {m.decision && <Typography variant="body2" color="text.secondary" mt={1} sx={{ fontStyle: 'italic' }}>Décision : {m.decision}</Typography>}

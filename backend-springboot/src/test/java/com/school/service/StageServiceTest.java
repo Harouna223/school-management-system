@@ -1,5 +1,6 @@
 package com.school.service;
 
+import com.school.dto.response.StageResponse;
 import com.school.entity.Stage;
 import com.school.entity.Student;
 import com.school.exception.BusinessException;
@@ -80,7 +81,7 @@ class StageServiceTest {
             s.setId(20L);
             return s;
         });
-        Stage saved = service.create(stage(1L), httpRequest);
+        StageResponse saved = service.create(stage(1L), httpRequest);
         assertThat(saved.getId()).isEqualTo(20L);
         assertThat(saved.getCompany()).isEqualTo("TechCorp");
         verify(stageRepository).save(any(Stage.class));
@@ -101,7 +102,7 @@ class StageServiceTest {
         when(stageRepository.save(any(Stage.class))).thenAnswer(inv -> inv.getArgument(0));
         Stage updated = Stage.builder().company("NewCorp").student(student(1L)).status("TERMINE")
                 .grade(new BigDecimal("16")).build();
-        Stage saved = service.update(5L, updated, httpRequest);
+        StageResponse saved = service.update(5L, updated, httpRequest);
         assertThat(saved.getId()).isEqualTo(5L);
         assertThat(saved.getCompany()).isEqualTo("NewCorp");
         verify(stageRepository).save(any(Stage.class));

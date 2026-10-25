@@ -104,9 +104,9 @@ export default function StagesPage() {
   const openEdit = (s) => {
     setEditing(s)
     setForm({
-      studentId: String(s.student?.id || ''), company: s.company || '', companyContact: s.companyContact || '',
+      studentId: String(s.studentId || ''), company: s.company || '', companyContact: s.companyContact || '',
       subject: s.subject || '', startDate: s.startDate || '', endDate: s.endDate || '',
-      supervisorId: s.supervisor ? String(s.supervisor.id) : '', conventionRef: s.conventionRef || '',
+      supervisorId: s.supervisorId ? String(s.supervisorId) : '', conventionRef: s.conventionRef || '',
       reportSubmitted: s.reportSubmitted || false, defenseDate: s.defenseDate || '',
       grade: s.grade || '', evaluation: s.evaluation || '', status: s.status || 'EN_COURS',
     })
@@ -137,8 +137,8 @@ export default function StagesPage() {
 
               <Box display="flex" alignItems="center" gap={1} mt={1.5}>
                 <Avatar sx={{ width: 28, height: 28, bgcolor: 'primary.main' }}><MenuBook sx={{ fontSize: 15 }} /></Avatar>
-                <Typography variant="body2" fontWeight={600}>{s.student?.firstName} {s.student?.lastName}</Typography>
-                <Typography variant="caption" color="text.secondary">({s.student?.matricule})</Typography>
+                <Typography variant="body2" fontWeight={600}>{s.studentName}</Typography>
+                <Typography variant="caption" color="text.secondary">({s.matricule})</Typography>
               </Box>
 
               <Box display="flex" alignItems="center" gap={1} mt={1}>
@@ -149,7 +149,7 @@ export default function StagesPage() {
               </Box>
 
               <Box display="flex" gap={1} flexWrap="wrap" mt={1.5}>
-                {s.supervisor && <Chip size="small" label={`Encadrant : ${s.supervisor.firstName} ${s.supervisor.lastName}`} variant="outlined" />}
+                {s.supervisorName && <Chip size="small" label={`Encadrant : ${s.supervisorName}`} variant="outlined" />}
                 {s.reportSubmitted && <Chip size="small" color="success" label="Rapport déposé" />}
                 {s.defenseDate && <Chip size="small" label={`Soutenance : ${formatDate(s.defenseDate)}`} variant="outlined" />}
                 {s.grade != null && <Chip size="small" color="secondary" label={`Note : ${s.grade}/20`} />}

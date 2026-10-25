@@ -1,6 +1,7 @@
 package com.school.controller;
 
 import com.school.dto.response.ApiResponse;
+import com.school.dto.response.StageResponse;
 import com.school.entity.Stage;
 import com.school.service.AccessControlService;
 import com.school.service.StageService;
@@ -28,20 +29,20 @@ public class StageController {
 
     @GetMapping
     @Operation(summary = "Liste des stages")
-    public ResponseEntity<ApiResponse<List<Stage>>> list(@RequestParam(required = false) Long studentId) {
+    public ResponseEntity<ApiResponse<List<StageResponse>>> list(@RequestParam(required = false) Long studentId) {
         if (studentId != null) accessControlService.assertCanAccessStudent(studentId);
         return ok("Stages", studentId != null ? stageService.listByStudent(studentId) : stageService.listAll());
     }
 
     @PostMapping
     @Operation(summary = "Créer un stage")
-    public ResponseEntity<ApiResponse<Stage>> create(@RequestBody Stage stage, HttpServletRequest httpRequest) {
+    public ResponseEntity<ApiResponse<StageResponse>> create(@RequestBody Stage stage, HttpServletRequest httpRequest) {
         return ok("Stage créé", stageService.create(stage, httpRequest));
     }
 
     @PutMapping("/{id}")
     @Operation(summary = "Modifier un stage (rapport, soutenance, note)")
-    public ResponseEntity<ApiResponse<Stage>> update(@PathVariable Long id, @RequestBody Stage stage,
+    public ResponseEntity<ApiResponse<StageResponse>> update(@PathVariable Long id, @RequestBody Stage stage,
                                                      HttpServletRequest httpRequest) {
         return ok("Stage modifié", stageService.update(id, stage, httpRequest));
     }

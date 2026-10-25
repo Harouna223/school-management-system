@@ -1,6 +1,7 @@
 package com.school.controller;
 
 import com.school.dto.response.ApiResponse;
+import com.school.dto.response.MemoireResponse;
 import com.school.entity.Memoire;
 import com.school.service.AccessControlService;
 import com.school.service.MemoireService;
@@ -28,20 +29,20 @@ public class MemoireController {
 
     @GetMapping
     @Operation(summary = "Liste des mémoires (filtrer par étudiant)")
-    public ResponseEntity<ApiResponse<List<Memoire>>> list(@RequestParam(required = false) Long studentId) {
+    public ResponseEntity<ApiResponse<List<MemoireResponse>>> list(@RequestParam(required = false) Long studentId) {
         if (studentId != null) accessControlService.assertCanAccessStudent(studentId);
         return ok("Mémoires", studentId != null ? memoireService.listByStudent(studentId) : memoireService.listAll());
     }
 
     @PostMapping
     @Operation(summary = "Créer un mémoire")
-    public ResponseEntity<ApiResponse<Memoire>> create(@RequestBody Memoire memoire, HttpServletRequest httpRequest) {
+    public ResponseEntity<ApiResponse<MemoireResponse>> create(@RequestBody Memoire memoire, HttpServletRequest httpRequest) {
         return ok("Mémoire créé", memoireService.create(memoire, httpRequest));
     }
 
     @PutMapping("/{id}")
     @Operation(summary = "Modifier un mémoire (jury, note, décision)")
-    public ResponseEntity<ApiResponse<Memoire>> update(@PathVariable Long id, @RequestBody Memoire memoire,
+    public ResponseEntity<ApiResponse<MemoireResponse>> update(@PathVariable Long id, @RequestBody Memoire memoire,
                                                        HttpServletRequest httpRequest) {
         return ok("Mémoire modifié", memoireService.update(id, memoire, httpRequest));
     }
