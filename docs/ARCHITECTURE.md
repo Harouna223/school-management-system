@@ -19,7 +19,7 @@
                                     ▼
                     ┌────────────────────────────────────────────────┐
                     │                  MySQL 8                        │
-                    │  school_management (database/schema.sql)       │
+                    │  school_management (migrations Flyway)       │
                     └────────────────────────────────────────────────┘
 ```
 
@@ -27,8 +27,8 @@
 
 ```
 school-management-system/
-├── database/
-│   └── schema.sql              # Schéma complet + données initiales
+├── database/                   # Scripts SQL historiques — HÉRITAGE, non exécutés
+│   └── schema.sql              # Ancien schéma (remplacé par les migrations Flyway)
 ├── backend-springboot/
 │   └── src/main/java/com/school/
 │       ├── config/             # AppProperties, OpenApiConfig, WebConfig, DataInitializer
@@ -89,11 +89,13 @@ Les erreurs sont normalisées par `GlobalExceptionHandler` (404, 409, 400, 401, 
 
 ### Données initiales
 - `DataInitializer` crée le super admin (si absent), les rôles, les permissions et les data de référence (sections, niveaux, salles).
-- `database/schema.sql` fournit le même jeu de données complet (exécuté par MySQL en Docker).
+- Les tables sont créées par les migrations Flyway (`backend-springboot/src/main/resources/db/migration`),
+  appliquées automatiquement au démarrage du backend ; `database/schema.sql` n'est plus utilisé.
 
 ## Docker
 
-- **mysql** : image officielle 8.4, volume persistant, init via `schema.sql` monté dans `/docker-entrypoint-initdb.d/`.
+- **mysql** : image officielle 8.4, volume persistant ; aucune initialisation SQL sur disque,
+  le schéma est créé par Flyway au démarrage du backend.
 - **backend** : build multi-stage (Maven → JRE 21), santé vérifiée avant démarrage du frontend, volume pour les uploads.
 - **frontend** : build multi-stage (Node → Nginx), le SPA fallback et le proxy `/api` sont gérés par `nginx.conf`.
 

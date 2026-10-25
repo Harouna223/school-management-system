@@ -16,7 +16,10 @@ jobs:
     runs-on: ubuntu-latest
     services:
       mysql:
-        image: mysql:8.0
+        # Aligne la CI sur la version de production (docker/docker-compose.yml) :
+        # une divergence 8.0 / 8.4 peut masquer des differences de comportement
+        # SQL (collations, types, DDL).
+        image: mysql:8.4
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: school_management
@@ -67,6 +70,34 @@ jobs:
       - name: Run integration tests
         run: mvn -B verify -DskipUnitTests=true -Djacoco.skip=true
         working-directory: backend-springboot
+
+      # Un test d'integration « ignore » (Assumptions.abort quand aucune base
+      # n'est joignable) n'est PAS un test reussi : il masquerait notamment une
+      # migration Flyway cassee, donc une installation neuve impossible. Les IT
+      # tournent sur un MySQL 8.4 jetable (Testcontainers) et creent le schema
+      # via Flyway : ils constituent la validation reelle de l'installation.
+      - name: Verifier qu'aucun test d'integration n'a ete ignore
+        working-directory: backend-springboot
+        run: |
+          if ! ls target/failsafe-reports/*.txt >/dev/null 2>&1; then
+            echo "ERREUR : aucun rapport de test d'integration produit."
+            exit 1
+          fi
+          if grep -hE 'Skipped: [1-9]' target/failsafe-reports/*.txt; then
+            echo "ERREUR : des tests d'integration ont ete ignores (Skipped > 0)."
+            exit 1
+          fi
+          # Une classe neutralisee par Assumptions.abort (base injoignable) peut
+          # apparaitre avec « Tests run: 0 » plutot qu'un compteur d'ignores.
+          if grep -hE 'Tests run: 0,' target/failsafe-reports/*.txt; then
+            echo "ERREUR : une classe de tests d'integration n'a execute aucun test."
+            exit 1
+          fi
+          if grep -qE '<skipped>[1-9]' target/failsafe-reports/failsafe-summary.xml 2>/dev/null; then
+            echo "ERREUR : le rapport global signale des tests ignores."
+            exit 1
+          fi
+          echo "Tests d'integration executes sans ignore (Skipped: 0)."
 
   frontend:
     name: Frontend – Build

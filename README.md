@@ -32,8 +32,17 @@ Le schéma est la propriété exclusive de Flyway :
 > Sur cette machine : **3307** (un ancien MySQL local 5.6 occupe déjà le 3306).
 
 ```bash
+# 1. Créer le fichier d'environnement puis y définir JWT_SECRET (obligatoire)
+cp docker/.env.example docker/.env
+openssl rand -base64 48   # coller la valeur obtenue dans docker/.env, ligne JWT_SECRET=
+
+# 2. Construire et démarrer
 docker compose -f docker/docker-compose.yml up -d --build
 ```
+
+> ⚠️ **`JWT_SECRET` est obligatoire.** Sa valeur par défaut a été retirée du dépôt et
+> `REQUIRE_SECURE_SECRETS=true` par défaut fait **échouer le démarrage** du backend tant que le
+> secret est absent, vide, resté celui du dépôt ou plus court que 32 octets décodés.
 
 | Service | Accès |
 |---|---|
@@ -45,8 +54,10 @@ Connexion : `admin` / `Admin@123` (modifiable via `ADMIN_PASSWORD`).
 
 ### Option 2 — Développement local
 
-1. **Base de données** : le schéma est créé automatiquement par Flyway au premier démarrage du backend
-   (`V1__baseline.sql`). Pour une initialisation manuelle, exécuter `database/schema.sql` dans MySQL.
+1. **Base de données** : rien à créer. Flyway est la source de vérité du schéma et le crée
+   intégralement (`V1__baseline.sql` puis `V2..V10`) au premier démarrage du backend.
+   `database/schema.sql` est un **héritage** : il n'est plus exécuté et ne correspond plus au
+   schéma courant — ne pas l'utiliser.
    Astuce : utiliser le MySQL Docker sur un autre port ne change rien à votre MySQL local :
    ```bash
    docker compose -f docker/docker-compose.yml up -d mysql

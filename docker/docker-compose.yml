@@ -23,8 +23,13 @@ services:
       # Pour une inspection locale : mysql -h 127.0.0.1 -P ${DB_PORT:-3306}.
       - "127.0.0.1:${DB_PORT:-3306}:3306"
     volumes:
+      # Le schéma n'est PAS créé ici : Flyway en est la source de vérité unique
+      # (backend-springboot/src/main/resources/db/migration) et crée l'intégralité
+      # des tables au démarrage du backend. Monter en plus un script
+      # d'initialisation faisait diverger deux schémas concurrents (tables
+      # manquantes, noms de tables erronés), ce qui rendait toute installation
+      # neuve impossible.
       - mysql_data:/var/lib/mysql
-      - ../database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${DB_PASSWORD:-root}"]
       interval: 10s
@@ -46,8 +51,13 @@ services:
       DB_NAME: ${DB_NAME:-school_management}
       DB_USERNAME: root
       DB_PASSWORD: ${DB_PASSWORD:-root}
-      JWT_SECRET: ${JWT_SECRET:-Y2hhbmdlLXRoaXMtc2VjcmV0LWtleS1pbi1wcm9kdWN0aW9uLXdpdGgtYTM3LWNyYXdhbGxlbg==}
-      REQUIRE_SECURE_SECRETS: ${REQUIRE_SECURE_SECRETS:-false}
+      # ⚠️ Aucune valeur par défaut : le secret de signature des jetons n'est plus
+      # stocké dans le dépôt. Il doit être défini dans docker/.env (non versionné).
+      # Générer : openssl rand -base64 48
+      JWT_SECRET: ${JWT_SECRET:-}
+      # true en PRODUCTION (défaut) : le backend REFUSE de démarrer si le secret
+      # est absent, vide, resté celui du dépôt, ou plus court que 32 octets décodés.
+      REQUIRE_SECURE_SECRETS: ${REQUIRE_SECURE_SECRETS:-true}
       SERVER_PORT: 8080
       OPEN_IN_VIEW: ${OPEN_IN_VIEW:-false}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}

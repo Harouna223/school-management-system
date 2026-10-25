@@ -3,6 +3,19 @@
 -- Schéma de base de données MySQL
 -- Version : 1.0
 -- ============================================================
+--
+-- ⚠️ HÉRITAGE — CE FICHIER N'EST PLUS EXÉCUTÉ ET N'EST PLUS À JOUR.
+--
+-- Le schéma est la propriété exclusive de Flyway :
+--   backend-springboot/src/main/resources/db/migration/
+--     V1__baseline.sql (schéma complet) puis V2..V10.
+--
+-- Aucun service Docker ne monte ce fichier. Son exécution échoue par ailleurs
+-- (il ne crée pas la table `academic_years` qu'il référence en clé étrangère,
+-- et référence une table `school_classes` alors qu'il crée `classes`).
+--
+-- Pour installer : démarrer le backend, Flyway crée l'intégralité du schéma.
+-- ============================================================
 
 CREATE DATABASE IF NOT EXISTS school_management
   CHARACTER SET utf8mb4

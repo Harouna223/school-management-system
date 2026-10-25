@@ -31,6 +31,21 @@ frontend-react/dist-*/
 /_*.log
 /_*.ps1
 /_*.js
+/_*.json
+/_*.png
+/_*.tar
+/_*.gz
+/_*.err
+/_*.exit
+/_*.py
+
+# Journaux de verification laisses par une session precedente : conserves sur le
+# disque (utiles au diagnostic) mais jamais versionnes.
+/.verify-*
+
+# Etat local des outils : depot Maven hors ligne, memoire de l'assistant.
+/.m2/
+/.workbuddy-ai/
 
 # Sauvegardes de bases de donnees (contiennent des donnees reelles) : ne jamais commiter.
 database/*backup*.sql

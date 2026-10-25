@@ -24,7 +24,8 @@ docker compose -f docker/docker-compose.yml up -d --build
 docker compose -f docker/docker-compose.yml ps
 ```
 
-Le schéma de base de données (`database/schema.sql`) est exécuté automatiquement au premier démarrage de MySQL.
+Le schéma de base de données est créé automatiquement par Flyway au premier démarrage du backend
+(migration `V1__baseline.sql`, puis `V2..V10`). Aucune initialisation SQL manuelle n'est nécessaire.
 
 **Arrêt** : `docker compose -f docker/docker-compose.yml down` (ajouter `-v` pour supprimer aussi les volumes).
 
@@ -50,11 +51,10 @@ docker compose -f docker/docker-compose.yml run --rm db-backup \
 
 ### 3.1 Base de données
 
-```sql
-mysql -u root -p < database/schema.sql
-```
-
-Ou laisser Hibernate créer les tables : le backend démarre avec `ddl-auto: update` et l'URL JDBC contient `createDatabaseIfNotExist=true`.
+Aucune création de schéma manuelle : au premier démarrage, Flyway applique les migrations
+(`backend-springboot/src/main/resources/db/migration`) et crée l'intégralité des tables.
+L'URL JDBC contient `createDatabaseIfNotExist=true`, la base elle-même est donc créée si besoin.
+Hibernate ne fait que **valider** la cohérence (`ddl-auto: validate`).
 
 ### 3.2 Backend
 
