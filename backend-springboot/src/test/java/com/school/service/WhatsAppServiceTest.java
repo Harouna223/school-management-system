@@ -4,6 +4,7 @@ import com.school.config.AppProperties;
 import com.school.entity.MessageLog;
 import com.school.entity.Parent;
 import com.school.entity.Student;
+import com.school.entity.User;
 import com.school.enums.AttendanceStatus;
 import com.school.enums.Term;
 import com.school.repository.MessageLogRepository;
@@ -26,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
@@ -379,5 +381,68 @@ class WhatsAppServiceTest {
                 .contains("2026-01-15")
                 .contains("08:30")
                 .contains("Bureau du directeur");
+    }
+
+    // ==================================================================
+    // Relances de paiement (frais scolaires impayés ou en retard)
+    // ==================================================================
+
+    @Test
+    void paymentReminderMessage_nommeLEleveLeSoldeEtLEcheance() {
+        String body = service.paymentReminderMessage(student(), "FAC-2026-0001",
+                new BigDecimal("30000"), "Scolarité", DATE, false);
+
+        assertThat(body)
+                .contains("FAC-2026-0001")
+                .contains("Aïcha Kamdem")
+                .contains("30000.00 FCFA")
+                .contains("Scolarité")
+                .contains("Échéance : 15/01/2026")
+                .contains("Sahel Edu")
+                .doesNotContain("échue");
+    }
+
+    @Test
+    void paymentReminderMessage_annonceLeRetardQuandLEcheanceEstDepassee() {
+        String body = service.paymentReminderMessage(student(), "FAC-2026-0001",
+                new BigDecimal("30000"), "Scolarité", DATE, true);
+
+        assertThat(body).contains("échue depuis le 15/01/2026");
+    }
+
+    /**
+     * Un élève sans numéro est un cas normal : la relance élève est ignorée,
+     * sans écrire de trace d'échec dans l'historique.
+     */
+    @Test
+    void relanceEleve_sansNumeroNiEnvoiNiTraceDEchec() {
+        config.setEnabled(true);
+
+        boolean envoye = service.sendPaymentReminderToStudent(parent(), student(), "sujet", "corps");
+
+        assertThat(envoye).isFalse();
+        verifyNoInteractions(messageLogRepository);
+        server.verify();
+    }
+
+    /** À défaut de numéro propre, l'élève est joint sur celui de son compte utilisateur. */
+    @Test
+    void relanceEleve_utiliseLeNumeroDeSonCompteUtilisateur() {
+        config.setEnabled(false);
+        Student student = student();
+        User account = new User();
+        account.setPhone("69 00 00 00");
+        student.setUser(account);
+        when(phoneNumberService.normalize("69 00 00 00")).thenReturn("+22369000000");
+
+        boolean envoye = service.sendPaymentReminderToStudent(parent(), student, "sujet", "corps");
+
+        assertThat(envoye).isTrue();
+        MessageLog log = capturedLog();
+        assertThat(log.getStatus()).isEqualTo(MessageLog.Status.SIMULATED);
+        assertThat(log.getPhone()).isEqualTo("+22369000000");
+        assertThat(log.getRecipientName()).isEqualTo("Aïcha Kamdem");
+        assertThat(log.getStudentId()).isEqualTo(10L);
+        assertThat(log.getParentId()).isEqualTo(4L);
     }
 }

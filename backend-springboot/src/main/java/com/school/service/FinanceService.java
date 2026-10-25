@@ -48,6 +48,7 @@ public class FinanceService {
     private final NotificationService notificationService;
     private final AccessControlService accessControlService;
     private final NumberSequenceService numberSequenceService;
+    private final WhatsAppService whatsAppService;
 
     // ---------- Factures ----------
 
@@ -361,48 +362,67 @@ public class FinanceService {
     // ---------- Relances de paiement ----------
 
     /**
-     * Relance les parents / élèves pour les factures impayées ou en retard :
-     * passe les factures échues en OVERDUE puis crée une notification de relance.
-     * Retourne le nombre de relances envoyées.
+     * Relance les parents <strong>et</strong> les élèves pour les frais scolaires
+     * impayés, partiels ou en retard : passe les factures échues en OVERDUE,
+     * crée une notification interne (cloche) et envoie un message WhatsApp aux
+     * <strong>deux</strong> destinataires (parent et élève) dans la même relance.
+     * <p>
+     * L'élève n'a pas toujours de numéro : dans ce cas seule la relance au parent
+     * part réellement, sans être comptée comme un échec.
+     * <p>
+     * Si WhatsApp est désactivé ({@code WA_ENABLED=false}), les envois sont
+     * journalisés en mode simulation (table {@code message_logs}) sans erreur.
+     *
+     * @return le nombre de factures effectivement relancées
      */
     @Transactional
     public long remindOverdue() {
         // Récupérer les factures échues AVANT de les basculer en OVERDUE
         List<Invoice> toRemind = new java.util.ArrayList<>(invoiceRepository.findOverdue(LocalDate.now()));
         toRemind.addAll(invoiceRepository.findByStatusIn(List.of(
-                com.school.enums.InvoiceStatus.UNPAID,
-                com.school.enums.InvoiceStatus.PARTIAL,
-                com.school.enums.InvoiceStatus.OVERDUE)));
+                InvoiceStatus.UNPAID, InvoiceStatus.PARTIAL, InvoiceStatus.OVERDUE)));
         java.util.LinkedHashSet<Invoice> unique = new java.util.LinkedHashSet<>(toRemind);
         markOverdue();
 
-        long sent = 0;
+        long reminded = 0;
         for (Invoice invoice : unique) {
             Student student = invoice.getStudent();
             BigDecimal discount = invoice.getDiscount() != null ? invoice.getDiscount() : BigDecimal.ZERO;
             BigDecimal remaining = invoice.getAmount().subtract(discount).subtract(invoice.getPaidAmount());
+            if (remaining.signum() <= 0) {
+                continue;   // solde nul : il n'y a rien à réclamer
+            }
+            Parent parent = student.getParent();
+            String detail = "Facture " + invoice.getInvoiceNo() + " : solde restant "
+                    + remaining + " (" + invoice.getFeeType().getName() + ").";
 
-            if (student.getParent() != null && student.getParent().getUser() != null) {
-                notificationService.notify(student.getParent().getUser(),
-                        "Relance de paiement",
-                        "Facture " + invoice.getInvoiceNo() + " : solde restant "
-                                + remaining + " (" + invoice.getFeeType().getName() + ").",
+            // 1) Notification interne (cloche) : parent puis élève
+            if (parent != null && parent.getUser() != null) {
+                notificationService.notify(parent.getUser(), "Relance de paiement", detail,
                         NotificationType.PAYMENT, "/payments");
-                sent++;
             }
             if (student.getUser() != null) {
-                notificationService.notify(student.getUser(),
-                        "Relance de paiement",
-                        "Facture " + invoice.getInvoiceNo() + " : solde restant "
-                                + remaining + " (" + invoice.getFeeType().getName() + ").",
+                notificationService.notify(student.getUser(), "Relance de paiement", detail,
                         NotificationType.PAYMENT, "/payments");
-                sent++;
             }
+
+            // 2) WhatsApp : parent ET élève, dans la même relance
+            String subject = "Relance de paiement - " + invoice.getInvoiceNo();
+            String body = whatsAppService.paymentReminderMessage(student, invoice.getInvoiceNo(), remaining,
+                    invoice.getFeeType().getName(), invoice.getDueDate(),
+                    invoice.getStatus() == InvoiceStatus.OVERDUE);
+            if (parent != null) {
+                whatsAppService.sendPaymentReminder(parent, student, subject, body);
+            }
+            whatsAppService.sendPaymentReminderToStudent(parent, student, subject, body);
+
+            reminded++;
         }
-        if (sent > 0) {
+        if (reminded > 0) {
             auditService.log("REMIND", "Invoice", null,
-                    "Relances de paiement envoyées : " + sent + " notification(s)", null);
+                    "Relances de paiement : " + reminded
+                            + " facture(s) — notification et WhatsApp au parent et à l'élève", null);
         }
-        return sent;
+        return reminded;
     }
 }

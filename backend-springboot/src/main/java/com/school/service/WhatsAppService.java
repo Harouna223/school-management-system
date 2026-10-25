@@ -21,7 +21,8 @@ import java.util.Base64;
 import java.util.Map;
 
 /**
- * Envoi de notifications WhatsApp aux parents (bulletins disponibles, absences signalées).
+ * Envoi de notifications WhatsApp (bulletins disponibles, absences signalées,
+ * convocations, relances de paiement au parent <em>et</em> à l'élève).
  * <p>
  * Fournisseurs supportés :
  * <ul>
@@ -84,6 +85,84 @@ public class WhatsAppService {
     }
 
     /**
+     * Message WhatsApp : relance de paiement adressée au parent (tuteur légal).
+     *
+     * @return {@code true} si le message a été remis au fournisseur (ou journalisé
+     *         en mode simulation)
+     */
+    public boolean sendPaymentReminder(Parent parent, Student student, String subject, String body) {
+        send(parent, student, subject, body);
+        return true;
+    }
+
+    /**
+     * Message WhatsApp : relance de paiement adressée directement à l'élève.
+     *
+     * <p>Le numéro utilisé est celui de l'élève, à défaut celui de son compte
+     * utilisateur. Un élève sans numéro est un cas <strong>normal</strong>
+     * (contrairement à un numéro invalide) : aucune trace d'échec n'est écrite,
+     * et la relance au parent reste envoyée.</p>
+     *
+     * @return {@code true} si un message a été remis au fournisseur
+     */
+    public boolean sendPaymentReminderToStudent(Parent parent, Student student, String subject, String body) {
+        String phone = studentPhone(student);
+        if (phone == null) {
+            log.info("[WhatsApp] Aucun numéro pour l'élève {} {} — relance élève ignorée",
+                    student.getFirstName(), student.getLastName());
+            return false;
+        }
+        deliver(student.getFullName(), phone, student.getId(),
+                parent != null ? parent.getId() : null, subject, body);
+        return true;
+    }
+
+    /** Numéro joignable de l'élève : son numéro, sinon celui de son compte utilisateur. */
+    private String studentPhone(Student student) {
+        String raw = student.getPhone();
+        if ((raw == null || raw.isBlank()) && student.getUser() != null) {
+            raw = student.getUser().getPhone();
+        }
+        return phoneNumberService.normalize(raw);
+    }
+
+    /**
+     * Corps du message de relance de paiement. Identique pour le parent et pour
+     * l'élève : le texte désigne l'élève concerné, il est donc lisible par les deux.
+     *
+     * @param overdue {@code true} si l'échéance est déjà dépassée (facture en retard)
+     */
+    public String paymentReminderMessage(Student student, String invoiceNo, BigDecimal remaining,
+                                         String feeTypeName, LocalDate dueDate, boolean overdue) {
+        StringBuilder sb = new StringBuilder("Bonjour,\n");
+        sb.append("La facture ").append(invoiceNo);
+        if (student != null) {
+            sb.append(" de l'élève ").append(student.getFullName())
+                    .append(" (").append(student.getMatricule()).append(")");
+        }
+        sb.append(" (").append(feeTypeName).append(")")
+                .append(" présente un solde restant de ").append(amountText(remaining)).append(".");
+        if (dueDate != null) {
+            String dateStr = dueDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+            sb.append(overdue
+                    ? " Elle est échue depuis le " + dateStr + "."
+                    : " Échéance : " + dateStr + ".");
+        }
+        sb.append("\nMerci de régulariser auprès de l'établissement.\n\n")
+                .append(appProperties.getSchool().getName());
+        return sb.toString();
+    }
+
+    /**
+     * Montant lisible : échelle 2 et notation décimale, comme le reste de
+     * l'application (jamais la notation scientifique de {@code stripTrailingZeros}).
+     */
+    private static String amountText(BigDecimal value) {
+        return (value == null ? BigDecimal.ZERO : value)
+                .setScale(2, java.math.RoundingMode.HALF_UP).toPlainString() + " FCFA";
+    }
+
+    /**
      * Corps du message d'absence envoyé aux parents (réutilisé pour le lien wa.me).
      */
     public String absenceMessage(Parent parent, Student student, LocalDate date,
@@ -99,21 +178,36 @@ public class WhatsAppService {
                 + appProperties.getSchool().getName();
     }
 
+    /** Envoi au parent (comportement historique : la relance est portée par le tuteur). */
     private void send(Parent parent, Student student, String subject, String body) {
-        String phone = phoneNumberService.normalize(parent.getPhone());
+        deliver(parent.getFirstName() + " " + parent.getLastName(),
+                phoneNumberService.normalize(parent.getPhone()),
+                student != null ? student.getId() : null,
+                parent.getId(), subject, body);
+    }
+
+    /**
+     * Envoi WhatsApp générique : choisit le mode (simulation / Meta / Twilio),
+     * journalise la tentative dans {@code message_logs} et ne propage jamais
+     * d'exception au flux métier.
+     *
+     * @param studentId identifiant de l'élève rattaché (facultatif)
+     * @param parentId  identifiant du parent rattaché (facultatif)
+     */
+    private void deliver(String recipientName, String phone, Long studentId, Long parentId,
+                         String subject, String body) {
         AppProperties.WhatsApp config = appProperties.getWhatsapp();
         if (!config.isEnabled()) {
-            log.info("[WhatsApp] Simulation (désactivé) pour {} {} -> {}\n{}",
-                    parent.getFirstName(), parent.getLastName(), phone, body);
-            logMessage(parent, student, subject, body, phone, MessageLog.Channel.WHATSAPP,
-                    MessageLog.Status.SIMULATED, null);
+            log.info("[WhatsApp] Simulation (désactivé) pour {} -> {}\n{}", recipientName, phone, body);
+            logMessage(recipientName, parentId, studentId, subject, body, phone,
+                    MessageLog.Channel.WHATSAPP, MessageLog.Status.SIMULATED, null);
             return;
         }
         if (phone == null) {
-            log.warn("[WhatsApp] Numéro invalide pour {} {} — message non envoyé",
-                    parent.getFirstName(), parent.getLastName());
-            logMessage(parent, student, subject, body, null, MessageLog.Channel.WHATSAPP,
-                    MessageLog.Status.FAILED, "Numéro de téléphone absent ou invalide");
+            log.warn("[WhatsApp] Numéro invalide pour {} — message non envoyé", recipientName);
+            logMessage(recipientName, parentId, studentId, subject, body, null,
+                    MessageLog.Channel.WHATSAPP, MessageLog.Status.FAILED,
+                    "Numéro de téléphone absent ou invalide");
             return;
         }
         boolean success;
@@ -122,7 +216,8 @@ public class WhatsAppService {
         } else {
             success = sendViaMeta(config, phone, body);
         }
-        logMessage(parent, student, subject, body, phone, MessageLog.Channel.WHATSAPP,
+        logMessage(recipientName, parentId, studentId, subject, body, phone,
+                MessageLog.Channel.WHATSAPP,
                 success ? MessageLog.Status.SENT : MessageLog.Status.FAILED,
                 success ? null : "Échec de l'envoi via " + config.getProvider());
     }
@@ -185,19 +280,20 @@ public class WhatsAppService {
         }
     }
 
-    private void logMessage(Parent parent, Student student, String subject, String body, String phone,
-                            MessageLog.Channel channel, MessageLog.Status status, String errorMessage) {
+    private void logMessage(String recipientName, Long parentId, Long studentId, String subject,
+                            String body, String phone, MessageLog.Channel channel,
+                            MessageLog.Status status, String errorMessage) {
         try {
             messageLogRepository.save(MessageLog.builder()
                     .channel(channel)
-                    .recipientName(parent.getFirstName() + " " + parent.getLastName())
+                    .recipientName(recipientName)
                     .phone(phone)
                     .subject(subject)
                     .message(body != null && body.length() > 2000 ? body.substring(0, 2000) : body)
                     .status(status)
                     .errorMessage(errorMessage)
-                    .studentId(student != null ? student.getId() : null)
-                    .parentId(parent.getId())
+                    .studentId(studentId)
+                    .parentId(parentId)
                     .build());
         } catch (Exception e) {
             log.warn("[WhatsApp] Impossible d'enregistrer l'historique : {}", e.getMessage());

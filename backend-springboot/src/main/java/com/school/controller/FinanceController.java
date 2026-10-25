@@ -108,10 +108,10 @@ public class FinanceController {
     }
 
     @PostMapping("/invoices/remind")
-    @Operation(summary = "Relancer les parents/élèves pour les factures impayées ou en retard")
+    @Operation(summary = "Relancer le parent ET l'élève (notification + WhatsApp) pour les frais impayés ou en retard")
     public ResponseEntity<ApiResponse<Long>> remind() {
-        long sent = financeService.remindOverdue();
-        return ok(sent + " relance(s) envoyée(s)", sent);
+        long count = financeService.remindOverdue();
+        return ok(count + " facture(s) relancée(s) — parent et élève prévenus (notification + WhatsApp)", count);
     }
 
     @GetMapping("/report")
