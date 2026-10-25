@@ -33,6 +33,8 @@ public class SchoolInfoResponse {
     private String city;
     private String region;
     private String country;
+    /** Indicatif téléphonique du pays, appliqué aux numéros sans indicatif. */
+    private String phoneCountryCode;
     private String phone;
     private String phoneAlt;
     private String email;

@@ -58,6 +58,14 @@ public class SchoolInfoRequest {
     @Size(max = 80)
     private String country;
 
+    /**
+     * Indicatif téléphonique du pays (ex. « 237 »), appliqué à tous les numéros
+     * saisis sans indicatif (WhatsApp, SMS, lien wa.me).
+     */
+    @Pattern(regexp = "^$|^\\+?[0-9]{1,4}$",
+            message = "L'indicatif du pays doit comporter 1 à 4 chiffres (ex. 237)")
+    private String phoneCountryCode;
+
     @Pattern(regexp = "^$|^[0-9+().\\s-]{6,30}$",
             message = "Le téléphone principal contient des caractères invalides")
     private String phone;

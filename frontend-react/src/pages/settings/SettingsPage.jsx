@@ -12,7 +12,7 @@ import { extractError } from '../../api/axios'
 import { formatDate } from '../../utils/format'
 
 const KEYS = [
-  'RECEIPT_FOOTER', 'WHATSAPP_ENABLED', 'WHATSAPP_DEFAULT_NUMBER',
+  'RECEIPT_FOOTER', 'WHATSAPP_ENABLED',
 ]
 
 /**
@@ -30,7 +30,6 @@ const CYCLES_OPTIONS = [
 const LABELS = {
   RECEIPT_FOOTER: 'Pied de page des reçus',
   WHATSAPP_ENABLED: 'Activer WhatsApp',
-  WHATSAPP_DEFAULT_NUMBER: 'Indicatif par défaut',
 }
 
 /**
@@ -322,10 +321,6 @@ export default function SettingsPage() {
                     onChange={(e) => set('WHATSAPP_ENABLED', String(e.target.checked))} />}
                   label={LABELS.WHATSAPP_ENABLED}
                 />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField fullWidth label={LABELS.WHATSAPP_DEFAULT_NUMBER} value={values.WHATSAPP_DEFAULT_NUMBER ?? ''}
-                  onChange={(e) => set('WHATSAPP_DEFAULT_NUMBER', e.target.value)} />
               </Grid>
             </>
           ))}

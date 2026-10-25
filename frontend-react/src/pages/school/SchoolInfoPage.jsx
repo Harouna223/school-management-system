@@ -28,7 +28,7 @@ const EMPTY = {
   name: '', shortName: '', type: '', status: '', identificationNumber: '',
   motto: '', creationYear: '',
   address: '', district: '', city: '', region: '', country: 'Mali',
-  phone: '', phoneAlt: '', email: '', website: '',
+  phoneCountryCode: '', phone: '', phoneAlt: '', email: '', website: '',
   directorName: '', directorRole: 'Directeur', directorPhone: '', directorEmail: '',
   accreditationNumber: '', additionalInfo: '', logoUrl: '',
 }
@@ -97,6 +97,10 @@ export default function SchoolInfoPage() {
 
   const localValidate = () => {
     if (!form.name?.trim()) return "Le nom officiel de l'établissement est obligatoire."
+    // Même règle que la validation serveur : 1 à 4 chiffres, « + » toléré.
+    if (form.phoneCountryCode && !/^\+?\d{1,4}$/.test(form.phoneCountryCode.trim())) {
+      return "L'indicatif du pays doit comporter 1 à 4 chiffres (ex. 237)."
+    }
     const emailPattern = /^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$/
     if (form.email && !emailPattern.test(form.email)) return "L'adresse e-mail de l'établissement est invalide."
     if (form.directorEmail && !emailPattern.test(form.directorEmail)) return "L'adresse e-mail du responsable est invalide."
@@ -272,6 +276,12 @@ export default function SchoolInfoPage() {
         <Grid item xs={12} md={3}>
           <TextField fullWidth label="Pays" value={form.country}
             onChange={(e) => set('country', e.target.value)} />
+        </Grid>
+        <Grid item xs={12} md={3}>
+          <TextField fullWidth label="Indicatif du pays" value={form.phoneCountryCode}
+            onChange={(e) => set('phoneCountryCode', e.target.value)}
+            inputProps={{ inputMode: 'numeric' }}
+            helperText="Ex. 237 — appliqué à tous les numéros sans indicatif" />
         </Grid>
         <Grid item xs={12} md={3}>
           <TextField fullWidth label="Téléphone principal" value={form.phone}

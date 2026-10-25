@@ -127,4 +127,52 @@ class SchoolInfoServiceTest {
                 .anyMatch(s -> SettingService.SCHOOL_NAME.equals(s.getKey()) && "École".equals(s.getValue()))
                 .anyMatch(s -> SettingService.SCHOOL_COUNTRY.equals(s.getKey()) && "".equals(s.getValue()));
     }
+
+    // ==================================================================
+    // Indicatif téléphonique du pays
+    // ==================================================================
+
+    @Test
+    @DisplayName("L'indicatif du pays est écrit sous la clé déjà lue par tous les envois")
+    void indicatifEnregistreSousLaCleDesEnvois() {
+        when(settingRepository.findById(any(String.class))).thenReturn(Optional.empty());
+        when(settingRepository.save(any(Setting.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        SchoolInfoRequest request = new SchoolInfoRequest();
+        request.setName("École");
+        request.setPhoneCountryCode("+237");
+
+        service.updateSchoolInfo(request, null);
+
+        org.mockito.ArgumentCaptor<Setting> captor = org.mockito.ArgumentCaptor.forClass(Setting.class);
+        org.mockito.Mockito.verify(settingRepository, org.mockito.Mockito.atLeastOnce()).save(captor.capture());
+        assertThat(captor.getAllValues())
+                .as("une clé distincte créerait deux valeurs concurrentes pour un même réglage")
+                .anyMatch(s -> SettingService.WHATSAPP_DEFAULT_NUMBER.equals(s.getKey())
+                        && "237".equals(s.getValue()));
+    }
+
+    @Test
+    @DisplayName("L'indicatif est relu tel quel pour le formulaire")
+    void indicatifReluDepuisLaBase() {
+        when(settingRepository.findById(any(String.class))).thenReturn(Optional.empty());
+        when(settingRepository.findById("WHATSAPP_DEFAULT_NUMBER"))
+                .thenReturn(Optional.of(setting("WHATSAPP_DEFAULT_NUMBER", "223")));
+
+        var info = service.schoolInfo();
+
+        assertThat(info.getPhoneCountryCode()).isEqualTo("223");
+    }
+
+    @Test
+    @DisplayName("Un indicatif de plus de 4 chiffres est refusé")
+    void indicatifTropLongRefuse() {
+        SchoolInfoRequest request = new SchoolInfoRequest();
+        request.setName("École");
+        request.setPhoneCountryCode("12345");
+
+        assertThatThrownBy(() -> service.updateSchoolInfo(request, null))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("indicatif");
+    }
 }

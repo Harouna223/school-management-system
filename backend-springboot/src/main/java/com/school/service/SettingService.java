@@ -175,6 +175,7 @@ public class SettingService {
                 .city(stored(SCHOOL_CITY, ""))
                 .region(stored(SCHOOL_REGION, ""))
                 .country(stored(SCHOOL_COUNTRY, "Mali"))
+                .phoneCountryCode(stored(WHATSAPP_DEFAULT_NUMBER, d.get(WHATSAPP_DEFAULT_NUMBER)))
                 .phone(stored(SCHOOL_PHONE, d.get(SCHOOL_PHONE)))
                 .phoneAlt(stored(SCHOOL_PHONE_ALT, ""))
                 .email(stored(SCHOOL_EMAIL, d.get(SCHOOL_EMAIL)))
@@ -208,9 +209,15 @@ public class SettingService {
     /**
      * Enregistre les informations de l'établissement.
      *
-     * <p>Seules les clés {@code SCHOOL_*} sont écrites : cet endpoint ne peut
-     * pas modifier d'autres paramètres (WhatsApp, cycles…). Le nom officiel est
-     * obligatoire ; tous les autres champs peuvent être vides.</p>
+     * <p>Le nom officiel est obligatoire ; tous les autres champs peuvent être
+     * vides. Seules les clés du formulaire sont écrites — aucune autre
+     * (cycles, WhatsApp activé…).</p>
+     *
+     * <p><b>Exception assumée</b> : l'indicatif téléphonique du pays est
+     * enregistré sous la clé {@code WHATSAPP_DEFAULT_NUMBER}, qui est déjà celle
+     * lue par {@link PhoneNumberService} pour tous les envois et par le lien
+     * {@code wa.me}. Une clé distincte créerait deux valeurs concurrentes pour un
+     * même réglage.</p>
      */
     @Transactional
     public com.school.dto.response.SchoolInfoResponse updateSchoolInfo(
@@ -218,6 +225,7 @@ public class SettingService {
         assertPhone(request.getPhone(), "principal");
         assertPhone(request.getPhoneAlt(), "secondaire");
         assertPhone(request.getDirectorPhone(), "du responsable");
+        assertCountryCode(request.getPhoneCountryCode());
         if (request.getCreationYear() != null
                 && request.getCreationYear() > java.time.Year.now().getValue() + 1) {
             throw new com.school.exception.BusinessException(
@@ -238,6 +246,7 @@ public class SettingService {
         values.put(SCHOOL_CITY, text(request.getCity()));
         values.put(SCHOOL_REGION, text(request.getRegion()));
         values.put(SCHOOL_COUNTRY, text(request.getCountry()));
+        values.put(WHATSAPP_DEFAULT_NUMBER, countryCode(request.getPhoneCountryCode()));
         values.put(SCHOOL_PHONE, text(request.getPhone()));
         values.put(SCHOOL_PHONE_ALT, text(request.getPhoneAlt()));
         values.put(SCHOOL_EMAIL, text(request.getEmail()));
@@ -304,6 +313,26 @@ public class SettingService {
             return Integer.valueOf(value.trim());
         } catch (NumberFormatException e) {
             return null;
+        }
+    }
+
+    /**
+     * Indicatif pays normalisé : chiffres uniquement (« +237 », « 00237 » et
+     * « 237 » donnent tous « 237 »). Une valeur vide efface le réglage, auquel
+     * cas {@link PhoneNumberService} reprend l'indicatif de configuration.
+     */
+    private String countryCode(String value) {
+        return value == null ? "" : value.replaceAll("\\D", "");
+    }
+
+    private void assertCountryCode(String code) {
+        if (code == null || code.isBlank()) {
+            return;
+        }
+        String digits = code.replaceAll("\\D", "");
+        if (digits.isEmpty() || digits.length() > 4) {
+            throw new com.school.exception.BusinessException(
+                    "L'indicatif du pays est invalide : 1 à 4 chiffres attendus (ex. 237)");
         }
     }
 
