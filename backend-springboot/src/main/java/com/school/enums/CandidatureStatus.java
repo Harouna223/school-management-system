@@ -8,5 +8,7 @@ public enum CandidatureStatus {
     RECUE,
     ACCEPTEE,
     LISTE_ATTENTE,
-    REFUSEE
+    REFUSEE,
+    /** L'élève a été créé : la candidature n'est plus un simple dossier. */
+    INSCRITE
 }

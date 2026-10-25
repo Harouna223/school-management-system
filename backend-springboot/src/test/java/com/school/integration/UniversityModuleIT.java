@@ -172,6 +172,100 @@ class UniversityModuleIT extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("une candidature acceptee devient une inscription : l'eleve est cree avec son matricule")
+    void candidatureAccepteePuisInscrite() throws Exception {
+        String token = login();
+        long id = candidatureAcceptee(token);
+
+        mockMvc.perform(post("/api/candidatures/" + id + "/enroll")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"gender\":\"FEMALE\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.student.matricule", org.hamcrest.Matchers.startsWith("ETU-")))
+                .andExpect(jsonPath("$.data.student.firstName").value("Awa"))
+                .andExpect(jsonPath("$.data.student.generatedPassword", notNullValue()))
+                .andExpect(jsonPath("$.data.candidature.status").value("INSCRITE"))
+                .andExpect(jsonPath("$.data.candidature.studentId", notNullValue()));
+
+        // La candidature apparait desormais rattachee a un eleve.
+        mockMvc.perform(get("/api/candidatures")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[*].matricule", org.hamcrest.Matchers.hasItem(
+                        org.hamcrest.Matchers.startsWith("ETU-"))));
+    }
+
+    @Test
+    @DisplayName("une candidature ne peut pas etre inscrite deux fois ni supprimee ensuite")
+    void inscriptionRefuseeDeuxFois() throws Exception {
+        String token = login();
+        long id = candidatureAcceptee(token);
+
+        mockMvc.perform(post("/api/candidatures/" + id + "/enroll")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"gender\":\"MALE\"}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/candidatures/" + id + "/enroll")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"gender\":\"MALE\"}"))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(delete("/api/candidatures/" + id)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("l'inscription exige le genre et un statut accepte")
+    void inscriptionValideeAvantCreation() throws Exception {
+        String token = login();
+
+        String created = mockMvc.perform(post("/api/candidatures")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"firstName\":\"Moussa\",\"lastName\":\"Fall\",\"fieldName\":\"Droit\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        long id = objectMapper.readTree(created).path("data").path("id").asLong();
+
+        // Genre absent : refuse par la validation.
+        mockMvc.perform(post("/api/candidatures/" + id + "/enroll")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+
+        // Statut encore EN_ATTENTE : l'inscription est refusee.
+        mockMvc.perform(post("/api/candidatures/" + id + "/enroll")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"gender\":\"MALE\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    /** Cree une candidature puis la passe au statut ACCEPTEE, pret a l'inscription. */
+    private long candidatureAcceptee(String token) throws Exception {
+        String created = mockMvc.perform(post("/api/candidatures")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"firstName\":\"Awa\",\"lastName\":\"Diop\",\"fieldName\":\"Gestion\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        long id = objectMapper.readTree(created).path("data").path("id").asLong();
+
+        mockMvc.perform(patch("/api/candidatures/" + id + "/status")
+                        .param("status", "ACCEPTEE")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("ACCEPTEE"));
+        return id;
+    }
+
+    @Test
     @DisplayName("la verticale universitaire reste interdite sans permission LMD")
     void universitaireInterditSansPermission() throws Exception {
         mockMvc.perform(get("/api/stages"))

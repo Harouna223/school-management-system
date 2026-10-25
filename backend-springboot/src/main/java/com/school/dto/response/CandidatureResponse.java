@@ -30,10 +30,14 @@ public class CandidatureResponse {
     private String reference;
     private String notes;
     private CandidatureStatus status;
+    /** Élève créé à l'inscription : renseigné uniquement au statut INSCRITE. */
+    private Long studentId;
+    private String studentName;
+    private String matricule;
     private LocalDateTime createdAt;
 
     public static CandidatureResponse from(Candidature c) {
-        return CandidatureResponse.builder()
+        CandidatureResponseBuilder builder = CandidatureResponse.builder()
                 .id(c.getId())
                 .firstName(c.getFirstName())
                 .lastName(c.getLastName())
@@ -45,7 +49,12 @@ public class CandidatureResponse {
                 .reference(c.getReference())
                 .notes(c.getNotes())
                 .status(c.getStatus())
-                .createdAt(c.getCreatedAt())
-                .build();
+                .createdAt(c.getCreatedAt());
+        if (c.getStudent() != null) {
+            builder.studentId(c.getStudent().getId())
+                    .studentName(c.getStudent().getFullName())
+                    .matricule(c.getStudent().getMatricule());
+        }
+        return builder.build();
     }
 }

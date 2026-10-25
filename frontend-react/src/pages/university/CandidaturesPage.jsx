@@ -16,20 +16,33 @@ import {
   Avatar,
   TablePagination
 } from '@mui/material'
-import { Add, Delete, Person, School } from '@mui/icons-material'
+import { Add, Delete, Person, School, PersonAdd } from '@mui/icons-material'
 import PageHeader from '../../components/PageHeader'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { useToast } from '../../hooks/useToast'
-import { candidatureApi } from '../../api/endpoints'
+import { candidatureApi, classApi } from '../../api/endpoints'
 import { extractError } from '../../api/axios'
-const STATUSES = ['EN_ATTENTE', 'RECUE', 'ACCEPTEE', 'LISTE_ATTENTE', 'REFUSEE']
+const STATUSES = ['EN_ATTENTE', 'RECUE', 'ACCEPTEE', 'LISTE_ATTENTE', 'REFUSEE', 'INSCRITE']
 const STATUS_COLORS = {
   EN_ATTENTE: 'warning', RECUE: 'info', ACCEPTEE: 'success',
-  LISTE_ATTENTE: 'warning', REFUSEE: 'error',
+  LISTE_ATTENTE: 'warning', REFUSEE: 'error', INSCRITE: 'success',
 }
+const GENDERS = [
+  { value: 'MALE', label: 'Masculin' },
+  { value: 'FEMALE', label: 'Féminin' },
+]
+const CYCLES = [
+  { value: 'JARDIN', label: 'Maternelle' },
+  { value: 'PRIMAIRE', label: 'Primaire' },
+  { value: 'COLLEGE', label: 'Collège' },
+  { value: 'LYCEE', label: 'Lycée' },
+  { value: 'UNIVERSITE', label: 'Université' },
+]
+const EMPTY_ENROLL = { gender: '', classId: '', educationCycle: '' }
 
 /**
- * Module admission universitaire : candidatures, dossiers, sélection.
+ * Module admission universitaire : candidatures, dossiers, sélection et
+ * inscription (transformation du dossier en élève).
  */
 export default function CandidaturesPage() {
   const { success, error: toastError } = useToast()
@@ -39,8 +52,12 @@ export default function CandidaturesPage() {
   const [page, setPage] = useState(0)
   const [size, setSize] = useState(10)
   const [statusFilter, setStatusFilter] = useState('')
+  const [classes, setClasses] = useState([])
   const [dialogOpen, setDialogOpen] = useState(false)
   const [toDelete, setToDelete] = useState(null)
+  const [enrollTarget, setEnrollTarget] = useState(null)
+  const [enrollForm, setEnrollForm] = useState(EMPTY_ENROLL)
+  const [enrollResult, setEnrollResult] = useState(null)
   const [form, setForm] = useState({
     firstName: '', lastName: '', birthDate: '', email: '', phone: '',
     fieldName: '', level: 'L1', notes: '',
@@ -59,6 +76,11 @@ export default function CandidaturesPage() {
   }, [statusFilter, page, size, toastError])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    // Classes d'accueil possibles : facultatives à l'inscription.
+    classApi.all().then((r) => setClasses(r.data.data || [])).catch(() => {})
+  }, [])
 
   const handleCreate = async () => {
     if (!form.firstName || !form.lastName || !form.fieldName) {
@@ -84,6 +106,31 @@ export default function CandidaturesPage() {
     try {
       await candidatureApi.updateStatus(id, status)
       success('Statut mis à jour')
+      load()
+    } catch (err) {
+      toastError(extractError(err))
+    }
+  }
+
+  const openEnroll = (c) => {
+    setEnrollTarget(c)
+    setEnrollForm(EMPTY_ENROLL)
+  }
+
+  const handleEnroll = async () => {
+    if (!enrollForm.gender) {
+      toastError('Le genre est obligatoire')
+      return
+    }
+    try {
+      const { data } = await candidatureApi.enroll(enrollTarget.id, {
+        gender: enrollForm.gender,
+        classId: enrollForm.classId ? Number(enrollForm.classId) : undefined,
+        educationCycle: enrollForm.educationCycle || undefined,
+      })
+      setEnrollResult(data.data)
+      success('Candidature inscrite')
+      setEnrollTarget(null)
       load()
     } catch (err) {
       toastError(extractError(err))
@@ -139,12 +186,22 @@ export default function CandidaturesPage() {
                 <Typography variant="body2">{c.fieldName} — {c.level || ''}</Typography>
               </Box>
               {c.notes && <Typography variant="body2" color="text.secondary" mt={1} sx={{ fontStyle: 'italic' }}>{c.notes}</Typography>}
+              {c.matricule && (
+                <Chip size="small" sx={{ mt: 1 }} color="primary" variant="outlined" label={`Élève ${c.matricule}`} />
+              )}
 
               <Box display="flex" gap={0.5} mt={1.5} flexWrap="wrap">
-                <Button size="small" color="success" variant="outlined" onClick={() => handleStatus(c.id, 'ACCEPTEE')}>Accepter</Button>
-                <Button size="small" color="warning" variant="outlined" onClick={() => handleStatus(c.id, 'LISTE_ATTENTE')}>Liste d'attente</Button>
-                <Button size="small" color="error" variant="outlined" onClick={() => handleStatus(c.id, 'REFUSEE')}>Refuser</Button>
-                <IconButton size="small" color="error" onClick={() => setToDelete(c)}><Delete fontSize="small" /></IconButton>
+                {c.status === 'ACCEPTEE' && (
+                  <Button size="small" variant="contained" startIcon={<PersonAdd />} onClick={() => openEnroll(c)}>Inscrire</Button>
+                )}
+                {c.status !== 'INSCRITE' && (
+                  <>
+                    <Button size="small" color="success" variant="outlined" onClick={() => handleStatus(c.id, 'ACCEPTEE')}>Accepter</Button>
+                    <Button size="small" color="warning" variant="outlined" onClick={() => handleStatus(c.id, 'LISTE_ATTENTE')}>Liste d'attente</Button>
+                    <Button size="small" color="error" variant="outlined" onClick={() => handleStatus(c.id, 'REFUSEE')}>Refuser</Button>
+                    <IconButton size="small" color="error" onClick={() => setToDelete(c)}><Delete fontSize="small" /></IconButton>
+                  </>
+                )}
               </Box>
             </Card>
           </Grid>
@@ -185,6 +242,75 @@ export default function CandidaturesPage() {
         <DialogActions>
           <Button onClick={() => setDialogOpen(false)}>Annuler</Button>
           <Button variant="contained" onClick={handleCreate}>Déposer</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={Boolean(enrollTarget)} onClose={() => setEnrollTarget(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>Inscrire {enrollTarget?.firstName} {enrollTarget?.lastName}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" mb={2}>
+            L&apos;élève est créé à partir du dossier : prénom, nom, naissance et coordonnées sont repris.
+          </Typography>
+          <Grid container spacing={2}>
+            <Grid item xs={12}>
+              <TextField select fullWidth size="small" label="Genre" value={enrollForm.gender}
+                onChange={(e) => setEnrollForm((f) => ({ ...f, gender: e.target.value }))}>
+                {GENDERS.map((g) => <MenuItem key={g.value} value={g.value}>{g.label}</MenuItem>)}
+              </TextField>
+            </Grid>
+            <Grid item xs={12}>
+              <TextField select fullWidth size="small" label="Classe d'accueil" value={enrollForm.classId}
+                onChange={(e) => setEnrollForm((f) => ({ ...f, classId: e.target.value }))}>
+                <MenuItem value="">Aucune</MenuItem>
+                {classes.map((cl) => <MenuItem key={cl.id} value={String(cl.id)}>{cl.name}</MenuItem>)}
+              </TextField>
+            </Grid>
+            <Grid item xs={12}>
+              <TextField select fullWidth size="small" label="Cycle" value={enrollForm.educationCycle}
+                onChange={(e) => setEnrollForm((f) => ({ ...f, educationCycle: e.target.value }))}
+                helperText="Déduit de la classe si celle-ci est renseignée.">
+                <MenuItem value="">Non précisé</MenuItem>
+                {CYCLES.map((cy) => <MenuItem key={cy.value} value={cy.value}>{cy.label}</MenuItem>)}
+              </TextField>
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEnrollTarget(null)}>Annuler</Button>
+          <Button variant="contained" onClick={handleEnroll}>Inscrire</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={Boolean(enrollResult)} onClose={() => setEnrollResult(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>Inscription effectuée</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" mb={2}>
+            {enrollTarget?.firstName} {enrollTarget?.lastName} est inscrit(e) comme élève.
+          </Typography>
+          <Box sx={{ p: 1.5, borderRadius: '12px', bgcolor: 'action.hover' }}>
+            <Typography variant="caption" color="text.secondary" display="block">Matricule</Typography>
+            <Typography variant="body2" fontWeight={700}>{enrollResult?.student?.matricule}</Typography>
+            {enrollResult?.student?.accountUsername && (
+              <>
+                <Typography variant="caption" color="text.secondary" display="block" mt={1}>Identifiant</Typography>
+                <Typography variant="body2" fontWeight={700}>{enrollResult.student.accountUsername}</Typography>
+              </>
+            )}
+            {enrollResult?.student?.generatedPassword && (
+              <>
+                <Typography variant="caption" color="text.secondary" display="block" mt={1}>Mot de passe</Typography>
+                <Typography variant="body2" fontWeight={700}>{enrollResult.student.generatedPassword}</Typography>
+              </>
+            )}
+          </Box>
+          {enrollResult?.student?.generatedPassword && (
+            <Typography variant="caption" color="warning.main" display="block" mt={1.5}>
+              Ce mot de passe n&apos;est affiché qu&apos;une fois : transmettez-le maintenant.
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button variant="contained" onClick={() => setEnrollResult(null)}>Fermer</Button>
         </DialogActions>
       </Dialog>
 

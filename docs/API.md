@@ -286,6 +286,7 @@ Le numéro du parent est utilisé tel que saisi (normalisation automatique : `6X
 | POST · PUT · DELETE | `/api/memoires` · `/api/memoires/{id}` | Gestion des mémoires (`PERM_LMD_WRITE`) |
 | GET | `/api/candidatures?fieldName=&status=&page=&size=` | Candidatures d'admission, paginées (`PERM_LMD_READ`) |
 | POST · PATCH `/api/candidatures/{id}/status` · DELETE | `/api/candidatures` | Dépôt, sélection, suppression (`PERM_LMD_WRITE`) |
+| POST | `/api/candidatures/{id}/enroll` | **Inscription** : crée l'élève (matricule + compte) depuis le dossier accepté et le rattache (`PERM_LMD_WRITE`) |
 | GET | `/api/alumni?fieldName=` | Diplômés (`PERM_LMD_READ`) |
 | POST · PUT · DELETE | `/api/alumni` · `/api/alumni/{id}` | Gestion des diplômés (`PERM_LMD_WRITE`) |
 
@@ -299,6 +300,13 @@ Le numéro du parent est utilisé tel que saisi (normalisation automatique : `6X
   `AlumnusRequest`) : les notes sont bornées à 0–20, et ni la référence d'une candidature ni son
   statut initial ne peuvent être imposés par le client (le serveur les attribue).
 - Les permissions `LMD_READ` / `LMD_WRITE` sont conservées pour ces modules annexes.
+- **Inscription d'une candidature** : seul un dossier au statut `ACCEPTEE` peut être inscrit, une
+  seule fois. Le corps ne demande que ce que le dossier ne contient pas (`gender` obligatoire,
+  `classId` et `educationCycle` facultatifs) ; prénom, nom, naissance et coordonnées sont repris.
+  Le matricule, la classe/cycle et le compte élève sont attribués par `StudentService`, donc
+  `POST /api/students` et l'inscription produisent exactement le même élève. La réponse renvoie le
+  `generatedPassword` **une seule fois**. Une candidature inscrite ne peut plus changer de statut
+  ni être supprimée — elle justifie l'existence de l'élève.
 
 ## Fichiers
 

@@ -1,6 +1,8 @@
 package com.school.controller;
 
+import com.school.dto.request.AdmissionEnrollmentRequest;
 import com.school.dto.request.CandidatureRequest;
+import com.school.dto.response.AdmissionEnrollmentResponse;
 import com.school.dto.response.ApiResponse;
 import com.school.dto.response.CandidatureResponse;
 import com.school.dto.response.PageResponse;
@@ -55,6 +57,15 @@ public class CandidatureController {
                                                                          @RequestParam CandidatureStatus status,
                                                                          HttpServletRequest httpRequest) {
         return ok("Statut mis à jour", candidatureService.updateStatus(id, status, httpRequest));
+    }
+
+    @PostMapping("/{id}/enroll")
+    @Operation(summary = "Inscrire une candidature acceptée : crée l'élève et le rattache")
+    public ResponseEntity<ApiResponse<AdmissionEnrollmentResponse>> enroll(
+            @PathVariable Long id,
+            @Valid @RequestBody AdmissionEnrollmentRequest request,
+            HttpServletRequest httpRequest) {
+        return ok("Candidature inscrite", candidatureService.enroll(id, request, httpRequest));
     }
 
     @DeleteMapping("/{id}")

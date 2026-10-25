@@ -402,6 +402,7 @@ export const candidatureApi = {
   list: (params) => api.get('/candidatures', { params }),
   create: (data) => api.post('/candidatures', data),
   updateStatus: (id, status) => api.patch(`/candidatures/${id}/status`, null, { params: { status } }),
+  enroll: (id, data) => api.post(`/candidatures/${id}/enroll`, data),
   delete: (id) => api.delete(`/candidatures/${id}`),
 }
 

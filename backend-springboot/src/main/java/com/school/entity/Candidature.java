@@ -53,6 +53,15 @@ public class Candidature {
     @Column(columnDefinition = "TEXT")
     private String notes;
 
+    /**
+     * Élève créé lors de l'inscription de la candidature. Renseigné par
+     * {@code CandidatureService.enroll} : sa présence prouve que le dossier a
+     * déjà été transformé en inscription.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "student_id")
+    private Student student;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @Builder.Default
