@@ -149,6 +149,8 @@ export const attendanceApi = {
  * Endpoints du module parents.
  */
 export const parentApi = {
+  /** Dossiers parents — sélecteur de cible des convocations (personnel uniquement). */
+  parents: () => api.get('/parents'),
   children: () => api.get('/parents/children'),
   childBulletins: (studentId) => api.get(`/parents/children/${studentId}/bulletins`),
   childBulletinPdf: (studentId, bulletinId) => api.get(`/parents/children/${studentId}/bulletins/${bulletinId}/pdf`, { responseType: 'blob' }),
@@ -431,6 +433,10 @@ export const communicationApi = {
   inbox: (params) => api.get('/communication/messages/inbox', { params }),
   sent: (params) => api.get('/communication/messages/sent', { params }),
   send: (data) => api.post('/communication/messages', data),
+  // Ouvre une conversation (marque le message lu côté serveur) et y répond.
+  open: (id) => api.get(`/communication/messages/${id}`),
+  reply: (id, content) => api.post(`/communication/messages/${id}/reply`, { content }),
+  remove: (id) => api.delete(`/communication/messages/${id}`),
   unreadMessages: () => api.get('/communication/messages/unread-count'),
   markMessagesRead: () => api.patch('/communication/messages/read-all'),
   announcements: () => api.get('/communication/announcements'),

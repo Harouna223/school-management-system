@@ -68,6 +68,12 @@ public class ParentController {
         return ok("Parcours trouvé", parentService.childTimeline(studentId));
     }
 
+    @GetMapping
+    @Operation(summary = "Liste des dossiers parents (sélecteur de convocation)")
+    public ResponseEntity<ApiResponse<List<com.school.dto.response.ParentResponse>>> parents() {
+        return ok("Parents trouvés", parentService.listAll());
+    }
+
     private <T> ResponseEntity<ApiResponse<T>> ok(String message, T data) {
         return ResponseEntity.ok(ApiResponse.<T>builder()
                 .success(true).message(message).data(data)

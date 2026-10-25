@@ -1,5 +1,6 @@
 package com.school.dto.request;
 
+import com.school.enums.ConvocationTarget;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -12,6 +13,10 @@ import java.time.LocalDateTime;
 
 /**
  * Création / modification d'une convocation.
+ *
+ * <p>La {@code target} désigne QUI est convoqué ; l'identifiant correspondant
+ * est alors obligatoire (élève, parent ou enseignant). {@code target} absente
+ * vaut {@code ELEVE}, pour rester compatible avec les appels existants.</p>
  */
 @Data
 @Builder
@@ -19,8 +24,17 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class ConvocationRequest {
 
-    @NotNull(message = "L'élève est obligatoire")
+    /** ÉLÈVE (défaut), PARENT ou ENSEIGNANT. */
+    private ConvocationTarget target;
+
+    /** Obligatoire si {@code target = ELEVE}. */
     private Long studentId;
+
+    /** Obligatoire si {@code target = PARENT}. */
+    private Long parentId;
+
+    /** Obligatoire si {@code target = ENSEIGNANT}. */
+    private Long teacherId;
 
     /** SCHOOL ou UNIVERSITY. */
     @NotBlank(message = "Le contexte est obligatoire")

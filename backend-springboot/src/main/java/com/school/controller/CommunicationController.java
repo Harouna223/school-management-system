@@ -126,6 +126,36 @@ public class CommunicationController {
         return ok("Message envoyé", messageService.send(request, httpRequest));
     }
 
+    @GetMapping("/messages/{id}")
+    @Operation(summary = "Ouvrir un message (le marque lu s'il est reçu)")
+    public ResponseEntity<ApiResponse<MessageResponse>> openMessage(@PathVariable Long id) {
+        return ok("Message", messageService.open(id, SecurityUtils.currentUserId()));
+    }
+
+    @PatchMapping("/messages/{id}/read")
+    @Operation(summary = "Marquer un message reçu comme lu")
+    public ResponseEntity<ApiResponse<Void>> markMessageRead(@PathVariable Long id) {
+        messageService.markAsRead(id, SecurityUtils.currentUserId());
+        return ok("Message marqué comme lu", null);
+    }
+
+    @PostMapping("/messages/{id}/reply")
+    @Operation(summary = "Répondre à un message")
+    public ResponseEntity<ApiResponse<MessageResponse>> replyMessage(
+            @PathVariable Long id,
+            @Valid @RequestBody com.school.dto.request.MessageReplyRequest request,
+            HttpServletRequest httpRequest) {
+        return ok("Réponse envoyée", messageService.reply(id, request, httpRequest));
+    }
+
+    @DeleteMapping("/messages/{id}")
+    @Operation(summary = "Supprimer un message (expéditeur ou destinataire)")
+    public ResponseEntity<ApiResponse<Void>> deleteMessage(@PathVariable Long id,
+                                                           HttpServletRequest httpRequest) {
+        messageService.delete(id, SecurityUtils.currentUserId(), httpRequest);
+        return ok("Message supprimé", null);
+    }
+
     @GetMapping("/messages/unread-count")
     @Operation(summary = "Messages non lus")
     public ResponseEntity<ApiResponse<Long>> unreadMessages() {

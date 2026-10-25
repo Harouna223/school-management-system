@@ -40,9 +40,12 @@ public class ConvocationController {
     }
 
     @GetMapping
-    @Operation(summary = "Liste paginée des convocations")
+    @Operation(summary = "Liste paginée des convocations (élève, parent, enseignant ou toutes)")
     public ResponseEntity<ApiResponse<com.school.dto.response.PageResponse<ConvocationResponse>>> list(
             @RequestParam(required = false) Long studentId,
+            @RequestParam(required = false) Long parentId,
+            @RequestParam(required = false) Long teacherId,
+            @RequestParam(required = false) com.school.enums.ConvocationTarget target,
             @Min(value = 0, message = "Le numéro de page ne peut pas être négatif") @RequestParam(defaultValue = "0") int page,
             @Max(value = 100, message = "La taille de page ne peut pas dépasser 100")
             @RequestParam(defaultValue = "10") int size) {
@@ -50,7 +53,7 @@ public class ConvocationController {
             accessControlService.assertCanAccessStudentData(studentId);
         }
         return ok("Convocations", com.school.dto.response.PageResponse.from(
-                convocationService.listByStudent(studentId, page, size), x -> x));
+                convocationService.list(studentId, parentId, teacherId, target, page, size), x -> x));
     }
 
     @GetMapping("/student/{studentId}")

@@ -109,6 +109,18 @@ public class ParentService {
     }
 
     /**
+     * Liste des dossiers parents — alimente le sélecteur de cible de la page
+     * Convocations. Réservé au personnel : la règle d'URL exige
+     * {@code PERM_STUDENT_WRITE}, que ni PARENT ni ELEVE ne détiennent.
+     */
+    @Transactional(readOnly = true)
+    public List<com.school.dto.response.ParentResponse> listAll() {
+        return parentRepository
+                .findAll(org.springframework.data.domain.Sort.by("lastName").ascending())
+                .stream().map(com.school.dto.response.ParentResponse::from).toList();
+    }
+
+    /**
      * Vérifie et retourne l'enfant appartenant au parent connecté.
      * Utilisé par les endpoints documentaires.
      */

@@ -69,6 +69,15 @@ public class SecurityConfig {
                         .requestMatchers("/api/classes/**").hasAnyAuthority("PERM_CLASS_WRITE")
                         .requestMatchers(HttpMethod.GET, "/api/subjects/**").hasAnyAuthority("PERM_SUBJECT_READ")
                         .requestMatchers("/api/subjects/**").hasAnyAuthority("PERM_SUBJECT_WRITE")
+                        // Le bulletin PDF est un document PERSONNEL : l'accès réel est
+                        // déjà cloisonné par AccessControlService.assertCanAccessStudent
+                        // (appelé par GradeService.exportBulletinPdf). L'exiger sous
+                        // PERM_EXAM_READ renvoyait un 403 à tout élève et à tout parent
+                        // (ce rôle ne détient pas EXAM_READ) : le bouton « Télécharger le
+                        // PDF » du portail élève était donc inutilisable. GRADE_READ est
+                        // détenu par ELEVE et PARENT, mais pas par COMPTABLE.
+                        .requestMatchers(HttpMethod.GET, "/api/exams/bulletins/*/pdf")
+                        .hasAnyAuthority("PERM_EXAM_READ", "PERM_GRADE_READ")
                         .requestMatchers(HttpMethod.GET, "/api/exams/**").hasAnyAuthority("PERM_EXAM_READ")
                         .requestMatchers("/api/exams/**").hasAnyAuthority("PERM_EXAM_WRITE")
                         .requestMatchers(HttpMethod.GET, "/api/attendances/**").hasAnyAuthority("PERM_ATTENDANCE_READ")
@@ -103,6 +112,15 @@ public class SecurityConfig {
                                 "/api/courses/*/download").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/courses/**").hasAnyAuthority("PERM_COURSE_READ")
                         .requestMatchers("/api/courses/**").hasAnyAuthority("PERM_COURSE_WRITE")
+                        // Un message est borné à ses DEUX participants (contrôle dans
+                        // MessageService) : ouvrir une conversation, la marquer lue,
+                        // y répondre ou la supprimer ne peut donc pas exiger
+                        // COMMUNICATION_WRITE — les comptes parent et élève, qui sont
+                        // des destinataires légitimes, ne le détiennent pas.
+                        .requestMatchers(HttpMethod.GET, "/api/communication/messages/*").authenticated()
+                        .requestMatchers(HttpMethod.PATCH, "/api/communication/messages/*/read").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/communication/messages/*/reply").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/api/communication/messages/*").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/communication/**").hasAnyAuthority("PERM_COMMUNICATION_READ")
                         .requestMatchers("/api/communication/**").hasAnyAuthority("PERM_COMMUNICATION_WRITE")
                         // Barèmes d'appréciation : configuration réservée aux administrateurs
@@ -118,6 +136,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/academic-years/**").hasAnyAuthority("PERM_ACADEMIC_YEAR_WRITE")
                         // Convocations : lecture par l'élève, l'étudiant et le parent (IDOR contrôlé côté service),
                         // écriture par l'administration
+                        // Liste des dossiers parents (sélecteur de convocation) :
+                        // donnée d'établissement. STUDENT_READ ne suffit pas — un
+                        // parent ou un élève le détient.
+                        .requestMatchers(HttpMethod.GET, "/api/parents").hasAnyAuthority("PERM_STUDENT_WRITE")
                         .requestMatchers(HttpMethod.GET, "/api/convocations/**").authenticated()
                         .requestMatchers("/api/convocations/**").hasAnyAuthority("PERM_STUDENT_WRITE")
                         // Stages : mêmes règles d'autorisation que les autres modules annexes

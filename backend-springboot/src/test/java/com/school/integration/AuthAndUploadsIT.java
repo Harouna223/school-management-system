@@ -6,6 +6,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 
 import static org.hamcrest.Matchers.notNullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -90,6 +92,65 @@ class AuthAndUploadsIT extends AbstractIntegrationTest {
         String token = login();
         mockMvc.perform(get("/api/dashboard/stats")
                         .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
+
+    // ------------------------------------------------------------------
+    // Bulletin PDF : document personnel accessible sans PERM_EXAM_READ
+    // ------------------------------------------------------------------
+
+    /**
+     * Regression : le role ELEVE (et PARENT) ne detient pas PERM_EXAM_READ, or
+     * la regle generale {@code GET /api/exams/**} l'exigeait. Le portail eleve
+     * recevait donc un 403 sur « Telecharger le PDF » alors que le bulletin est
+     * SON document (le cloisonnement reel est fait par AccessControlService).
+     * Un bulletin inexistant doit desormais produire un 404 : preuve que la
+     * regle d'URL est franchie et que le controle de propriete s'execute.
+     */
+    @Test
+    @DisplayName("Le bulletin PDF est atteignable avec GRADE_READ seul (plus de 403)")
+    void bulletinPdfAtteignableAvecGradeReadSeul() throws Exception {
+        mockMvc.perform(get("/api/exams/bulletins/999999/pdf")
+                        .with(SecurityMockMvcRequestPostProcessors.user("eleve-de-test")
+                                .authorities(new SimpleGrantedAuthority("PERM_GRADE_READ"))))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("Le bulletin PDF reste interdit sans permission de notes (403)")
+    void bulletinPdfRefuseSansPermissionDeNotes() throws Exception {
+        mockMvc.perform(get("/api/exams/bulletins/999999/pdf")
+                        .with(SecurityMockMvcRequestPostProcessors.user("sans-droits")
+                                .authorities(new SimpleGrantedAuthority("PERM_LIBRARY_READ"))))
+                .andExpect(status().isForbidden());
+    }
+
+    // ------------------------------------------------------------------
+    // Liste des dossiers parents : donnee d'etablissement
+    // ------------------------------------------------------------------
+
+    /**
+     * La liste des dossiers parents (nom, telephone, e-mail) est une donnee
+     * d'etablissement. STUDENT_READ, que detiennent parent et eleve, ne doit
+     * pas suffire : sans cette regle un compte eleve listerait toutes les
+     * familles de l'etablissement.
+     */
+    @Test
+    @DisplayName("La liste des dossiers parents est refusee avec STUDENT_READ seul (403)")
+    void listeParentsRefuseeAvecStudentReadSeul() throws Exception {
+        mockMvc.perform(get("/api/parents")
+                        .with(SecurityMockMvcRequestPostProcessors.user("eleve-de-test")
+                                .authorities(new SimpleGrantedAuthority("PERM_STUDENT_READ"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("La liste des dossiers parents est accessible au personnel administratif")
+    void listeParentsAccessibleAuPersonnel() throws Exception {
+        mockMvc.perform(get("/api/parents")
+                        .with(SecurityMockMvcRequestPostProcessors.user("secretaire")
+                                .authorities(new SimpleGrantedAuthority("PERM_STUDENT_WRITE"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
     }

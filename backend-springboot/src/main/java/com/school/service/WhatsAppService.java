@@ -85,6 +85,21 @@ public class WhatsAppService {
     }
 
     /**
+     * Message WhatsApp : convocation adressée au parent lui-même, sans élève
+     * rattaché (entretien, impayés, dossier administratif…).
+     */
+    public void sendConvocationToParent(Parent parent, String subject,
+                                        LocalDate date, String time, String location) {
+        String body = "Bonjour " + parent.getFirstName() + " " + parent.getLastName() + ",\n"
+                + "Vous êtes convoqué(e) par l'établissement.\n"
+                + "Motif : " + subject + "\n"
+                + "Date : " + date + " à " + time + "\n"
+                + "Lieu : " + location + "\n\n"
+                + appProperties.getSchool().getName();
+        send(parent, null, "Convocation - " + subject, body);
+    }
+
+    /**
      * Message WhatsApp : relance de paiement adressée au parent (tuteur légal).
      *
      * @return {@code true} si le message a été remis au fournisseur (ou journalisé
