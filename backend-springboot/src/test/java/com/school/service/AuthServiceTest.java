@@ -537,6 +537,80 @@ class AuthServiceTest {
     }
 
     // ------------------------------------------------------------------
+    // Révocation / rétablissement des comptes rattachés à un dossier
+    // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("la révocation désactive le compte ET supprime ses jetons de rafraîchissement")
+    void revokeDesactiveLeCompteEtSupprimeLesJetons() {
+        User user = utilisateur(42L, "aicha.kamdem");
+        when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.revokeLinkedAccount(user);
+
+        assertThat(user.isEnabled()).isFalse();
+        verify(userRepository).save(user);
+        // La désactivation seule ne suffisait pas : la session en cours se
+        // renouvelait pendant 7 jours via /api/auth/refresh. Un élève radié
+        // conservait donc un accès complet malgré la suppression de son dossier.
+        verify(refreshTokenRepository).deleteByUserId(42L);
+    }
+
+    @Test
+    @DisplayName("la révocation est idempotente sur un compte déjà désactivé")
+    void revokeEstIdempotenteSurUnCompteDejaDesactive() {
+        User user = utilisateur(42L, "aicha.kamdem");
+        user.setEnabled(false);
+
+        service.revokeLinkedAccount(user);
+
+        verifyNoInteractions(userRepository, refreshTokenRepository);
+    }
+
+    @Test
+    @DisplayName("la révocation ignore un dossier sans compte rattaché")
+    void revokeIgnoreUnDossierSansCompte() {
+        assertThatCode(() -> service.revokeLinkedAccount(null)).doesNotThrowAnyException();
+
+        verifyNoInteractions(userRepository, refreshTokenRepository);
+    }
+
+    @Test
+    @DisplayName("le rétablissement réactive un compte désactivé et conserve ses identifiants")
+    void restoreReactiveLeCompte() {
+        User user = utilisateur(42L, "aicha.kamdem");
+        user.setEnabled(false);
+        user.setPassword("hache-dorigine");
+        when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.restoreLinkedAccount(user);
+
+        assertThat(user.isEnabled()).isTrue();
+        // Le mot de passe d'origine est conservé : l'élève réinscrit retrouve
+        // ses identifiants sans qu'un administrateur ait à les régénérer.
+        assertThat(user.getPassword()).isEqualTo("hache-dorigine");
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    @DisplayName("le rétablissement ne touche pas un compte déjà actif")
+    void restoreIgnoreUnCompteDejaActif() {
+        User user = utilisateur(42L, "aicha.kamdem");
+
+        service.restoreLinkedAccount(user);
+
+        verifyNoInteractions(userRepository);
+    }
+
+    @Test
+    @DisplayName("le rétablissement ignore un dossier sans compte rattaché")
+    void restoreIgnoreUnDossierSansCompte() {
+        assertThatCode(() -> service.restoreLinkedAccount(null)).doesNotThrowAnyException();
+
+        verifyNoInteractions(userRepository);
+    }
+
+    // ------------------------------------------------------------------
     // Changement de mot de passe
     // ------------------------------------------------------------------
 

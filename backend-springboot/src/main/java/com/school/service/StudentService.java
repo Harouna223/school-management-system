@@ -256,6 +256,9 @@ public class StudentService {
         try {
             auditService.log("DELETE", "Student", id,
                     "Suppression du dossier de " + student.getFullName(), httpRequest);
+            // Le compte survivait à la suppression du dossier : l'élève supprimé
+            // conservait un identifiant de connexion valide (rôle ELEVE).
+            authService.revokeLinkedAccount(student.getUser());
             studentRepository.delete(student);
             studentRepository.flush();
         } catch (org.springframework.dao.DataIntegrityViolationException ex) {
@@ -297,6 +300,8 @@ public class StudentService {
             throw new BusinessException("Cet élève est déjà radié");
         }
         student.setStatus(StudentStatus.RADIATED);
+        // Un élève radié quitte l'établissement : son accès doit tomber avec son dossier.
+        authService.revokeLinkedAccount(student.getUser());
         studentRepository.save(student);
         recordHistory(student, StudentHistoryAction.RADIATION,
                 student.getSchoolClass() != null ? student.getSchoolClass().getName() : null,
@@ -317,6 +322,8 @@ public class StudentService {
         }
         student.setStatus(StudentStatus.ACTIVE);
         student.setEnrollmentDate(LocalDate.now());
+        // Retour dans l'établissement : l'accès est rétabli (mot de passe inchangé).
+        authService.restoreLinkedAccount(student.getUser());
         studentRepository.save(student);
         recordHistory(student, StudentHistoryAction.REINSCRIPTION,
                 null, student.getSchoolClass() != null ? student.getSchoolClass().getName() : null,

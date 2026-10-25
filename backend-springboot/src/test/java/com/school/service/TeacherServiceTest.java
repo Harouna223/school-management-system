@@ -469,6 +469,52 @@ class TeacherServiceTest {
         verify(auditService).log("UPDATE", "Teacher", 7L, "Statut changé : ON_LEAVE", httpRequest);
     }
 
+    @Test
+    @DisplayName("updateStatus INACTIVE révoque le compte : l'enseignant parti perd ses accès")
+    void updateStatusInactiveRevoqueLeCompte() {
+        Teacher existant = enseignant(7L, "Jean", "Kamdem", "ENS-2026-0001");
+        User compte = User.builder().id(99L).username("jean.kamdem").enabled(true).build();
+        existant.setUser(compte);
+        when(teacherRepository.findById(7L)).thenReturn(Optional.of(existant));
+        saveRenvoieSonArgument();
+
+        teacherService.updateStatus(7L, TeacherStatus.INACTIVE, httpRequest);
+
+        verify(authService).revokeLinkedAccount(compte);
+        verify(authService, never()).restoreLinkedAccount(any());
+    }
+
+    @Test
+    @DisplayName("updateStatus ON_LEAVE ne touche PAS au compte : un congé est temporaire")
+    void updateStatusOnLeaveConserveLesAcces() {
+        Teacher existant = enseignant(7L, "Jean", "Kamdem", "ENS-2026-0001");
+        User compte = User.builder().id(99L).username("jean.kamdem").enabled(true).build();
+        existant.setUser(compte);
+        when(teacherRepository.findById(7L)).thenReturn(Optional.of(existant));
+        saveRenvoieSonArgument();
+
+        teacherService.updateStatus(7L, TeacherStatus.ON_LEAVE, httpRequest);
+
+        // Confondre congé et départ couperait l'accès d'un enseignant toujours
+        // en poste : la distinction est le cœur de cette règle.
+        verifyNoInteractions(authService);
+    }
+
+    @Test
+    @DisplayName("updateStatus ACTIVE rétablit l'accès d'un compte précédemment révoqué")
+    void updateStatusActiveRetablitLeCompte() {
+        Teacher existant = enseignant(7L, "Jean", "Kamdem", "ENS-2026-0001");
+        User compte = User.builder().id(99L).username("jean.kamdem").enabled(false).build();
+        existant.setUser(compte);
+        when(teacherRepository.findById(7L)).thenReturn(Optional.of(existant));
+        saveRenvoieSonArgument();
+
+        teacherService.updateStatus(7L, TeacherStatus.ACTIVE, httpRequest);
+
+        verify(authService).restoreLinkedAccount(compte);
+        verify(authService, never()).revokeLinkedAccount(any());
+    }
+
     // -------------------------------------------------------------- uploadPhoto
 
     @Test
@@ -568,6 +614,21 @@ class TeacherServiceTest {
         verify(teacherRepository).delete(existant);
         verify(auditService).log(eq("DELETE"), eq("Teacher"), eq(7L),
                 contains("Jean Kamdem"), eq(httpRequest));
+    }
+
+    @Test
+    @DisplayName("delete révoque le compte rattaché avant de supprimer le profil")
+    void deleteRevoqueLeCompte() {
+        Teacher existant = enseignant(7L, "Jean", "Kamdem", "ENS-2026-0001");
+        User compte = User.builder().id(99L).username("jean.kamdem").enabled(true).build();
+        existant.setUser(compte);
+        when(teacherRepository.findById(7L)).thenReturn(Optional.of(existant));
+
+        teacherService.delete(7L, httpRequest);
+
+        // Le compte survivait au profil supprimé : l'enseignant parti gardait
+        // un identifiant de connexion valide (rôle ENSEIGNANT).
+        verify(authService).revokeLinkedAccount(compte);
     }
 
     // -------------------------------------------------------------- search / get

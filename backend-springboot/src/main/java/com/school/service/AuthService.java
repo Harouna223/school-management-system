@@ -260,6 +260,41 @@ public class AuthService {
         return userRepository.save(user);
     }
 
+    /**
+     * Retire l'accès du compte rattaché à un dossier (élève, enseignant).
+     *
+     * <p>Sans cette révocation, supprimer ou radier un dossier laissait un
+     * identifiant de connexion parfaitement valide : l'ancien élève continuait
+     * de se connecter avec le rôle {@code ELEVE}. La désactivation bloque les
+     * nouvelles connexions, mais les jetons de rafraîchissement déjà émis
+     * survivraient et renouvelleraient la session en cours : ils sont donc
+     * supprimés.</p>
+     */
+    @Transactional
+    public void revokeLinkedAccount(User user) {
+        if (user == null || !user.isEnabled()) {
+            return;
+        }
+        user.setEnabled(false);
+        userRepository.save(user);
+        refreshTokenRepository.deleteByUserId(user.getId());
+    }
+
+    /**
+     * Rétablit l'accès d'un compte rattaché (réinscription, retour à {@code ACTIVE}).
+     *
+     * <p>Le mot de passe est inchangé : l'utilisateur retrouve ses identifiants
+     * d'origine.</p>
+     */
+    @Transactional
+    public void restoreLinkedAccount(User user) {
+        if (user == null || user.isEnabled()) {
+            return;
+        }
+        user.setEnabled(true);
+        userRepository.save(user);
+    }
+
     private String createRefreshToken(User user) {
         String token = UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", "");
         RefreshToken refreshToken = RefreshToken.builder()

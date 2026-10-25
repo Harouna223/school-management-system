@@ -62,6 +62,7 @@ Chaque rôle dispose de **permissions fines** (`PERM_STUDENT_READ`, `PERM_PAYMEN
 | **Déverrouillage** | Un administrateur peut déverrouiller un compte verrouillé |
 | **Activation/désactivation** | Un compte désactivé perd l'accès immédiatement (même avec JWT valide) |
 | **Comptes liés** | Création automatique d'un compte élève/parent/enseignant lors de l'inscription |
+| **Révocation des comptes liés** | Le compte rattaché à un dossier est **désactivé** (et ses jetons de rafraîchissement supprimés) dès que le dossier quitte l'établissement : **suppression** ou **radiation** d'un élève, statut **INACTIVE** ou **suppression** d'un enseignant. Un **congé** (`ON_LEAVE`) ne révoque rien. La **réinscription** d'un élève ou le retour au statut **ACTIVE** d'un enseignant rétablit l'accès, **avec le mot de passe d'origine** |
 | **Sécurité** | Hash bcrypt, JWT secret configurable, CORS configuré, contrôle d'accès IDOR |
 
 ---
@@ -69,7 +70,7 @@ Chaque rôle dispose de **permissions fines** (`PERM_STUDENT_READ`, `PERM_PAYMEN
 ## 4. Scolarité (Jardin → Lycée)
 
 ### 4.1 Élèves
-- **CRUD complet** : inscription avec génération automatique de matricule, modification, radiation, réinscription, transfert de classe
+- **CRUD complet** : inscription avec génération automatique de matricule, modification, radiation, réinscription, transfert de classe — le compte de connexion est révoqué à la radiation/suppression et rétabli à la réinscription
 - **Recherche avancée** : nom, matricule, classe, statut, **cycle d'enseignement**, pagination
 - **Fiche élève détaillée** : identité, classe, parent, historique du parcours (transferts, radiations)
 - **Photos** : upload et affichage de la photo de profil
@@ -87,7 +88,7 @@ Chaque rôle dispose de **permissions fines** (`PERM_STUDENT_READ`, `PERM_PAYMEN
 ### 4.3 Enseignants
 - **CRUD complet** : numéro d'employé généré automatiquement, spécialité, contact
 - **Affectation aux classes/matières** : un enseignant peut enseigner plusieurs matières dans plusieurs classes
-- **Compte enseignant** lié automatiquement
+- **Compte enseignant** lié automatiquement, révoqué au départ (statut INACTIVE) ou à la suppression, rétabli au retour à ACTIVE
 
 ---
 

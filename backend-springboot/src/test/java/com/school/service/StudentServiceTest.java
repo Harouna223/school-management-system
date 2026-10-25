@@ -909,6 +909,62 @@ class StudentServiceTest {
                 contains("Aicha Kamdem"), eq(httpRequest));
     }
 
+    // -------------------------------------------------- revocation des comptes
+
+    @Test
+    @DisplayName("delete revoque le compte rattache avant de supprimer le dossier")
+    void deleteRevoqueLeCompteRattache() {
+        Student existant = eleve(6L, "ETU-2026-000006", StudentStatus.ACTIVE, null);
+        User compte = User.builder().id(42L).username("aicha.kamdem").enabled(true).build();
+        existant.setUser(compte);
+        when(studentRepository.findById(6L)).thenReturn(Optional.of(existant));
+
+        studentService.delete(6L, httpRequest);
+
+        // Bug constate en reel : sans cette revocation, l'eleve supprime
+        // continuait de se connecter avec le role ELEVE (login 200).
+        verify(authService).revokeLinkedAccount(compte);
+    }
+
+    @Test
+    @DisplayName("delete d'un dossier sans compte rattache transmet null (la garde est dans AuthService)")
+    void deleteSansCompteTransmetNull() {
+        Student existant = eleve(6L, "ETU-2026-000006", StudentStatus.ACTIVE, null);
+        when(studentRepository.findById(6L)).thenReturn(Optional.of(existant));
+
+        studentService.delete(6L, httpRequest);
+
+        verify(authService).revokeLinkedAccount(isNull());
+    }
+
+    @Test
+    @DisplayName("radiate revoque le compte de l'eleve qui quitte l'etablissement")
+    void radiateRevoqueLeCompte() {
+        Student existant = eleve(6L, "ETU-2026-000006", StudentStatus.ACTIVE, null);
+        User compte = User.builder().id(42L).username("aicha.kamdem").enabled(true).build();
+        existant.setUser(compte);
+        when(studentRepository.findById(6L)).thenReturn(Optional.of(existant));
+        saveEleveRenouvele();
+
+        studentService.radiate(6L, "Déménagement", httpRequest);
+
+        verify(authService).revokeLinkedAccount(compte);
+    }
+
+    @Test
+    @DisplayName("reinscribe retablit l'acces du compte de l'eleve qui revient")
+    void reinscribeRetablitLeCompte() {
+        Student radie = eleve(6L, "ETU-2026-000006", StudentStatus.RADIATED, null);
+        User compte = User.builder().id(42L).username("aicha.kamdem").enabled(false).build();
+        radie.setUser(compte);
+        when(studentRepository.findById(6L)).thenReturn(Optional.of(radie));
+        saveEleveRenouvele();
+
+        studentService.reinscribe(6L, null, "Retour", httpRequest);
+
+        verify(authService).restoreLinkedAccount(compte);
+    }
+
     // ---------------------------------------------------------------- lecture
 
     @Test

@@ -155,6 +155,13 @@ public class TeacherService {
     public TeacherResponse updateStatus(Long id, TeacherStatus status, HttpServletRequest httpRequest) {
         Teacher teacher = findById(id);
         teacher.setStatus(status);
+        // INACTIVE = l'enseignant a quitté l'établissement : son accès doit tomber
+        // avec son statut. ON_LEAVE n'est qu'un congé temporaire : il conserve ses accès.
+        if (status == TeacherStatus.INACTIVE) {
+            authService.revokeLinkedAccount(teacher.getUser());
+        } else if (status == TeacherStatus.ACTIVE) {
+            authService.restoreLinkedAccount(teacher.getUser());
+        }
         auditService.log("UPDATE", "Teacher", id, "Statut changé : " + status, httpRequest);
         return TeacherResponse.from(teacherRepository.save(teacher));
     }
@@ -194,6 +201,9 @@ public class TeacherService {
         }
         auditService.log("DELETE", "Teacher", id,
                 "Suppression du profil de " + teacher.getFullName(), httpRequest);
+        // Le compte survivait à la suppression du profil : l'enseignant parti
+        // conservait un identifiant de connexion valide.
+        authService.revokeLinkedAccount(teacher.getUser());
         teacherRepository.delete(teacher);
     }
 
