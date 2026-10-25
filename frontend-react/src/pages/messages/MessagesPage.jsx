@@ -35,7 +35,7 @@ export default function MessagesPage() {
   }
 
   useEffect(() => {
-    userApi.search({ page: 0, size: 500 }).then((r) => setUsers(r.data.data.content)).catch(() => {})
+    userApi.search({ page: 0, size: 100 }).then((r) => setUsers(r.data.data.content)).catch(() => {})
   }, [])
 
   useEffect(() => {

@@ -59,7 +59,7 @@ export default function LibraryPage() {
   }
 
   useEffect(() => {
-    studentApi.search({ page: 0, size: 500 }).then((r) => setStudents(r.data.data.content)).catch(() => {})
+    studentApi.search({ page: 0, size: 100 }).then((r) => setStudents(r.data.data.content)).catch(() => {})
   }, [])
 
   useEffect(() => {

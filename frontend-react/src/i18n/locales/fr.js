@@ -114,6 +114,8 @@ export const fr = {
   'dashboard.welcome': 'Bonjour, {{name}} 👋',
   'dashboard.overview': '{{date}} — Voici un aperçu de votre établissement aujourd\'hui.',
   'dashboard.newStudent': 'Nouvel élève',
+  // Libellé court pour les raccourcis de la bannière (« Notes » tient dans le bouton).
+  'dashboard.grades': 'Notes',
   'dashboard.students': 'Élèves actifs',
   'dashboard.subjects': 'Matières',
   'dashboard.teachers': 'Enseignants',

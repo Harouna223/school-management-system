@@ -64,7 +64,7 @@ export default function ConvocationsPage() {
   }
 
   useEffect(() => {
-    studentApi.search({ page: 0, size: 500 })
+    studentApi.search({ page: 0, size: 100 })
       .then((r) => setStudents(r.data.data.content || []))
       .catch(() => {})
   }, [])

@@ -60,7 +60,7 @@ export default function HrPage() {
   const [teachers, setTeachers] = useState([])
 
   useEffect(() => {
-    teacherApi.search({ page: 0, size: 500 }).then((r) => setTeachers(r.data.data.content)).catch(() => {})
+    teacherApi.search({ page: 0, size: 100 }).then((r) => setTeachers(r.data.data.content)).catch(() => {})
   }, [])
 
   // ---------- Congés ----------

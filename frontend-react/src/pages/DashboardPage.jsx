@@ -68,6 +68,30 @@ const GENDER_COLORS = ['#2563eb', '#ec4899']
 const CLASS_COLORS = ['#2563eb', '#7c3aed', '#0284c7', '#d97706', '#16a34a', '#dc2626', '#6d28d9', '#0e7490']
 
 /**
+ * Cycles proposés au filtre du tableau de bord.
+ *
+ * `value` est la constante EXACTE de l'énumération serveur `EducationCycle`
+ * (JARDIN, PRIMAIRE, COLLEGE, LYCEE, UNIVERSITE) ; `label` est le texte affiché,
+ * accentué pour le français.
+ *
+ * Pourquoi ne plus envoyer le libellé directement : la version précédente
+ * passait « Jardin », « Collège », « Lycée »… au paramètre `cycle`. Spring
+ * convertit ce paramètre en énumération et refuse toute valeur inconnue : les
+ * cinq filtres (tous sauf « Tous ») renvoyaient une erreur 400 et les
+ * indicateurs restaient vides — sans aucun message pour l'utilisateur.
+ */
+const CYCLES = [
+  { label: 'Jardin', value: 'JARDIN' },
+  { label: 'Primaire', value: 'PRIMAIRE' },
+  { label: 'Collège', value: 'COLLEGE' },
+  { label: 'Lycée', value: 'LYCEE' },
+  { label: 'Université', value: 'UNIVERSITE' },
+]
+
+/** Valeur neutre : aucune restriction de cycle. */
+const ALL_CYCLES = 'TOUS'
+
+/**
  * Tableau de bord premium : bannière d'accueil, KPIs, graphiques et activités.
  * Toutes les données proviennent de /dashboard/stats (aucune donnée simulée).
  */
@@ -86,9 +110,9 @@ export default function DashboardPage() {
   }, [])
 
   // Filtre de cycle : Tous / Jardin / Primaire / Collège / Lycée / Université
-  const [cycle, setCycle] = useState('Tous')
+  const [cycle, setCycle] = useState(ALL_CYCLES)
   const { data: cycleStats, loading: cycleLoading } = useFetch(
-    () => dashboardApi.stats(cycle === 'Tous' ? undefined : cycle),
+    () => dashboardApi.stats(cycle === ALL_CYCLES ? undefined : cycle),
     [cycle, refreshKey],
   )
   const stats = cycleStats ?? null
@@ -203,7 +227,7 @@ export default function DashboardPage() {
                   '&:hover': { bgcolor: 'rgba(255,255,255,0.26)' },
                 }}
               >
-                Notes
+                {t('dashboard.grades')}
               </Button>
             </Box>
           </Box>
@@ -218,9 +242,9 @@ export default function DashboardPage() {
       {/* Sélecteur de cycle */}
       <Box display="flex" alignItems="center" gap={1} flexWrap="wrap" mb={2.5}>
         <Typography variant="subtitle2" fontWeight={700} mr={0.5}>Cycle :</Typography>
-        {['Tous', 'Jardin', 'Primaire', 'Collège', 'Lycée', 'Université'].map((c) => (
-          <Chip key={c} label={c} clickable color={cycle === c ? 'primary' : 'default'}
-            onClick={() => setCycle(c)} sx={{ fontWeight: 600 }} />
+        {CYCLES.map(({ label, value }) => (
+          <Chip key={value} label={label} clickable color={cycle === value ? 'primary' : 'default'}
+            onClick={() => setCycle(value)} sx={{ fontWeight: 600 }} />
         ))}
       </Box>
 

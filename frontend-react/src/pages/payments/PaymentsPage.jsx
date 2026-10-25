@@ -65,7 +65,7 @@ export default function PaymentsPage() {
   }
 
   useEffect(() => {
-    studentApi.search({ page: 0, size: 500 }).then((r) => setStudents(r.data.data.content)).catch(() => {})
+    studentApi.search({ page: 0, size: 100 }).then((r) => setStudents(r.data.data.content)).catch(() => {})
     financeApi.feeTypes().then((r) => setFeeTypes(r.data.data)).catch(() => {})
     classApi.all().then((r) => setClasses(r.data.data)).catch(() => {})
     getDefaultCountryCode().catch(() => {})

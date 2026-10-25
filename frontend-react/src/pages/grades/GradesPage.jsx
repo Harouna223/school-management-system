@@ -80,7 +80,7 @@ export default function GradesPage() {
     const year = yearId ? Number(yearId) : undefined
     examApi.byClass(classId, year).then((r) => setExams(r.data.data || [])).catch(() => {})
     examApi.ranking(classId, term, year).then((r) => setRanking(r.data.data || [])).catch(() => {})
-    studentApi.search({ classId, page: 0, size: 500 })
+    studentApi.search({ classId, page: 0, size: 100 })
       .then((r) => setClassStudents(r.data.data.content || []))
       .catch(() => {})
     setSelectedExam('')

@@ -200,7 +200,22 @@ export default function Sidebar({ open, onClose, collapsed, onCollapseToggle, va
   const toggleGroup = (key) =>
     setOpenGroups((prev) => ({ ...prev, [key]: !prev[key] }))
 
-  const isGroupActive = (items) => items.some((c) => location.pathname.startsWith(c.to))
+  /**
+   * Un élément est actif s'il correspond EXACTEMENT au chemin courant, ou s'il en
+   * est le parent (`/students` pour `/students/12`).
+   *
+   * Pourquoi pas un simple `startsWith` : `/students` préfixe aussi `/students/new`,
+   * ce qui est voulu — mais le test débordait sur des chemins distincts. Sur
+   * `/exams`, la rubrique « Examens » est active ; sur `/exam-types`, elle
+   * l'était AUSSI, et `/exam-types` étant déclarée AVANT `/exams`, le code
+   * d'active-état retombait sur « Examens » alors que l'utilisateur consultait
+   * les types d'examen. Le préfixe n'est donc valide que s'il est suivi d'un
+   * séparateur de segment.
+   */
+  const isActivePath = (to) =>
+    location.pathname === to || location.pathname.startsWith(`${to}/`)
+
+  const isGroupActive = (items) => items.some((c) => isActivePath(c.to))
 
   const handleLogout = async () => {
     await dispatch(logout())
@@ -208,7 +223,7 @@ export default function Sidebar({ open, onClose, collapsed, onCollapseToggle, va
   }
 
   const renderItem = (item, indent = 0, compact = false, isTemp = false) => {
-    const isActive = item.to ? location.pathname.startsWith(item.to) : false
+    const isActive = item.to ? isActivePath(item.to) : false
     const button = item.to ? (
       <ListItemButton
         component={NavLink}
@@ -337,7 +352,32 @@ export default function Sidebar({ open, onClose, collapsed, onCollapseToggle, va
                 </ListItemButton>
               )}
               {!compact && (
-                <Collapse in={open} timeout="auto" unmountOnExit>
+                /*
+                 * `timeout="auto"` est VOLONTAIREMENT proscrit ici (2026-10-24).
+                 *
+                 * Avec `timeout="auto"`, MUI transmet `timeout: null` à la
+                 * Transition de react-transition-group. Comme un groupe replié est
+                 * démonté (`unmountOnExit`), son état est `UNMOUNTED`. Le premier
+                 * rendu où `in` passe à `true` — c'est-à-dire la PREMIÈRE
+                 * navigation vers une rubrique, le clic sur un bouton du tableau
+                 * de bord — enchaîne alors, en boucle infinie :
+                 *
+                 *   getDerivedStateFromProps → EXITED
+                 *   componentDidUpdate      → performEnter → ENTERING
+                 *   getDerivedStateFromProps(prop unchanged) → EXITED
+                 *   componentDidUpdate      → performEnter → …
+                 *
+                 * React interrompt au bout de 50 passes avec l'erreur #185
+                 * (« Maximum update depth exceeded ») et l'ErrorBoundary
+                 * affichait « Une erreur est survenue » : l'application paraissait
+                 * figée. Un rechargement direct de l'URL ne déclenchait pas la
+                 * boucle (le groupe était déjà actif au montage), ce qui rendait
+                 * le défaut invisible aux tests de route page-par-page.
+                 *
+                 * Une durée explicite fait passer `performEnter` par le chemin
+                 * `onTransitionEnd` et supprime l'oscillation.
+                 */
+                <Collapse in={open} timeout={180} unmountOnExit>
                   <List component="div" disablePadding>
                     {group.items.map((item) => renderItem(item, 1.8, compact, isTemp))}
                   </List>

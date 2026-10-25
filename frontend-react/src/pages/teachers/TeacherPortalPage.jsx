@@ -73,7 +73,7 @@ export default function TeacherPortalPage() {
 
   useEffect(() => {
     if (!selectedClass) return
-    studentApi.search({ classId: Number(selectedClass), size: 500 })
+    studentApi.search({ classId: Number(selectedClass), size: 100 })
       .then((r) => setStudents(r.data.data.content || []))
       .catch(() => {})
     examApi.byClass(Number(selectedClass))

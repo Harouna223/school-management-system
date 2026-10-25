@@ -114,6 +114,8 @@ export const en = {
   'dashboard.welcome': 'Hello, {{name}} 👋',
   'dashboard.overview': '{{date}} — Here is an overview of your school today.',
   'dashboard.newStudent': 'New student',
+  // Short label for the banner shortcuts (« Grades » must fit in the button).
+  'dashboard.grades': 'Grades',
   'dashboard.students': 'Active students',
   'dashboard.subjects': 'Subjects',
   'dashboard.teachers': 'Teachers',

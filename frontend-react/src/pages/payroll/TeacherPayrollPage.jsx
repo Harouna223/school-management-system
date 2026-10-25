@@ -84,7 +84,7 @@ export default function TeacherPayrollPage({ initialTab = 'monthly' }) {
   const [txFilters, setTxFilters] = useState({ teacherId: '', month: '' })
 
   useEffect(() => {
-    teacherApi.search({ page: 0, size: 500 }).then((r) => setTeachers(r.data.data.content)).catch(() => {})
+    teacherApi.search({ page: 0, size: 100 }).then((r) => setTeachers(r.data.data.content)).catch(() => {})
     classApi.all().then((r) => setClasses(r.data.data || [])).catch(() => {})
     subjectApi.all().then((r) => setSubjects(r.data.data || [])).catch(() => {})
     academicYearApi.all().then((r) => setYears(r.data.data || [])).catch(() => {})

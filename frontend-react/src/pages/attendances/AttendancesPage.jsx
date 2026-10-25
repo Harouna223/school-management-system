@@ -120,7 +120,7 @@ export default function AttendancesPage() {
   // --- Enseignants ---
   const loadTeachers = async () => {
     try {
-      const { data } = await teacherApi.search({ page: 0, size: 500 })
+      const { data } = await teacherApi.search({ page: 0, size: 100 })
       const list = data.data.content
       setTeachers(list)
       const initial = {}

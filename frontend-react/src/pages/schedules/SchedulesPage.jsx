@@ -53,7 +53,7 @@ export default function SchedulesPage() {
 
   const loadRefs = async () => {
     const [c, t, r, s] = await Promise.all([
-      classApi.all(), teacherApi.search({ page: 0, size: 500 }),
+      classApi.all(), teacherApi.search({ page: 0, size: 100 }),
       classApi.rooms(), subjectApi.all(),
     ])
     setClasses(c.data.data)

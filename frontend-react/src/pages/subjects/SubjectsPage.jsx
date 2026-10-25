@@ -41,7 +41,7 @@ export default function SubjectsPage() {
 
   useEffect(() => {
     load()
-    teacherApi.search({ page: 0, size: 500 }).then((r) => setTeachers(r.data.data.content)).catch(() => {})
+    teacherApi.search({ page: 0, size: 100 }).then((r) => setTeachers(r.data.data.content)).catch(() => {})
     classApi.all().then((r) => setClasses(r.data.data)).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
