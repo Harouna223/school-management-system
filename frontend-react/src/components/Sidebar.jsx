@@ -353,31 +353,39 @@ export default function Sidebar({ open, onClose, collapsed, onCollapseToggle, va
               )}
               {!compact && (
                 /*
-                 * `timeout="auto"` est VOLONTAIREMENT proscrit ici (2026-10-24).
+                 * `unmountOnExit` est VOLONTAIREMENT ABSENT ici — ne pas le remettre.
                  *
-                 * Avec `timeout="auto"`, MUI transmet `timeout: null` à la
-                 * Transition de react-transition-group. Comme un groupe replié est
-                 * démonté (`unmountOnExit`), son état est `UNMOUNTED`. Le premier
-                 * rendu où `in` passe à `true` — c'est-à-dire la PREMIÈRE
-                 * navigation vers une rubrique, le clic sur un bouton du tableau
-                 * de bord — enchaîne alors, en boucle infinie :
+                 * Ce que provoquait sa présence (constaté en production le
+                 * 2026-10-24, reproduit en navigateur le 2026-10-26) : au premier
+                 * clic qui rend un groupe actif, `in` passe de `false` à `true`
+                 * alors que la Transition est `UNMOUNTED`. Les deux mécanismes de
+                 * react-transition-group s'affrontent alors sans jamais converger :
                  *
-                 *   getDerivedStateFromProps → EXITED
-                 *   componentDidUpdate      → performEnter → ENTERING
-                 *   getDerivedStateFromProps(prop unchanged) → EXITED
-                 *   componentDidUpdate      → performEnter → …
+                 *   getDerivedStateFromProps : in && status===UNMOUNTED → EXITED
+                 *   componentDidUpdate       : status===EXITED && in → ENTERING
+                 *                              → performEnter → cancelNextCallback()
                  *
-                 * React interrompt au bout de 50 passes avec l'erreur #185
-                 * (« Maximum update depth exceeded ») et l'ErrorBoundary
-                 * affichait « Une erreur est survenue » : l'application paraissait
-                 * figée. Un rechargement direct de l'URL ne déclenchait pas la
-                 * boucle (le groupe était déjà actif au montage), ce qui rendait
-                 * le défaut invisible aux tests de route page-par-page.
+                 * `updateStatus` commence par `cancelNextCallback()` : le minuteur
+                 * de fin de transition est annulé à chaque passe, donc la
+                 * transition ne peut JAMAIS aboutir. Une durée finie n'y change
+                 * rien — `timeout={180}` a été testé et échoue de la même façon.
+                 * React coupe au bout de 50 passes avec l'erreur #185
+                 * (« Maximum update depth exceeded ») et l'ErrorBoundary affiche
+                 * « Une erreur est survenue » : les boutons du tableau de bord
+                 * semblaient morts.
                  *
-                 * Une durée explicite fait passer `performEnter` par le chemin
-                 * `onTransitionEnd` et supprime l'oscillation.
+                 * Sans `unmountOnExit`, l'état avance normalement
+                 * (EXITED → ENTERING → ENTERED) et le sous-menu se déplie. Le
+                 * contenu replié reste monté mais masqué (`visibility: hidden`
+                 * via la classe `hidden` de Collapse) : coût négligeable pour une
+                 * poignée de liens.
+                 *
+                 * ⚠️ jsdom ne reproduit PAS cette boucle (pas de mesure de
+                 * hauteur, `wrapperSize` reste à 0) : la CI peut être verte alors
+                 * que la production plante. La recette doit passer par un vrai
+                 * navigateur, en cliquant les boutons du tableau de bord.
                  */
-                <Collapse in={open} timeout={180} unmountOnExit>
+                <Collapse in={open} timeout={180}>
                   <List component="div" disablePadding>
                     {group.items.map((item) => renderItem(item, 1.8, compact, isTemp))}
                   </List>

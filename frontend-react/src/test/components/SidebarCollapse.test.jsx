@@ -103,22 +103,32 @@ describe('Menu latéral — déplier puis replier un groupe ne casse pas l’app
     const adminHeader = headers.find((el) => /Administration/i.test(el.textContent || ''))
     expect(adminHeader, 'en-tête « Administration » introuvable dans le menu').toBeTruthy()
 
-    fireEvent.click(adminHeader)
-    await waitFor(() => expect(screen.queryByText('Une erreur est survenue')).toBeNull(), { timeout: 4000 })
-
     /*
-     * Le sous-menu est aussi un `<nav>` imbrique : c'est le seul endroit ou le
-     * lien `/students` existe. `queryAllByText(/Élèves/)` serait ambigu (le
-     * libelle « Eleves » apparait aussi sur d'autres ecrans), un lien l'est pas.
+     * On mesure la CONVERGENCE de la transition, pas la simple presence du DOM.
+     *
+     * Depuis le correctif, le sous-menu n'est plus demonte (`unmountOnExit`
+     * retire) : ses liens existent donc en permanence, meme replies. Les
+     * chercher ne prouverait rien. MUI pose en revanche une classe d'etat sur le
+     * conteneur : `MuiCollapse-entered` quand la transition a abouti,
+     * `MuiCollapse-hidden` quand le groupe est replie. C'est exactement ce que
+     * la boucle infinie empechait d'atteindre.
      */
-    await waitFor(() => expect(nav.querySelector('a[href="/students"]')).not.toBeNull(), { timeout: 4000 })
+    const collapse = () => nav.querySelector('a[href="/students"]')?.closest('.MuiCollapse-root')
+
+    await waitFor(() => expect(collapse()).toBeTruthy(), { timeout: 4000 })
+    expect(collapse().className, 'groupe replié au départ').toMatch(/MuiCollapse-hidden/)
+
+    fireEvent.click(adminHeader)
+    await waitFor(() => expect(collapse().className).toMatch(/MuiCollapse-entered/), { timeout: 4000 })
+    await waitFor(() => expect(screen.queryByText('Une erreur est survenue')).toBeNull(), { timeout: 4000 })
 
     // Puis on replie : c'est la transition inverse, historiquement aussi fragile.
     fireEvent.click(adminHeader)
+    await waitFor(() => expect(collapse().className).toMatch(/MuiCollapse-hidden/), { timeout: 4000 })
     await waitFor(() => expect(screen.queryByText('Une erreur est survenue')).toBeNull(), { timeout: 4000 })
   })
 
-  it('un groupe replié s’ouvre réellement (pas seulement l’état visuel)', async () => {
+  it('un groupe replié s’ouvre réellement (transition aboutie)', async () => {
     mountDashboard()
     await screen.findByText('Cycle :')
     const nav = document.querySelector('nav')
@@ -126,10 +136,14 @@ describe('Menu latéral — déplier puis replier un groupe ne casse pas l’app
     const services = headers.find((el) => /Services/i.test(el.textContent || ''))
     expect(services, 'en-tête « Services » introuvable').toBeTruthy()
 
+    // Le lien existe deja (contenu garde monte) : c'est son etat qui doit changer.
+    // On cible le Collapse du groupe via le lien, pas le premier du menu.
+    const collapse = () => nav.querySelector('a[href="/library"]')?.closest('.MuiCollapse-root')
+    expect(collapse()).toBeTruthy()
+    expect(collapse().className, 'groupe replié au départ').toMatch(/MuiCollapse-hidden/)
+
     fireEvent.click(services)
-    // Les enfants sont montes par le `unmountOnExit` du Collapse : leur presence
-    // prouve que la transition a abouti au lieu de reboucler.
-    await waitFor(() => expect(nav.querySelector('a[href="/library"]')).not.toBeNull(), { timeout: 4000 })
+    await waitFor(() => expect(collapse().className).toMatch(/MuiCollapse-entered/), { timeout: 4000 })
     await waitFor(() => expect(screen.queryByText('Une erreur est survenue')).toBeNull(), { timeout: 4000 })
   })
 })
