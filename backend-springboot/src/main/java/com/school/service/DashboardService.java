@@ -101,7 +101,13 @@ public class DashboardService {
                 .todayAbsent(todayAbsent)
                 .totalLate(totalLate)
                 .totalBooks(bookRepository.count())
-                .borrowedBooks(borrowingRepository.countByStatus(com.school.enums.BorrowingStatus.BORROWED))
+                // OVERDUE inclus, pour la même raison que les factures ci-dessus :
+                // le job de nuit (4 h) bascule BORROWED -> OVERDUE, et le compteur
+                // tombait à 0 le lendemain matin alors que les livres étaient
+                // toujours sortis. Constaté en production : 1 emprunt OVERDUE,
+                // 0 BORROWED, tableau de bord annonçant 0 livre emprunté.
+                .borrowedBooks(borrowingRepository.countByStatus(com.school.enums.BorrowingStatus.BORROWED)
+                        + borrowingRepository.countByStatus(com.school.enums.BorrowingStatus.OVERDUE))
                 .pendingLeaves(leaveRepository.findByStatus(com.school.enums.LeaveStatus.PENDING).size())
                 .revenueByMonth(last6MonthsRevenue())
                 .studentsByClass(studentsByClass(cycleClasses))
