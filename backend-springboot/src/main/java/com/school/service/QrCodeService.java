@@ -20,11 +20,16 @@ public class QrCodeService {
 
     /**
      * Payload du QR Code de la carte scolaire d'un élève.
+     *
+     * <p>Un élève non affecté a une classe {@code null} : le payload affichait
+     * alors « Classe: null » sur une carte <em>imprimée</em>. Le libellé reste
+     * identique pour ne pas casser les lecteurs qui analysent ce bloc.</p>
      */
     public String studentQrPayload(String matricule, String fullName, String className) {
+        String classe = className != null && !className.isBlank() ? className : "Non affectée";
         return String.format(
                 "CARTE SCOLAIRE\nMatricule: %s\nNom: %s\nClasse: %s",
-                matricule, fullName, className);
+                matricule, fullName, classe);
     }
 
     /**
