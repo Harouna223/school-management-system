@@ -70,6 +70,8 @@ class ReportServiceTest {
     @Mock
     private SchoolDocumentTheme documentTheme;
     @Mock
+    private com.school.pdf.CardSettingsService cardSettingsService;
+    @Mock
     private HttpServletResponse response;
 
     @InjectMocks

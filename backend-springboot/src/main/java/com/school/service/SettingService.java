@@ -271,25 +271,47 @@ public class SettingService {
     public void deleteLogo(HttpServletRequest httpRequest) {
         String current = value(SCHOOL_LOGO, "");
         updateAll(Map.of(SCHOOL_LOGO, ""), httpRequest);
-        deleteLocalFile(current);
+        deleteUploadedFile(current);
     }
 
     /** Supprime un fichier de {@code /uploads/...} sans jamais sortir du dossier. */
-    private void deleteLocalFile(String publicPath) {        if (publicPath == null || !publicPath.startsWith("/uploads/")) {
-            return;
+    public void deleteUploadedFile(String publicPath) {
+        resolveUploadedFile(publicPath).ifPresent(file -> {
+            try {
+                java.nio.file.Files.deleteIfExists(file);
+            } catch (Exception e) {
+                // Un fichier orphelin est préférable à une suppression impossible :
+                // la référence en base est déjà effacée.
+            }
+        });
+    }
+
+    /**
+     * Résout un chemin public {@code /uploads/...} en fichier réel.
+     *
+     * <p>Renvoie vide si le chemin n'est pas un chemin d'upload, s'il sort du
+     * dossier après normalisation (traversée), ou si le fichier n'existe pas.
+     * Utilisé par le téléchargement du logo et par la suppression : les deux
+     * doivent appliquer exactement la même règle de confinement.</p>
+     */
+    public Optional<java.nio.file.Path> resolveUploadedFile(String publicPath) {
+        if (publicPath == null || !publicPath.startsWith("/uploads/")) {
+            return Optional.empty();
         }
         try {
             String relative = publicPath.substring("/uploads/".length());
             java.nio.file.Path base = java.nio.file.Paths.get(appProperties.getUploadDir())
                     .toAbsolutePath().normalize();
             java.nio.file.Path file = base.resolve(relative).normalize();
-            if (file.startsWith(base)) {
-                java.nio.file.Files.deleteIfExists(file);
+            if (file.startsWith(base)
+                    && java.nio.file.Files.isRegularFile(file)
+                    && java.nio.file.Files.isReadable(file)) {
+                return Optional.of(file);
             }
         } catch (Exception e) {
-            // Un logo orphelin est préférable à une suppression impossible :
-            // la référence en base est déjà effacée.
+            // chemin illisible ou dossier d'upload absent
         }
+        return Optional.empty();
     }
 
     /**
@@ -298,7 +320,7 @@ public class SettingService {
      * fichier n'est jamais touché.
      */
     public void deleteReplacedLogo(String previousPublicPath) {
-        deleteLocalFile(previousPublicPath);
+        deleteUploadedFile(previousPublicPath);
     }
 
     private String text(String value) {

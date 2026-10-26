@@ -36,6 +36,8 @@ public class DocumentPreviewService {
             "APERÇU — DONNÉES DE DÉMONSTRATION, SANS VALEUR OFFICIELLE";
 
     private final SchoolDocumentTheme theme;
+    private final com.school.service.ReportService reportService;
+    private final CardSettingsService cardSettingsService;
 
     /**
      * Produit l'aperçu d'un type de document avec la configuration fournie.
@@ -365,50 +367,18 @@ public class DocumentPreviewService {
     /**
      * Carte scolaire (format ID-1, 85,6 × 54 mm).
      *
-     * <p>La carte réelle est dessinée au {@code PdfContentByte} dans
-     * {@code ReportService} : sa géométrie (deux faces, marges de sécurité)
-     * n'est pas pilotée par le thème. L'aperçu respecte donc le même format et
-     * montre seulement ce que le thème contrôle — couleurs, logo, typographie —
-     * au lieu de faire croire à un format A4 modifiable.</p>
+     * <p>L'aperçu rend la <b>carte réelle</b>, telle que la produit
+     * {@code ReportService} avec les réglages enregistrés dans la rubrique
+     * « Carte scolaire ».</p>
+     *
+     * <p>Il dessinait auparavant une maquette A4 sans rapport avec le document
+     * (bandeau coloré, tableau de cinq lignes) : l'administrateur croyait
+     * régler une carte qu'il n'aurait jamais. Le style de document ne pilote
+     * pas la carte — sa géométrie et ses composants sont réglés ailleurs —
+     * donc {@code s} n'est volontairement pas utilisé ici.</p>
      */
     public void studentCardPreview(HttpServletResponse response, DocumentStyle s) throws IOException {
-        com.lowagie.text.Rectangle carte = new com.lowagie.text.Rectangle(243f, 153f);
-        Document document = new Document(carte, 12, 12, 12, 12);
-        PdfWriter writer = theme.init(response, "apercu-carte", document, s);
-        document.open();
-        try {
-            PdfPTable bandeau = new PdfPTable(1);
-            bandeau.setWidthPercentage(100);
-            var cellBand = new com.lowagie.text.pdf.PdfPCell();
-            cellBand.setBackgroundColor(s.primary);
-            cellBand.setBorder(0);
-            cellBand.setPadding(6);
-
-            Paragraph ecole = new Paragraph(theme.schoolName(), s.whiteBold(9f));
-            cellBand.addElement(ecole);
-            Paragraph type = new Paragraph("CARTE SCOLAIRE " + theme.academicYear(),
-                    s.whiteBold(6.5f));
-            cellBand.addElement(type);
-            bandeau.addCell(cellBand);
-            document.add(bandeau);
-
-            document.add(new Paragraph(" ", s.body(4f)));
-
-            document.add(theme.infoTable(new String[][]{
-                    {"Nom", "TRAORÉ"},
-                    {"Prénom", "Aminata"},
-                    {"Matricule", "SE-2026-0042"},
-                    {"Classe", "6ème A"},
-                    {"Né(e) le", "12/04/2013"},
-            }, s));
-
-            Paragraph mention = new Paragraph("APERÇU — SANS VALEUR OFFICIELLE", s.muted(6f));
-            mention.setAlignment(Element.ALIGN_CENTER);
-            mention.setSpacingBefore(4);
-            document.add(mention);
-        } finally {
-            document.close();
-        }
+        reportService.studentCardPreviewPdf(response, cardSettingsService.config());
     }
 
     /**

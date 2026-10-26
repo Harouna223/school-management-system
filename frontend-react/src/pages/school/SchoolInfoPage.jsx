@@ -6,7 +6,7 @@ import {
 } from '@mui/material'
 import {
   Business, ContactPhone, Badge, Image as ImageIcon, Notes, Save, RestartAlt,
-  Visibility, CloudUpload, DeleteOutline, School as SchoolIcon,
+  Visibility, CloudUpload, DeleteOutline, School as SchoolIcon, Download,
 } from '@mui/icons-material'
 import PageHeader from '../../components/PageHeader'
 import ConfirmDialog from '../../components/ConfirmDialog'
@@ -15,6 +15,7 @@ import defaultLogo from '../../assets/logo.svg'
 import { useToast } from '../../hooks/useToast'
 import { settingsApi } from '../../api/endpoints'
 import { extractError } from '../../api/axios'
+import { downloadBlob } from '../../utils/format'
 
 const TYPES = [
   'École maternelle', 'École fondamentale', 'Lycée',
@@ -71,6 +72,7 @@ export default function SchoolInfoPage() {
   const [logoFile, setLogoFile] = useState(null)
   const [logoPreviewUrl, setLogoPreviewUrl] = useState(null)
   const [logoBusy, setLogoBusy] = useState(false)
+  const [logoDownloading, setLogoDownloading] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
 
@@ -191,6 +193,42 @@ export default function SchoolInfoPage() {
       setError(extractError(err))
     } finally {
       setLogoBusy(false)
+    }
+  }
+
+  /**
+   * Télécharge le fichier du logo tel qu'il est utilisé dans les documents PDF
+   * et sur la carte scolaire.
+   *
+   * Le serveur répond par un flux binaire : en cas d'erreur, le corps est
+   * aussi un blob, que `extractError` ne sait pas lire. On le décode donc
+   * nous-mêmes pour afficher le vrai motif (logo absent, fichier supprimé du
+   * disque) plutôt qu'un message générique.
+   */
+  const downloadLogo = async () => {
+    setLogoDownloading(true)
+    setError('')
+    try {
+      const { data, headers } = await settingsApi.downloadLogo()
+      const disposition = headers?.['content-disposition'] || ''
+      const match = /filename="([^"]+)"/.exec(disposition)
+      downloadBlob(data, match ? match[1] : 'logo-etablissement')
+      success('Logo téléchargé')
+    } catch (err) {
+      const body = err?.response?.data
+      if (body instanceof Blob) {
+        try {
+          const text = await body.text()
+          const parsed = JSON.parse(text)
+          setError(parsed?.message || 'Le logo ne peut pas être téléchargé.')
+        } catch {
+          setError('Le logo ne peut pas être téléchargé.')
+        }
+      } else {
+        setError(extractError(err))
+      }
+    } finally {
+      setLogoDownloading(false)
     }
   }
 
@@ -354,6 +392,17 @@ export default function SchoolInfoPage() {
               </Button>
               <Button variant="contained" onClick={uploadLogo} disabled={!logoFile || logoBusy}>
                 {logoBusy ? 'Enregistrement…' : 'Enregistrer le logo'}
+              </Button>
+              {/* Toujours actif : sans logo personnalisé, c'est le logo par
+                  défaut qui est imprimé sur les documents — et c'est donc lui
+                  que l'utilisateur doit pouvoir récupérer. */}
+              <Button variant="outlined" startIcon={<Download />}
+                onClick={downloadLogo}
+                disabled={logoDownloading}
+                title={form.logoUrl
+                  ? 'Enregistrer sur votre poste le fichier utilisé dans les documents et la carte'
+                  : "Aucun logo personnalisé : c'est le logo par défaut qui est imprimé, et c'est lui qui sera téléchargé"}>
+                {logoDownloading ? 'Téléchargement…' : 'Télécharger le logo'}
               </Button>
               {form.logoUrl && (
                 <Button color="error" variant="outlined" startIcon={<DeleteOutline />}

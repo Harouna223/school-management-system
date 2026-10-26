@@ -47,6 +47,7 @@ export const fr = {
   'nav.settings': 'Paramètres',
   'nav.appreciationScales': "Barèmes d'appréciation",
   'nav.schoolInfo': "Informations de l'établissement",
+  'nav.studentCard': 'Carte scolaire',
   'nav.documentTheme': "Modèles et apparence des documents",
   'nav.logout': 'Déconnexion',
 

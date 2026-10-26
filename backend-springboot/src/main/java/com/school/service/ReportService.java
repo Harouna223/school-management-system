@@ -20,7 +20,6 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -42,6 +41,7 @@ public class ReportService {
     private final SettingService settingService;
     private final QrCodeService qrCodeService;
     private final SchoolDocumentTheme documentTheme;
+    private final com.school.pdf.CardSettingsService cardSettingsService;
 
     // ---------- Palette des documents officiels (modèle de référence) ----------
 
@@ -50,9 +50,8 @@ public class ReportService {
     private static final Color GOLD = new Color(179, 144, 88);        // #b39058
     private static final Color GRAY_TEXT = new Color(122, 128, 138);  // #7a808a
     private static final Color FOOTER_GRAY = new Color(208, 213, 221);// #d0d5dd
-    private static final Color FLAG_GREEN = new Color(20, 181, 58);
-    private static final Color FLAG_YELLOW = new Color(252, 209, 22);
-    private static final Color FLAG_RED = new Color(206, 17, 38);
+    // Les trois couleurs du drapeau et de la bande tricolore sont désormais
+    // pilotées par CardConfig ; seule la teinte du filet du drapeau reste ici.
     private static final Color FLAG_BORDER = new Color(122, 128, 138);
 
     // ---------- Polices (Georgia si disponible, sinon Times) ----------
@@ -581,19 +580,76 @@ public class ReportService {
 
     /**
      * Carte d'identité scolaire ID-1 (85,6 × 54 mm) d'un élève, conforme au modèle malien de
-     * référence : bordure noire, emblème à gauche, République du Mali au centre, drapeau à droite,
-     * titre, bande tricolore VERT-JAUNE-ROUGE, établissement, champs d'identité, photo encadrée,
-     * signature du Directeur. Mise en page compacte et horizontale.
+     * référence, avec les réglages enregistrés dans la rubrique « Carte scolaire ».
+     *
+     * <p>Sans réglage enregistré, le rendu est exactement celui d'avant
+     * l'introduction de {@link com.school.pdf.CardConfig}.</p>
      */
     public void schoolIdCardPdf(HttpServletResponse response,
                                 com.school.dto.response.StudentResponse student)
             throws IOException {
+        renderStudentCard(response, student, cardSettingsService.config(), false);
+    }
+
+    /**
+     * Même carte, avec une configuration explicite et sans en-tête
+     * {@code attachment}.
+     *
+     * <p>Sert à l'aperçu de l'écran de réglage : il doit montrer la carte
+     * <b>réellement produite</b>. Un aperçu qui redessinerait une
+     * approximation ferait valider à l'administrateur un rendu qui n'existe
+     * pas — c'est précisément ce que faisait l'ancien aperçu de la carte, qui
+     * affichait un tableau A4 à la place du document.</p>
+     */
+    public void studentCardPreviewPdf(HttpServletResponse response,
+                                      com.school.dto.response.StudentResponse student,
+                                      com.school.pdf.CardConfig config) throws IOException {
+        renderStudentCard(response, student, config, true);
+    }
+
+    /**
+     * Aperçu de la carte avec une identité de <b>démonstration</b>.
+     *
+     * <p>L'identité fictive est définie ici, à côté du rendu qui la consomme :
+     * deux copies de cette fixture finiraient par diverger, et l'aperçu d'un
+     * écran ne montrerait plus la même chose que celui de l'autre. Aucune
+     * donnée réelle n'est lue — un écran de réglage ne doit pas exposer
+     * l'identité d'un élève inscrit.</p>
+     */
+    public void studentCardPreviewPdf(HttpServletResponse response,
+                                      com.school.pdf.CardConfig config) throws IOException {
+        studentCardPreviewPdf(response, demoStudent(), config);
+    }
+
+    private static com.school.dto.response.StudentResponse demoStudent() {
+        return com.school.dto.response.StudentResponse.builder()
+                .matricule("SE-2026-0042")
+                .lastName("TRAORÉ")
+                .firstName("Aminata")
+                .birthDate(java.time.LocalDate.of(2013, 4, 12))
+                .birthPlace("Bamako")
+                .gender(com.school.enums.Gender.FEMALE)
+                .className("6ème A")
+                .build();
+    }
+
+    /**
+     * Dessine la carte sur un calque absolu.
+     *
+     * <p><b>Géométrie figée</b> : 242,65 × 153,07 pt (CR80) et positions des
+     * blocs. Seuls les composants — présence, textes, couleurs, tailles de
+     * police bornées, champs imprimés — sont pilotés par la configuration. Une
+     * carte dont on pourrait déplacer librement les blocs ne tiendrait plus
+     * dans une pochette ni dans un lecteur de badge.</p>
+     */
+    private void renderStudentCard(HttpServletResponse response,
+                                   com.school.dto.response.StudentResponse student,
+                                   com.school.pdf.CardConfig cfg, boolean preview)
+            throws IOException {
         response.setContentType("application/pdf");
         response.setHeader("Content-Disposition",
-                "attachment; filename=\"carte-" + student.getMatricule() + ".pdf\"");
-        // Carte ID-1 : format normalisé (85,6 x 54 mm). Le type de document
-        // existe au catalogue pour ses options de contenu, mais sa géométrie
-        // n'est pas pilotable — un format libre la rendrait illisible.
+                (preview ? "inline" : "attachment")
+                        + "; filename=\"carte-" + student.getMatricule() + ".pdf\"");
         float w = 242.65f, h = 153.07f;
         Document document = new Document(new Rectangle(w, h), 0, 0, 0, 0);
         PdfWriter writer = PdfWriter.getInstance(document, response.getOutputStream());
@@ -604,102 +660,197 @@ public class ReportService {
                 appProperties.getSchool().getName());
         float cx = w / 2;
 
-        // --- Bordure noire fine tout autour de la carte ---
-        cb.saveState();
-        cb.setLineWidth(0.9f);
-        cb.setColorStroke(Color.BLACK);
-        cb.rectangle(3f, 3f, w - 6f, h - 6f);
-        cb.stroke();
-        cb.restoreState();
+        // --- Bordure (facultative) ---
+        if (cfg.showBorder) {
+            cb.saveState();
+            cb.setLineWidth(cfg.borderWidth);
+            cb.setColorStroke(cfg.borderColor);
+            cb.rectangle(3f, 3f, w - 6f, h - 6f);
+            cb.stroke();
+            cb.restoreState();
+        }
 
-        // --- Emblème / logo de l'établissement en haut à gauche ---
-        Image emblem = loadLogo();
+        // --- Emblème / logo en haut à gauche ---
+        //
+        // La pastille est carrée : scaleToFit + centrage plutôt que
+        // scaleAbsolute, qui écrasait un logo rectangulaire pour le forcer
+        // dans le carré. Un logo carré reste identique au pixel près.
+        Image emblem = emblemImage(cfg);
         if (emblem != null) {
-            emblem.scaleAbsolute(22f, 22f);
-            emblem.setAbsolutePosition(10f, h - 5f - 22f);
+            float size = cfg.emblemSize;
+            emblem.scaleToFit(size, size);
+            emblem.setAbsolutePosition(
+                    10f + (size - emblem.getScaledWidth()) / 2f,
+                    h - 5f - size + (size - emblem.getScaledHeight()) / 2f);
             document.add(emblem);
         }
 
         // --- Drapeau tricolore du Mali en haut à droite (VERT | JAUNE | ROUGE) ---
-        float fx = 211f, fy = h - 5f - 16f, fw = 24f, fh = 16f;
-        cb.saveState();
-        cb.setColorFill(FLAG_GREEN);
-        cb.rectangle(fx, fy, fw / 3, fh);
-        cb.fill();
-        cb.setColorFill(FLAG_YELLOW);
-        cb.rectangle(fx + fw / 3, fy, fw / 3, fh);
-        cb.fill();
-        cb.setColorFill(FLAG_RED);
-        cb.rectangle(fx + 2 * fw / 3, fy, fw / 3, fh);
-        cb.fill();
-        cb.setLineWidth(0.3f);
-        cb.setColorStroke(FLAG_BORDER);
-        cb.rectangle(fx, fy, fw, fh);
-        cb.stroke();
-        cb.restoreState();
+        if (cfg.showFlag) {
+            float fx = 211f, fy = h - 5f - 16f, fw = 24f, fh = 16f;
+            cb.saveState();
+            cb.setColorFill(cfg.bandGreen);
+            cb.rectangle(fx, fy, fw / 3, fh);
+            cb.fill();
+            cb.setColorFill(cfg.bandYellow);
+            cb.rectangle(fx + fw / 3, fy, fw / 3, fh);
+            cb.fill();
+            cb.setColorFill(cfg.bandRed);
+            cb.rectangle(fx + 2 * fw / 3, fy, fw / 3, fh);
+            cb.fill();
+            cb.setLineWidth(0.3f);
+            cb.setColorStroke(FLAG_BORDER);
+            cb.rectangle(fx, fy, fw, fh);
+            cb.stroke();
+            cb.restoreState();
+        }
 
         // --- En-tête institutionnel (centre) ---
-        centeredAt(cb, "RÉPUBLIQUE DU MALI", serifBold(7.5f, NAVY), cx, h - 12f);
-        centeredAt(cb, "Un Peuple – Un But – Une Foi", sans(4.2f, DARK_TEXT), cx, h - 19f);
-        centeredAt(cb, "Ministère de l'Éducation Nationale", sans(4.5f, DARK_TEXT), cx, h - 25f);
+        if (cfg.showHeader) {
+            if (!cfg.headerLine1.isBlank()) {
+                centeredAt(cb, cfg.headerLine1, serifBold(7.5f, cfg.headingColor), cx, h - 12f);
+            }
+            if (!cfg.headerLine2.isBlank()) {
+                centeredAt(cb, cfg.headerLine2, sans(4.2f, cfg.textColor), cx, h - 19f);
+            }
+            if (!cfg.headerLine3.isBlank()) {
+                centeredAt(cb, cfg.headerLine3, sans(4.5f, cfg.textColor), cx, h - 25f);
+            }
+        }
 
         // --- Titre ---
-        centeredAt(cb, "CARTE D'IDENTITÉ SCOLAIRE", serifBold(8.5f, NAVY), cx, h - 33f);
+        // Position fixe, que l'en-tête soit affiché ou non : déplacer le titre
+        // selon la présence de l'en-tête produirait un blanc sous la bande
+        // tricolore, plus gênant que la marge laissée en haut.
+        if (!cfg.title.isBlank()) {
+            centeredAt(cb, cfg.title, serifBold(cfg.titleSize, cfg.headingColor), cx, h - 33f);
+        }
 
-        // --- Bande tricolore horizontale VERT | JAUNE | ROUGE (sous le titre) ---
-        float bandTop = h - 38f;
-        float bandBottom = h - 44f;
-        cb.saveState();
-        cb.setColorFill(FLAG_GREEN);
-        cb.rectangle(8f, bandBottom, (w - 16f) / 3, bandTop - bandBottom);
-        cb.fill();
-        cb.setColorFill(FLAG_YELLOW);
-        cb.rectangle(8f + (w - 16f) / 3, bandBottom, (w - 16f) / 3, bandTop - bandBottom);
-        cb.fill();
-        cb.setColorFill(FLAG_RED);
-        cb.rectangle(8f + 2 * (w - 16f) / 3, bandBottom, (w - 16f) / 3, bandTop - bandBottom);
-        cb.fill();
-        cb.restoreState();
+        // --- Bande tricolore horizontale (sous le titre) ---
+        if (cfg.showBand) {
+            float bandTop = h - 38f;
+            float bandBottom = h - 44f;
+            cb.saveState();
+            cb.setColorFill(cfg.bandGreen);
+            cb.rectangle(8f, bandBottom, (w - 16f) / 3, bandTop - bandBottom);
+            cb.fill();
+            cb.setColorFill(cfg.bandYellow);
+            cb.rectangle(8f + (w - 16f) / 3, bandBottom, (w - 16f) / 3, bandTop - bandBottom);
+            cb.fill();
+            cb.setColorFill(cfg.bandRed);
+            cb.rectangle(8f + 2 * (w - 16f) / 3, bandBottom, (w - 16f) / 3, bandTop - bandBottom);
+            cb.fill();
+            cb.restoreState();
+        }
 
         // --- Nom de l'établissement (sous la bande) ---
-        centeredAt(cb, schoolName != null ? schoolName.toUpperCase() : "ÉTABLISSEMENT SCOLAIRE",
-                serifBold(6.5f, DARK_TEXT), cx, h - 51f);
+        if (cfg.showSchoolName) {
+            centeredAt(cb, schoolName != null ? schoolName.toUpperCase() : "ÉTABLISSEMENT SCOLAIRE",
+                    serifBold(cfg.schoolNameSize, cfg.textColor), cx, h - 51f);
+        }
 
         // --- Cadre photo (droite) ---
         float frameX = 163f, frameY = h - 133f, frameW = 71f, frameH = 74f;
-        cb.saveState();
-        cb.setLineWidth(1.1f);
-        cb.setColorStroke(NAVY);
-        cb.rectangle(frameX, frameY, frameW, frameH);
-        cb.stroke();
-        cb.restoreState();
+        if (cfg.showPhotoFrame) {
+            cb.saveState();
+            cb.setLineWidth(1.1f);
+            cb.setColorStroke(cfg.photoFrameColor);
+            cb.rectangle(frameX, frameY, frameW, frameH);
+            cb.stroke();
+            cb.restoreState();
+        }
 
         // --- Photo de l'élève (centrée dans le cadre, avec marge intérieure) ---
+        // Imprimée même si le cadre est masqué : le cadre est une décoration,
+        // la photo est une donnée d'identification.
         Image photo = loadPhoto(student.getPhoto());
         if (photo != null) {
             photo.scaleToFit(48f, 56f);
             float pw = photo.getScaledWidth();
             float ph = photo.getScaledHeight();
-            photo.setAbsolutePosition(frameX + (frameW - pw) / 2f, h - 133f + (frameH - ph) / 2f);
+            photo.setAbsolutePosition(frameX + (frameW - pw) / 2f, frameY + (frameH - ph) / 2f);
             document.add(photo);
         }
 
         // --- Champs d'identité (gauche, compact) ---
-        addCardFieldAt(cb, "Nom : ", student.getLastName(), h - 61f);
-        addCardFieldAt(cb, "Prénom(s) : ", student.getFirstName(), h - 69.5f);
-        addCardFieldAt(cb, "Matricule : ", student.getMatricule(), h - 78f);
-        addCardFieldAt(cb, "Date de naissance : ", birthDate(student), h - 86.5f);
-        addCardFieldAt(cb, "Lieu de naissance : ",
-                student.getBirthPlace() != null ? student.getBirthPlace() : "—", h - 95f);
-        addCardFieldAt(cb, "Sexe : ", genderLabel(student.getGender()), h - 103.5f);
-        addCardFieldAt(cb, "Classe : ",
-                student.getClassName() != null ? student.getClassName() : "—", h - 112f);
+        //
+        // Interligne fixe de 8,5 pt : sept champs occupent la zone entre
+        // h-61 et h-112, au-dessus du pied de carte. C'est ce qui borne le
+        // nombre de champs à CardConfig.MAX_FIELDS.
+        int index = 0;
+        for (com.school.pdf.CardConfig.Field field : cfg.fields) {
+            addCardFieldAt(cb, cfg, field.label() + " : ", cardFieldValue(student, field),
+                    h - 61f - index * 8.5f);
+            index++;
+        }
+
+        // --- Logo de l'établissement (bas à droite, facultatif) ---
+        //
+        // Borné à 16 pt quand le cadre photo est affiché : le cadre descend
+        // jusqu'à y = 20, et un logo plus haut mordrait dessus. La borne est
+        // appliquée ici et non dans la validation, car elle dépend de la
+        // présence du cadre — un réglage enregistré à 24 pt reste valable si
+        // l'administrateur masque ensuite le cadre.
+        if (cfg.showSchoolLogo) {
+            Image logo = loadLogo();
+            if (logo != null) {
+                float size = cfg.showPhotoFrame ? Math.min(cfg.schoolLogoSize, 16f) : cfg.schoolLogoSize;
+                logo.scaleToFit(size, size);
+                logo.setAbsolutePosition(w - 4f - logo.getScaledWidth(), 3f);
+                document.add(logo);
+            }
+        }
 
         // --- Signature et cachet du Directeur (bas à gauche) ---
-        leftTextAt(cb, "Signature et cachet du Directeur", sansBold(6f, DARK_TEXT), 8f, h - 143f);
+        if (!cfg.footerText.isBlank()) {
+            leftTextAt(cb, cfg.footerText, sansBold(6f, cfg.textColor), 8f, h - 143f);
+        }
+
+        // --- Mention d'aperçu (jamais sur la carte d'un élève) ---
+        //
+        // Sans elle, l'aperçu est indiscernable d'une carte réelle : il
+        // reprend le logo et le nom de l'établissement, et ne se distingue
+        // que par les données de démonstration. Un document imprimé par
+        // erreur depuis cet écran porterait une identité d'élève plausible.
+        if (preview) {
+            leftTextAt(cb, "APERÇU — SANS VALEUR OFFICIELLE", sans(4f, GRAY_TEXT),
+                    w / 2f + 8f, h - 143f);
+        }
         } finally {
             safeClose(document);
         }
+    }
+
+    /** Valeur imprimée d'un champ d'identité, « — » si la donnée est absente. */
+    private String cardFieldValue(com.school.dto.response.StudentResponse student,
+                                  com.school.pdf.CardConfig.Field field) {
+        return switch (field) {
+            case LAST_NAME -> student.getLastName();
+            case FIRST_NAME -> student.getFirstName();
+            case MATRICULE -> student.getMatricule();
+            case BIRTH_DATE -> birthDate(student);
+            case BIRTH_PLACE -> student.getBirthPlace() != null ? student.getBirthPlace() : "—";
+            case GENDER -> genderLabel(student.getGender());
+            case CLASS_NAME -> student.getClassName() != null ? student.getClassName() : "—";
+        };
+    }
+
+    /**
+     * Image de la pastille : emblème téléversé, logo de l'école, ou rien.
+     *
+     * <p>Si l'emblème est choisi mais qu'aucun fichier n'a été téléversé, le
+     * logo de l'école est utilisé : un coin vide sur un document imprimé se
+     * lit comme un défaut d'impression. L'écran de réglage signale cet état.</p>
+     */
+    private Image emblemImage(com.school.pdf.CardConfig cfg) {
+        if (cfg.emblemSource == com.school.pdf.CardConfig.EmblemSource.NONE) {
+            return null;
+        }
+        if (cfg.emblemSource == com.school.pdf.CardConfig.EmblemSource.EMBLEM) {
+            Image uploaded = loadUploadedImage(cardSettingsService.emblemUrl());
+            return uploaded != null ? uploaded : loadLogo();
+        }
+        return loadLogo();
     }
 
     private String genderLabel(com.school.enums.Gender gender) {
@@ -712,10 +863,11 @@ public class ReportService {
         };
     }
 
-    private void addCardFieldAt(PdfContentByte cb, String label, String value, float y) {
+    private void addCardFieldAt(PdfContentByte cb, com.school.pdf.CardConfig cfg,
+                                String label, String value, float y) {
         Phrase p = new Phrase();
-        p.add(new Chunk(label, sansBold(6f, NAVY)));
-        p.add(new Chunk(value != null ? value : "—", sans(6.2f, DARK_TEXT)));
+        p.add(new Chunk(label, sansBold(6f, cfg.headingColor)));
+        p.add(new Chunk(value != null ? value : "—", sans(6.2f, cfg.textColor)));
         ColumnText.showTextAligned(cb, Element.ALIGN_LEFT, p, 7f, y, 0);
     }
 
@@ -960,19 +1112,14 @@ public class ReportService {
         return city.matches("^[A-Za-zÀ-ÿ' .-]+$") ? city : "";
     }
 
+    /**
+     * Logo de l'établissement : fichier téléversé s'il existe, sinon l'image
+     * livrée avec l'application, sinon rien.
+     */
     private Image loadLogo() {
-        String logoUrl = settingService.value(SettingService.SCHOOL_LOGO, "");
-        if (logoUrl != null && logoUrl.startsWith("/uploads/")) {
-            String relative = logoUrl.substring("/uploads/".length());
-            Path uploadDir = Paths.get(appProperties.getUploadDir()).toAbsolutePath().normalize();
-            File file = uploadDir.resolve(relative).normalize().toFile();
-            try {
-                if (file.getCanonicalPath().startsWith(uploadDir.toRealPath().toString())) {
-                    return Image.getInstance(file.toURI().toURL());
-                }
-            } catch (Exception ignored) {
-                // fichier hors du dossier uploads : ignorer
-            }
+        Image uploaded = loadUploadedImage(settingService.value(SettingService.SCHOOL_LOGO, ""));
+        if (uploaded != null) {
+            return uploaded;
         }
         try (InputStream in = getClass().getResourceAsStream("/static/school-logo.png")) {
             if (in != null) {
@@ -980,6 +1127,30 @@ public class ReportService {
             }
         } catch (Exception ignored) {
             // aucun logo disponible
+        }
+        return null;
+    }
+
+    /**
+     * Charge une image de {@code /uploads/...}.
+     *
+     * <p>Le confinement au dossier d'uploads est délégué à
+     * {@link SettingService#resolveUploadedFile(String)} : c'est la même règle
+     * que celle appliquée à la suppression et au téléchargement du logo. Trois
+     * copies de ce contrôle finiraient par diverger, et c'est la plus
+     * permissive qui gagnerait.</p>
+     *
+     * @return {@code null} si le chemin est absent, hors uploads, ou illisible
+     */
+    private Image loadUploadedImage(String publicPath) {
+        java.util.Optional<Path> file = settingService.resolveUploadedFile(publicPath);
+        if (file.isEmpty()) {
+            return null;
+        }
+        try {
+            return Image.getInstance(file.get().toUri().toURL());
+        } catch (Exception ignored) {
+            // image absente, hors uploads ou illisible
         }
         return null;
     }
@@ -995,20 +1166,7 @@ public class ReportService {
     }
 
     private Image loadPhoto(String photoUrl) {
-        if (photoUrl == null || !photoUrl.startsWith("/uploads/")) {
-            return null;
-        }
-        try {
-            String relative = photoUrl.substring("/uploads/".length());
-            Path uploadDir = Paths.get(appProperties.getUploadDir()).toAbsolutePath().normalize();
-            File file = uploadDir.resolve(relative).normalize().toFile();
-            if (file.getCanonicalPath().startsWith(uploadDir.toRealPath().toString())) {
-                return Image.getInstance(file.toURI().toURL());
-            }
-        } catch (Exception ignored) {
-            // photo manquante, hors uploads ou illisible : carte sans photo
-        }
-        return null;
+        return loadUploadedImage(photoUrl);
     }
 
     // ---------- Excel ----------

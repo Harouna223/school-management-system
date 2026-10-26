@@ -47,6 +47,7 @@ export const en = {
   'nav.settings': 'Settings',
   'nav.appreciationScales': 'Grading scales',
   'nav.schoolInfo': 'School information',
+  'nav.studentCard': 'Student card',
   'nav.documentTheme': "Document templates and appearance",
   'nav.logout': 'Log out',
 

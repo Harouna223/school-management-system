@@ -272,6 +272,37 @@ export const settingsApi = {
   schoolInfo: () => api.get('/settings/school'),
   updateSchoolInfo: (values) => api.put('/settings/school', values),
   deleteLogo: () => api.delete('/settings/logo'),
+  /**
+   * Téléchargement du logo de l'établissement.
+   *
+   * Le fichier n'est pas pris sur `/uploads/...` : cette route exige le jeton
+   * dans l'en-tête `Authorization`, qu'un lien direct ne peut pas envoyer, et
+   * elle répond en `inline` avec un nom de fichier en UUID. Ici le nom est
+   * lisible et le téléchargement est forcé par le serveur.
+   */
+  downloadLogo: () => api.get('/settings/logo/download', { responseType: 'blob' }),
+}
+
+/**
+ * Carte scolaire : composants, emblème et aperçu.
+ *
+ * `preview` renvoie un PDF construit avec un élève de démonstration : aucune
+ * donnée réelle n'est lue ni écrite.
+ */
+export const studentCardApi = {
+  get: () => api.get('/settings/card'),
+  defaults: () => api.get('/settings/card/defaults'),
+  save: (config) => api.put('/settings/card', config),
+  reset: () => api.delete('/settings/card'),
+  uploadEmblem: (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.post('/settings/card/emblem', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
+  deleteEmblem: () => api.delete('/settings/card/emblem'),
+  preview: (config) => api.post('/settings/card/preview', config, { responseType: 'blob' }),
 }
 
 /**
