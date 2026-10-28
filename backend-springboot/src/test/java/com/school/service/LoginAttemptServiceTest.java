@@ -1,6 +1,7 @@
 package com.school.service;
 
 import com.school.entity.User;
+import com.school.exception.TooManyLoginAttemptsException;
 import com.school.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -8,11 +9,16 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -139,5 +145,93 @@ class LoginAttemptServiceTest {
                     .as("propagation de " + methode)
                     .isEqualTo(org.springframework.transaction.annotation.Propagation.REQUIRES_NEW);
         }
+    }
+
+    // ---------------------------------------------------- limitation par IP
+
+    private static final String IP = "10.0.0.1";
+
+    private void seuilParIp(int seuil) {
+        ReflectionTestUtils.setField(service, "maxFailuresPerIp", seuil);
+    }
+
+    private void echouer(String ip, int fois) {
+        for (int i = 0; i < fois; i++) {
+            service.registerIpFailure(ip);
+        }
+    }
+
+    private long secondesRestantes(String ip) {
+        try {
+            service.assertIpAllowed(ip);
+            return 0L;
+        } catch (TooManyLoginAttemptsException ex) {
+            return ex.getRetryAfterSeconds();
+        }
+    }
+
+    /** Force l'échéance du blocage dans le passé pour observer le palier suivant. */
+    @SuppressWarnings("unchecked")
+    private void faireExpirerLeBlocage(String ip) throws Exception {
+        var champ = LoginAttemptService.class.getDeclaredField("ipFailures");
+        champ.setAccessible(true);
+        Object failures = ((Map<String, Object>) champ.get(service)).get(ip);
+        var champBlocage = failures.getClass().getDeclaredField("blockedUntil");
+        champBlocage.setAccessible(true);
+        champBlocage.set(failures, Instant.now().minusSeconds(1));
+    }
+
+    @Test
+    @DisplayName("sous le seuil, une IP n'est jamais bloquée")
+    void ipSousLeSeuilNEstPasBloquee() {
+        seuilParIp(3);
+        echouer(IP, 2);
+
+        assertThatCode(() -> service.assertIpAllowed(IP)).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("au seuil, l'IP est bloquée et le délai restant est annoncé (429)")
+    void ipAuSeuilEstBloquee() {
+        seuilParIp(3);
+        echouer(IP, 3);
+
+        assertThatThrownBy(() -> service.assertIpAllowed(IP))
+                .isInstanceOf(TooManyLoginAttemptsException.class)
+                .hasMessageContaining("Trop de tentatives")
+                .satisfies(ex -> assertThat(((TooManyLoginAttemptsException) ex).getRetryAfterSeconds())
+                        .isBetween(1L, 60L));
+    }
+
+    @Test
+    @DisplayName("le blocage est progressif : 1 minute, puis 5 minutes")
+    void blocageProgressif() throws Exception {
+        seuilParIp(2);
+        echouer(IP, 2);
+        assertThat(secondesRestantes(IP)).as("premier blocage").isBetween(1L, 60L);
+
+        faireExpirerLeBlocage(IP);
+        echouer(IP, 2);
+
+        assertThat(secondesRestantes(IP)).as("second blocage").isBetween(240L, 300L);
+    }
+
+    @Test
+    @DisplayName("une connexion réussie remet le compteur de l'IP à zéro")
+    void resetIpEffaceLesEchecs() {
+        seuilParIp(2);
+        echouer(IP, 2);
+        service.resetIp(IP);
+
+        assertThatCode(() -> service.assertIpAllowed(IP)).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("un blocage ne concerne que l'IP fautive")
+    void blocageLimiteALaSeuleIp() {
+        seuilParIp(2);
+        echouer(IP, 2);
+
+        assertThatCode(() -> service.assertIpAllowed("10.0.0.2")).doesNotThrowAnyException();
     }
 }

@@ -83,10 +83,12 @@ class AuthLockoutIT extends AbstractIntegrationTest {
         }
 
         // Un mot de passe CORRECT ne doit plus passer : le verrou est actif.
+        // La reponse est uniformisee (401 "Identifiants incorrects") pour ne pas
+        // reveler qu'un compte existe et qu'il est verrouille.
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"username\":\"" + ADMIN + "\",\"password\":\"" + ADMIN_PASSWORD + "\"}"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

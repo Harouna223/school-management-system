@@ -75,6 +75,13 @@ public class FinanceService {
         return PageResponse.from(result, InvoiceResponse::from);
     }
 
+    /** Toutes les factures visibles pour un export (pages bornées). */
+    public List<InvoiceResponse> allInvoicesForExport(AccessControlService.StudentScope scope,
+                                                      InvoiceStatus status) {
+        return PageResponse.collectAll(page ->
+                searchInvoices(scope, status, page, Pagination.MAX_SIZE));
+    }
+
     public List<InvoiceResponse> invoicesOfStudent(Long studentId) {
         return invoiceRepository.findByStudentId(studentId).stream()
                 .map(InvoiceResponse::from).toList();
@@ -151,6 +158,14 @@ public class FinanceService {
         return PageResponse.from(result, PaymentResponse::from);
     }
 
+    /** Tous les paiements visibles pour un export (pages bornées). */
+    public List<PaymentResponse> allPaymentsForExport(AccessControlService.StudentScope scope,
+                                                      PaymentMethod method,
+                                                      LocalDate from, LocalDate to) {
+        return PageResponse.collectAll(page ->
+                searchPayments(scope, method, from, to, page, Pagination.MAX_SIZE));
+    }
+
     public List<PaymentResponse> paymentsOfStudent(Long studentId) {
         return paymentRepository.findByStudentId(studentId).stream()
                 .map(PaymentResponse::from).toList();
@@ -217,6 +232,12 @@ public class FinanceService {
         Pageable pageable = Pagination.of(page, size, Sort.by("expenseDate").descending());
         Page<Expense> result = expenseRepository.search(categoryId, from, to, pageable);
         return PageResponse.from(result, ExpenseResponse::from);
+    }
+
+    /** Toutes les dépenses visibles pour un export (pages bornées). */
+    public List<ExpenseResponse> allExpensesForExport(Long categoryId, LocalDate from, LocalDate to) {
+        return PageResponse.collectAll(page ->
+                searchExpenses(categoryId, from, to, page, Pagination.MAX_SIZE));
     }
 
     @Transactional

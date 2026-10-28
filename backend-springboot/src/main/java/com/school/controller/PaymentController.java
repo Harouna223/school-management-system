@@ -141,7 +141,7 @@ public class PaymentController {
                                   @RequestParam(required = false) LocalDate to) throws IOException {
         var scope = accessControlService.resolveStudentScope(studentId);
         List<PaymentResponse> payments = financeService
-                .searchPayments(scope, method, from, to, 0, 10000).getContent();
+                .allPaymentsForExport(scope, method, from, to);
         String[] headers = new String[]{"Reçu", "Élève", "Matricule", "Facture", "Montant", "Mode", "Date", "Enregistré par"};
         List<String[]> rows = paymentRows(payments);
         java.math.BigDecimal total = payments.stream()
@@ -159,8 +159,7 @@ public class PaymentController {
                                   @RequestParam(required = false) InvoiceStatus status) throws IOException {
         var scope = accessControlService.resolveStudentScope(studentId);
         List<InvoiceResponse> invoices = financeService
-                .searchInvoices(scope, status, 0, 10000)
-                .getContent();
+                .allInvoicesForExport(scope, status);
         String[] headers = new String[]{"N° Facture", "Élève", "Matricule", "Frais", "Montant", "Payé", "Restant", "Statut", "Échéance"};
         List<String[]> rows = invoiceRows(invoices);
         java.math.BigDecimal total = invoices.stream()
@@ -200,7 +199,7 @@ public class PaymentController {
                                     @RequestParam(required = false) LocalDate to) throws IOException {
         var scope = accessControlService.resolveStudentScope(studentId);
         List<PaymentResponse> payments = financeService
-                .searchPayments(scope, method, from, to, 0, 10000).getContent();
+                .allPaymentsForExport(scope, method, from, to);
         reportService.exportExcel(response,
                 new String[]{"Reçu", "Élève", "Matricule", "Facture", "Montant", "Mode", "Date", "Enregistré par"},
                 paymentRows(payments), "paiements");
@@ -213,8 +212,7 @@ public class PaymentController {
                                     @RequestParam(required = false) InvoiceStatus status) throws IOException {
         var scope = accessControlService.resolveStudentScope(studentId);
         List<InvoiceResponse> invoices = financeService
-                .searchInvoices(scope, status, 0, 10000)
-                .getContent();
+                .allInvoicesForExport(scope, status);
         reportService.exportExcel(response,
                 new String[]{"N° Facture", "Élève", "Matricule", "Frais", "Montant", "Payé", "Restant", "Statut", "Échéance"},
                 invoiceRows(invoices), "factures");

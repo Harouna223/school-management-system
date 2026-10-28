@@ -117,6 +117,9 @@ class AttendanceServiceTest {
     private PhoneNumberService phoneNumberService;
 
     @Mock
+    private AccessControlService accessControlService;
+
+    @Mock
     private HttpServletRequest httpRequest;
 
     @InjectMocks
@@ -235,18 +238,20 @@ class AttendanceServiceTest {
     }
 
     @Test
-    @DisplayName("record rattache la presence a la classe de l'eleve, pas a celle de la requete")
-    void recordRattacheLaClasseDeLEleve() {
+    @DisplayName("record refuse un eleve qui n'appartient pas a la classe pointee")
+    void recordRefuseUnEleveHorsDeLaClasse() {
         Student a = eleve(6L, 8L, null);
         when(studentRepository.findById(6L)).thenReturn(Optional.of(a));
-        when(attendanceRepository.findByStudentIdAndDate(anyLong(), eq(jour))).thenReturn(Optional.empty());
-        saveAttendanceRenvoieSonArgument();
 
-        ArgumentCaptor<Attendance> captor = ArgumentCaptor.forClass(Attendance.class);
-        attendanceService.record(requete(3L, entree(6L, AttendanceStatus.PRESENT)), httpRequest);
-        verify(attendanceRepository).save(captor.capture());
+        // Auparavant la presence etait enregistree sous la classe 8 alors que la
+        // requete visait la classe 3 : un enseignant affecte a la classe 3
+        // pouvait ainsi ecrire une presence hors de son perimetre.
+        assertThatThrownBy(() -> attendanceService.record(
+                requete(3L, entree(6L, AttendanceStatus.PRESENT)), httpRequest))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("n'appartient pas à la classe");
 
-        assertThat(captor.getValue().getSchoolClass().getId()).isEqualTo(8L);
+        verify(attendanceRepository, never()).save(any(Attendance.class));
     }
 
     @Test

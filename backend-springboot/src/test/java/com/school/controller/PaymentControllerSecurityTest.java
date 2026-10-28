@@ -55,12 +55,15 @@ class PaymentControllerSecurityTest {
     @Mock private ReportService reportService;
     @Mock private StudentRepository studentRepository;
     @Mock private ParentRepository parentRepository;
+    @Mock private com.school.repository.TeacherRepository teacherRepository;
+    @Mock private com.school.repository.SubjectAssignmentRepository subjectAssignmentRepository;
 
     private PaymentController controller;
 
     @BeforeEach
     void setUp() {
-        AccessControlService accessControl = new AccessControlService(studentRepository, parentRepository);
+        AccessControlService accessControl = new AccessControlService(studentRepository, parentRepository,
+                teacherRepository, subjectAssignmentRepository);
         controller = new PaymentController(financeService, reportService, accessControl);
         // lenient : le stub n'est sollicité que par les tests qui atteignent le service.
         org.mockito.Mockito.lenient().when(financeService.searchPayments(

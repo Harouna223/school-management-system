@@ -10,6 +10,7 @@ import com.school.entity.Role;
 import com.school.entity.User;
 import com.school.exception.BusinessException;
 import com.school.exception.TokenRefreshException;
+import com.school.exception.TooManyLoginAttemptsException;
 import com.school.repository.RefreshTokenRepository;
 import com.school.repository.RoleRepository;
 import com.school.repository.UserRepository;
@@ -46,6 +47,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -103,13 +105,28 @@ class AuthServiceTest {
         user.setLockedUntil(LocalDateTime.now().plusMinutes(10));
         when(userRepository.findByUsername("prof1")).thenReturn(Optional.of(user));
 
+        // Réponse volontairement INDISTINGUABLE d'un mot de passe faux : un
+        // message « compte verrouillé » permettait de cartographier les comptes.
         assertThatThrownBy(() -> service.login(connexion("prof1", "MotDePasse1"), httpRequest))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("verrouillé");
+                .isInstanceOf(BadCredentialsException.class)
+                .hasMessage("Identifiants incorrects");
 
         // Le point important : on n'a pas vérifié le mot de passe, donc un mot de passe
         // correct ne contourne pas le verrou.
         verifyNoInteractions(authenticationManager);
+        verify(loginAttemptService).registerIpFailure("unknown");
+    }
+
+    @Test
+    @DisplayName("une IP bloquée est refusée avant toute lecture de compte")
+    void ipBloqueeRefuseAvantLectureDuCompte() {
+        doThrow(new TooManyLoginAttemptsException(60))
+                .when(loginAttemptService).assertIpAllowed(anyString());
+
+        assertThatThrownBy(() -> service.login(connexion("prof1", "MotDePasse1"), httpRequest))
+                .isInstanceOf(TooManyLoginAttemptsException.class);
+
+        verifyNoInteractions(userRepository, authenticationManager);
     }
 
     @Test
@@ -179,27 +196,28 @@ class AuthServiceTest {
     }
 
     @Test
-    @DisplayName("un compte désactivé est refusé par un message dédié, sans compteur d'échecs")
+    @DisplayName("un compte désactivé renvoie la même réponse générique qu'un mot de passe faux")
     void compteDesactiveRefuse() {
         when(authenticationManager.authenticate(any()))
                 .thenThrow(new DisabledException("compte désactivé"));
 
         assertThatThrownBy(() -> service.login(connexion("prof1", "MotDePasse1"), httpRequest))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("désactivé");
+                .isInstanceOf(BadCredentialsException.class)
+                .hasMessage("Identifiants incorrects");
 
         verify(userRepository, never()).save(any());
+        verify(loginAttemptService).registerIpFailure("unknown");
     }
 
     @Test
-    @DisplayName("un verrou Spring Security est traduit en message dédié")
+    @DisplayName("un verrou Spring Security renvoie la même réponse générique")
     void verrouSpringSecurityTraduit() {
         when(authenticationManager.authenticate(any()))
                 .thenThrow(new LockedException("compte verrouillé"));
 
         assertThatThrownBy(() -> service.login(connexion("prof1", "MotDePasse1"), httpRequest))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Contactez l'administrateur");
+                .isInstanceOf(BadCredentialsException.class)
+                .hasMessage("Identifiants incorrects");
     }
 
     @Test
@@ -231,14 +249,18 @@ class AuthServiceTest {
     // ------------------------------------------------------------------
 
     @Test
-    @DisplayName("un jeton de rafraîchissement inconnu est refusé")
+    @DisplayName("un jeton de rafraîchissement inconnu est refusé sans jamais recopier sa valeur")
     void refreshJetonInconnuRefuse() {
-        when(refreshTokenRepository.findByToken(AuthService.hashRefreshToken("inconnu")))
+        String jeton = "jeton-secret-qui-ne-doit-jamais-apparaitre";
+        when(refreshTokenRepository.findByToken(AuthService.hashRefreshToken(jeton)))
                 .thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.refresh(new RefreshTokenRequest("inconnu")))
+        assertThatThrownBy(() -> service.refresh(new RefreshTokenRequest(jeton)))
                 .isInstanceOf(TokenRefreshException.class)
-                .hasMessageContaining("inconnu");
+                .hasMessageContaining("inconnu")
+                // Le message part au client et dans les journaux : y inclure le
+                // jeton revenait à publier un secret à chaque refus.
+                .hasMessageNotContaining(jeton);
     }
 
     @Test
@@ -657,6 +679,8 @@ class AuthServiceTest {
 
         assertThat(user.getPassword()).isEqualTo("hache-nouveau");
         verify(userRepository).save(user);
+        // Les sessions ouvertes avec l'ancien mot de passe doivent expirer.
+        verify(refreshTokenRepository).deleteByUserId(1L);
         verify(auditService).log(eq("PASSWORD_CHANGE"), eq("User"), eq(1L), anyString(), isNull());
     }
 

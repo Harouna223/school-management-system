@@ -53,6 +53,7 @@ public class StudentService {
     private final AuthService authService;
     private final AuditService auditService;
     private final FileStorageService fileStorageService;
+    private final AccessControlService accessControlService;
 
     @Transactional(readOnly = true)
     public PageResponse<StudentResponse> search(String search, Long classId,
@@ -76,10 +77,33 @@ public class StudentService {
             result = selfId == null
                     ? new PageImpl<>(java.util.List.of(), pageable, 0)
                     : studentRepository.searchOwnProfile(selfId, search, classId, status, cycle, pageable);
+        } else if (accessControlService.isRestrictedTeacher()) {
+            // Un enseignant ne voit que les élèves des classes où il est affecté.
+            // Sans affectation la liste est VIDE (jamais l'établissement entier) ;
+            // une classe hors périmètre est refusée même si elle est demandée.
+            if (classId != null) {
+                accessControlService.assertCanAccessClass(classId);
+            }
+            List<Long> classIds = accessControlService.teacherClassIds();
+            result = classIds == null || classIds.isEmpty()
+                    ? new PageImpl<>(java.util.List.of(), pageable, 0)
+                    : studentRepository.searchByClassIds(classIds, search, classId, status, cycle, pageable);
         } else {
             result = studentRepository.search(search, classId, status, cycle, pageable);
         }
         return PageResponse.from(result, StudentResponse::from);
+    }
+
+    /**
+     * Toutes les lignes visibles par le compte courant pour un export, sans
+     * dépasser le plafond de pagination : l'ancien appel unique
+     * {@code size=10000} est refusé par {@link Pagination} (400) et n'aurait de
+     * toute façon pas tenu dans une seule page.
+     */
+    @Transactional(readOnly = true)
+    public List<StudentResponse> allForExport(String search, Long classId) {
+        return PageResponse.collectAll(page ->
+                search(search, classId, null, null, page, Pagination.MAX_SIZE));
     }
 
     @Transactional(readOnly = true)

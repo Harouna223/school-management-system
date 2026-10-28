@@ -6,6 +6,7 @@ import com.school.entity.Role;
 import com.school.entity.User;
 import com.school.exception.BusinessException;
 import com.school.exception.ResourceNotFoundException;
+import com.school.repository.RefreshTokenRepository;
 import com.school.repository.RoleRepository;
 import com.school.repository.UserRepository;
 import com.school.utils.PasswordPolicy;
@@ -44,6 +45,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuditService auditService;
 
@@ -113,6 +115,13 @@ public class UserService {
         user.setEnabled(enabled);
         user.setLockedUntil(null);
         user.setFailedAttempts(0);
+        if (!enabled) {
+            // Désactiver un compte doit couper la session en cours : sinon le
+            // refresh token continuait d'émettre des jetons d'accès valides.
+            // À la réactivation, ces jetons ayant été SUPPRIMÉS, aucun ancien
+            // refresh token ne redevient utilisable.
+            refreshTokenRepository.deleteByUserId(id);
+        }
         UserResponse saved = UserResponse.from(userRepository.save(user));
         auditService.log("TOGGLE_ENABLED", "User", id,
                 "Compte " + saved.getUsername() + (enabled ? " activé" : " désactivé"), httpRequest);
@@ -139,6 +148,9 @@ public class UserService {
         user.setFailedAttempts(0);
         user.setLockedUntil(null);
         userRepository.save(user);
+        // Le mot de passe vient de changer : toutes les sessions ouvertes avec
+        // l'ancien doivent expirer (jetons de rafraîchissement supprimés).
+        refreshTokenRepository.deleteByUserId(id);
         auditService.log("PASSWORD_RESET", "User", id,
                 "Réinitialisation du mot de passe de " + user.getUsername(), httpRequest);
     }

@@ -78,6 +78,29 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
                                    Pageable pageable);
 
     /**
+     * Variante de {@link #search} restreinte aux classes du périmètre d'un
+     * enseignant (affectations classe/matière) : un enseignant ne doit jamais
+     * pouvoir lister l'établissement entier ni une classe où il n'intervient pas.
+     */
+    @Query("""
+            SELECT s FROM Student s
+            WHERE s.schoolClass.id IN :classIds
+              AND (:search IS NULL OR :search = '' OR
+                   LOWER(s.firstName) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                   LOWER(s.lastName) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                   LOWER(s.matricule) LIKE LOWER(CONCAT('%', :search, '%')))
+              AND (:classId IS NULL OR s.schoolClass.id = :classId)
+              AND (:status IS NULL OR s.status = :status)
+              AND (:cycle IS NULL OR s.educationCycle = :cycle)
+            """)
+    Page<Student> searchByClassIds(@Param("classIds") java.util.Collection<Long> classIds,
+                                   @Param("search") String search,
+                                   @Param("classId") Long classId,
+                                   @Param("status") com.school.enums.StudentStatus status,
+                                   @Param("cycle") com.school.enums.EducationCycle cycle,
+                                   Pageable pageable);
+
+    /**
      * Variante multi-dossiers de {@link #searchByParentId} : un même compte
      * utilisateur peut être lié à plusieurs dossiers parent (enfants inscrits
      * séparément). Ne filter que sur le premier dossier masquait les autres

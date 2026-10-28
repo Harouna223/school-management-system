@@ -33,6 +33,27 @@ public interface ExamRepository extends JpaRepository<Exam, Long> {
                       @Param("status") ExamStatus status,
                       Pageable pageable);
 
+    /**
+     * Variante de {@link #search} restreinte aux classes du périmètre d'un
+     * enseignant : les évaluations des autres classes ne doivent pas être listées.
+     */
+    @Query("""
+            SELECT e FROM Exam e
+            WHERE e.schoolClass.id IN :classIds
+              AND (:search IS NULL OR :search = '' OR LOWER(e.name) LIKE LOWER(CONCAT('%', :search, '%')))
+              AND (:classId IS NULL OR e.schoolClass.id = :classId)
+              AND (:subjectId IS NULL OR e.subject.id = :subjectId)
+              AND (:term IS NULL OR e.term = :term)
+              AND (:status IS NULL OR e.status = :status)
+            """)
+    Page<Exam> searchByClassIds(@Param("classIds") java.util.Collection<Long> classIds,
+                                @Param("search") String search,
+                                @Param("classId") Long classId,
+                                @Param("subjectId") Long subjectId,
+                                @Param("term") com.school.enums.Term term,
+                                @Param("status") ExamStatus status,
+                                Pageable pageable);
+
     @Query("""
             SELECT e FROM Exam e
             WHERE e.examDate IS NOT NULL

@@ -7,6 +7,7 @@ import com.school.entity.User;
 import com.school.enums.RoleName;
 import com.school.exception.BusinessException;
 import com.school.exception.ResourceNotFoundException;
+import com.school.repository.RefreshTokenRepository;
 import com.school.repository.RoleRepository;
 import com.school.repository.UserRepository;
 import com.school.utils.SecurityUtils;
@@ -54,6 +55,8 @@ class UserServiceTest {
     @Mock
     private RoleRepository roleRepository;
     @Mock
+    private RefreshTokenRepository refreshTokenRepository;
+    @Mock
     private PasswordEncoder passwordEncoder;
     @Mock
     private AuditService auditService;
@@ -62,7 +65,8 @@ class UserServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new UserService(userRepository, roleRepository, passwordEncoder, auditService);
+        service = new UserService(userRepository, roleRepository, refreshTokenRepository,
+                passwordEncoder, auditService);
     }
 
     // ------------------------------------------------------------------
@@ -365,8 +369,41 @@ class UserServiceTest {
         assertThat(target.getFailedAttempts()).isZero();
         assertThat(target.getLockedUntil()).isNull();
         verify(userRepository).save(target);
+        // Un mot de passe réinitialisé doit couper les sessions en cours.
+        verify(refreshTokenRepository).deleteByUserId(5L);
         verify(auditService).log(eq("PASSWORD_RESET"), eq("User"), eq(5L),
                 contains("user5"), isNull());
+    }
+
+    @Test
+    void toggleEnabled_desactivationSupprimeLesJetonsDeRafraichissement() {
+        User target = user(5L, "PARENT");
+        when(userRepository.findById(5L)).thenReturn(Optional.of(target));
+        when(userRepository.save(target)).thenReturn(target);
+
+        try (MockedStatic<SecurityUtils> utils = asUser(1L)) {
+            service.toggleEnabled(5L, false, null);
+        }
+
+        assertThat(target.isEnabled()).isFalse();
+        // Sinon un compte désactivé continuait de renouveler sa session 7 jours.
+        verify(refreshTokenRepository).deleteByUserId(5L);
+    }
+
+    @Test
+    void toggleEnabled_reactivationNeRessusciteAucunJeton() {
+        User target = user(5L, false, "PARENT");
+        when(userRepository.findById(5L)).thenReturn(Optional.of(target));
+        when(userRepository.save(target)).thenReturn(target);
+
+        try (MockedStatic<SecurityUtils> utils = asUser(1L)) {
+            service.toggleEnabled(5L, true, null);
+        }
+
+        assertThat(target.isEnabled()).isTrue();
+        // Les jetons ont été SUPPRIMÉS lors de la désactivation : la
+        // réactivation ne peut pas les rétablir.
+        verify(refreshTokenRepository, never()).deleteByUserId(any());
     }
 
     // ------------------------------------------------------------------

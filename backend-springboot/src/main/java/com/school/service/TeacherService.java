@@ -32,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * Module enseignants : profils, contrats, salaires, comptes.
@@ -65,6 +66,16 @@ public class TeacherService {
         Pageable pageable = Pagination.of(page, size, Sort.by("lastName").ascending());
         Page<Teacher> result = teacherRepository.search(search, status, pageable);
         return PageResponse.from(result, TeacherResponse::from);
+    }
+
+    /**
+     * Toutes les lignes visibles pour un export, par pages bornées : l'ancien
+     * appel unique {@code size=10000} dépassait le plafond de pagination (400).
+     */
+    @Transactional(readOnly = true)
+    public List<TeacherResponse> allForExport(String search, TeacherStatus status) {
+        return PageResponse.collectAll(page ->
+                search(search, status, page, Pagination.MAX_SIZE));
     }
 
     public TeacherResponse getById(Long id) {

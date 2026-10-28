@@ -2,10 +2,13 @@ package com.school.service;
 
 import com.school.entity.Parent;
 import com.school.entity.Student;
+import com.school.entity.Teacher;
 import com.school.exception.BusinessException;
 import com.school.exception.ResourceNotFoundException;
 import com.school.repository.ParentRepository;
 import com.school.repository.StudentRepository;
+import com.school.repository.SubjectAssignmentRepository;
+import com.school.repository.TeacherRepository;
 import com.school.utils.SecurityUtils;
 import org.springframework.security.access.AccessDeniedException;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +26,11 @@ import java.util.List;
  * filtre sont donc automatiquement ramenées à l'élève (ou aux enfants) du
  * compte courant par {@link #resolveStudentScope(Long)} ; les accès par
  * identifiant passent par {@link #assertCanAccessStudent(Long)}.</p>
+ *
+ * <p>ENSEIGNANT : son périmètre est constitué des classes où il a une
+ * affectation réelle ({@code subject_assignments}). Sans affectation il ne voit
+ * aucun élève ; une classe hors périmètre est refusée, y compris quand son
+ * identifiant est fourni explicitement par le client.</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -30,13 +38,15 @@ public class AccessControlService {
 
     private final StudentRepository studentRepository;
     private final ParentRepository parentRepository;
+    private final TeacherRepository teacherRepository;
+    private final SubjectAssignmentRepository subjectAssignmentRepository;
 
     /**
      * Vérifie que l'utilisateur connecté peut accéder aux données de l'élève.
-     * - Rôles admin (SUPER_ADMIN, DIRECTEUR, SECRETAIRE) : autorisé
+     * - Rôles admin (SUPER_ADMIN, DIRECTEUR, SECRETAIRE) et COMPTABLE : autorisé
      * - PARENT : autorisé seulement si l'élève est l'un de ses enfants
      * - ELEVE : autorisé seulement si c'est son propre profil
-     * - ENSEIGNANT, COMPTABLE et autres : autorisé
+     * - ENSEIGNANT : autorisé seulement si l'élève est dans une de ses classes
      *
      * @throws AccessDeniedException si l'accès est refusé
      */
@@ -59,7 +69,89 @@ public class AccessControlService {
             }
             return;
         }
-        // Autres rôles (ENSEIGNANT, COMPTABLE, etc.) : autorisé
+        if (isRestrictedTeacher()) {
+            Student student = studentRepository.findById(studentId)
+                    .orElseThrow(() -> ResourceNotFoundException.of("Élève", studentId));
+            if (student.getSchoolClass() == null
+                    || !teacherClassIds().contains(student.getSchoolClass().getId())) {
+                throw new AccessDeniedException(
+                        "Accès refusé : cet élève n'appartient pas à une de vos classes");
+            }
+            return;
+        }
+        // COMPTABLE et autres rôles du personnel : autorisé
+    }
+
+    /**
+     * Vrai si le compte courant est un enseignant « simple » : son périmètre de
+     * données est limité aux classes où il a une affectation réelle. Une
+     * direction ou un comptable conserve l'accès établissement.
+     */
+    public boolean isRestrictedTeacher() {
+        return SecurityUtils.hasRole("ENSEIGNANT")
+                && !isAdmin()
+                && !SecurityUtils.hasRole("COMPTABLE")
+                && !hasStudentScope();
+    }
+
+    /**
+     * Classes du périmètre enseignant.
+     *
+     * @return {@code null} si le compte n'est pas un enseignant restreint
+     *         (aucune restriction) ; liste éventuellement VIDE pour un
+     *         enseignant sans affectation, qui ne doit voir aucun élève
+     */
+    public List<Long> teacherClassIds() {
+        if (!isRestrictedTeacher()) {
+            return null;
+        }
+        return subjectAssignmentRepository.findClassIdsByTeacherId(requireTeacherProfile().getId());
+    }
+
+    /**
+     * Réserve une donnée de classe (pointage, notes d'une classe, classement,
+     * bulletins collectifs…) au personnel autorisé. Un enseignant restreint ne
+     * peut y accéder que pour une classe où il est affecté.
+     *
+     * @throws AccessDeniedException si le compte est parent/élève, ou si la
+     *                               classe n'est pas dans le périmètre enseignant
+     */
+    public void assertCanAccessClass(Long classId) {
+        if (hasStudentScope()) {
+            throw new AccessDeniedException("Accès refusé : cette donnée n'est pas accessible "
+                    + "depuis un compte parent ou élève");
+        }
+        if (!isRestrictedTeacher()) {
+            return;
+        }
+        if (classId == null
+                || !subjectAssignmentRepository.existsByTeacherIdAndSchoolClassId(
+                        requireTeacherProfile().getId(), classId)) {
+            throw new AccessDeniedException("Accès refusé : vous n'enseignez pas dans cette classe");
+        }
+    }
+
+    /**
+     * Vérifie qu'un enseignant restreint est réellement affecté à la paire
+     * (classe, matière) qu'il cherche à modifier (évaluation, note, ressource).
+     * Les autres rôles du personnel ne sont pas contraints.
+     *
+     * @throws AccessDeniedException si l'affectation n'existe pas
+     */
+    public void assertCanTeachSubjectInClass(Long classId, Long subjectId) {
+        if (hasStudentScope()) {
+            throw new AccessDeniedException("Accès refusé : cette action n'est pas accessible "
+                    + "depuis un compte parent ou élève");
+        }
+        if (!isRestrictedTeacher()) {
+            return;
+        }
+        if (classId == null || subjectId == null
+                || !subjectAssignmentRepository.existsByTeacherIdAndSubjectIdAndSchoolClassId(
+                        requireTeacherProfile().getId(), subjectId, classId)) {
+            throw new AccessDeniedException("Accès refusé : cette classe et cette matière "
+                    + "ne font pas partie de vos affectations");
+        }
     }
 
     /**
@@ -169,6 +261,13 @@ public class AccessControlService {
             throw new BusinessException("Aucun dossier parent lié à ce compte");
         }
         return ids;
+    }
+
+    /** Profil enseignant du compte courant, requis dès qu'un contrôle s'applique. */
+    private Teacher requireTeacherProfile() {
+        return teacherRepository.findByUserId(SecurityUtils.currentUserId())
+                .orElseThrow(() -> new AccessDeniedException(
+                        "Accès refusé : aucun profil enseignant n'est lié à ce compte"));
     }
 
     private boolean isAdmin() {

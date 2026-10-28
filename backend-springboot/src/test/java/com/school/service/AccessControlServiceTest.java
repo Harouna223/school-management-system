@@ -1,11 +1,15 @@
 package com.school.service;
 
 import com.school.entity.Parent;
+import com.school.entity.SchoolClass;
 import com.school.entity.Student;
+import com.school.entity.Teacher;
 import com.school.entity.User;
 import com.school.exception.BusinessException;
 import com.school.repository.ParentRepository;
 import com.school.repository.StudentRepository;
+import com.school.repository.SubjectAssignmentRepository;
+import com.school.repository.TeacherRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,12 +39,17 @@ class AccessControlServiceTest {
     private StudentRepository studentRepository;
     @Mock
     private ParentRepository parentRepository;
+    @Mock
+    private TeacherRepository teacherRepository;
+    @Mock
+    private SubjectAssignmentRepository subjectAssignmentRepository;
 
     private AccessControlService service;
 
     @BeforeEach
     void setUp() {
-        service = new AccessControlService(studentRepository, parentRepository);
+        service = new AccessControlService(studentRepository, parentRepository,
+                teacherRepository, subjectAssignmentRepository);
     }
 
     private User user(Long id, String role) {
@@ -266,5 +275,111 @@ class AccessControlServiceTest {
                 assertThatNoException().isThrownBy(() -> service.assertStaffOnly("le pointage d'une classe"));
             }
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Périmètre enseignant : uniquement ses classes / matières affectées
+    // ------------------------------------------------------------------
+
+    @Test
+    void enseignantAccedeAUnEleveDeSaClasse() {
+        User user = user(1L, "ENSEIGNANT");
+        when(teacherRepository.findByUserId(1L)).thenReturn(Optional.of(teacher(50L)));
+        when(subjectAssignmentRepository.findClassIdsByTeacherId(50L)).thenReturn(List.of(3L));
+        when(studentRepository.findById(20L)).thenReturn(Optional.of(studentInClass(20L, 3L)));
+
+        try (MockedStatic<com.school.utils.SecurityUtils> utils = mockSecurity(user)) {
+            assertThatNoException().isThrownBy(() -> service.assertCanAccessStudent(20L));
+        }
+    }
+
+    @Test
+    void enseignantRefuseUnEleveHorsDeSesClasses() {
+        User user = user(1L, "ENSEIGNANT");
+        when(teacherRepository.findByUserId(1L)).thenReturn(Optional.of(teacher(50L)));
+        when(subjectAssignmentRepository.findClassIdsByTeacherId(50L)).thenReturn(List.of(3L));
+        when(studentRepository.findById(20L)).thenReturn(Optional.of(studentInClass(20L, 8L)));
+
+        try (MockedStatic<com.school.utils.SecurityUtils> utils = mockSecurity(user)) {
+            assertThatThrownBy(() -> service.assertCanAccessStudent(20L))
+                    .isInstanceOf(AccessDeniedException.class)
+                    .hasMessageContaining("pas à une de vos classes");
+        }
+    }
+
+    @Test
+    void enseignantSansAffectationNeVoitAucunEleve() {
+        User user = user(1L, "ENSEIGNANT");
+        when(teacherRepository.findByUserId(1L)).thenReturn(Optional.of(teacher(50L)));
+        when(subjectAssignmentRepository.findClassIdsByTeacherId(50L)).thenReturn(List.of());
+        when(studentRepository.findById(20L)).thenReturn(Optional.of(studentInClass(20L, 3L)));
+
+        try (MockedStatic<com.school.utils.SecurityUtils> utils = mockSecurity(user)) {
+            assertThatThrownBy(() -> service.assertCanAccessStudent(20L))
+                    .isInstanceOf(AccessDeniedException.class);
+        }
+    }
+
+    @Test
+    void enseignantRefuseUneClasseNonAffectee() {
+        User user = user(1L, "ENSEIGNANT");
+        when(teacherRepository.findByUserId(1L)).thenReturn(Optional.of(teacher(50L)));
+        when(subjectAssignmentRepository.existsByTeacherIdAndSchoolClassId(50L, 8L)).thenReturn(false);
+
+        try (MockedStatic<com.school.utils.SecurityUtils> utils = mockSecurity(user)) {
+            assertThatThrownBy(() -> service.assertCanAccessClass(8L))
+                    .isInstanceOf(AccessDeniedException.class)
+                    .hasMessageContaining("n'enseignez pas dans cette classe");
+        }
+    }
+
+    @Test
+    void enseignantAutoriseSaClasseEtSaMatiere() {
+        User user = user(1L, "ENSEIGNANT");
+        when(teacherRepository.findByUserId(1L)).thenReturn(Optional.of(teacher(50L)));
+        when(subjectAssignmentRepository.existsByTeacherIdAndSchoolClassId(50L, 3L)).thenReturn(true);
+        when(subjectAssignmentRepository
+                .existsByTeacherIdAndSubjectIdAndSchoolClassId(50L, 7L, 3L)).thenReturn(true);
+
+        try (MockedStatic<com.school.utils.SecurityUtils> utils = mockSecurity(user)) {
+            assertThatNoException().isThrownBy(() -> service.assertCanAccessClass(3L));
+            assertThatNoException().isThrownBy(() -> service.assertCanTeachSubjectInClass(3L, 7L));
+        }
+    }
+
+    @Test
+    void enseignantRefuseUneMatiereNonAffectee() {
+        User user = user(1L, "ENSEIGNANT");
+        when(teacherRepository.findByUserId(1L)).thenReturn(Optional.of(teacher(50L)));
+        when(subjectAssignmentRepository
+                .existsByTeacherIdAndSubjectIdAndSchoolClassId(50L, 9L, 3L)).thenReturn(false);
+
+        try (MockedStatic<com.school.utils.SecurityUtils> utils = mockSecurity(user)) {
+            assertThatThrownBy(() -> service.assertCanTeachSubjectInClass(3L, 9L))
+                    .isInstanceOf(AccessDeniedException.class)
+                    .hasMessageContaining("affectations");
+        }
+    }
+
+    @Test
+    void comptableConserveLAccesEtablissement() {
+        User user = user(1L, "COMPTABLE");
+
+        try (MockedStatic<com.school.utils.SecurityUtils> utils = mockSecurity(user)) {
+            assertThat(service.isRestrictedTeacher()).isFalse();
+            assertThatNoException().isThrownBy(() -> service.assertCanAccessStudent(999L));
+            assertThatNoException().isThrownBy(() -> service.assertCanAccessClass(999L));
+            assertThatNoException().isThrownBy(() -> service.assertCanTeachSubjectInClass(999L, 1L));
+        }
+    }
+
+    private Student studentInClass(Long id, Long classId) {
+        return Student.builder().id(id).firstName("Élève").lastName("Test" + id)
+                .schoolClass(SchoolClass.builder().id(classId).name("Classe " + classId).build())
+                .build();
+    }
+
+    private Teacher teacher(Long id) {
+        return Teacher.builder().id(id).firstName("Prof").lastName("Test").build();
     }
 }

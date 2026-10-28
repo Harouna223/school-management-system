@@ -93,7 +93,7 @@ public class TeacherController {
     public void exportExcel(HttpServletResponse response,
                             @RequestParam(required = false) String search,
                             @RequestParam(required = false) TeacherStatus status) throws IOException {
-        List<TeacherResponse> teachers = teacherService.search(search, status, 0, 10000).getContent();
+        List<TeacherResponse> teachers = teacherService.allForExport(search, status);
         List<String[]> rows = teachers.stream()
                 .map(t -> new String[]{t.getEmployeeNo(), t.getLastName(), t.getFirstName(),
                         t.getGender() != null ? t.getGender().name() : "",

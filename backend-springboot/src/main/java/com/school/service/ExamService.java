@@ -38,12 +38,27 @@ public class ExamService {
     private final AuditService auditService;
     private final GradeRepository gradeRepository;
     private final AcademicCalendarService academicCalendarService;
+    private final AccessControlService accessControlService;
 
     @Transactional(readOnly = true)
     public PageResponse<ExamResponse> search(String search, Long classId, Long subjectId,
                                              Term term, ExamStatus status, int page, int size) {
         Pageable pageable = Pagination.of(page, size, Sort.by("examDate").descending());
-        Page<Exam> result = examRepository.search(search, classId, subjectId, term, status, pageable);
+        Page<Exam> result;
+        if (accessControlService.isRestrictedTeacher()) {
+            // Un enseignant ne liste que les évaluations de ses classes ; une
+            // classe hors périmètre est refusée même demandée explicitement.
+            if (classId != null) {
+                accessControlService.assertCanAccessClass(classId);
+            }
+            List<Long> classIds = accessControlService.teacherClassIds();
+            result = classIds == null || classIds.isEmpty()
+                    ? Page.empty(pageable)
+                    : examRepository.searchByClassIds(classIds, search, classId, subjectId,
+                            term, status, pageable);
+        } else {
+            result = examRepository.search(search, classId, subjectId, term, status, pageable);
+        }
         return PageResponse.from(result, ExamResponse::from);
     }
 
@@ -61,6 +76,7 @@ public class ExamService {
      */
     @Transactional(readOnly = true)
     public List<ExamResponse> listByClass(Long classId, Long yearId) {
+        accessControlService.assertCanAccessClass(classId);
         List<Exam> exams = examRepository.findBySchoolClassId(classId);
         if (yearId == null) {
             return exams.stream().map(ExamResponse::from).toList();
@@ -73,11 +89,16 @@ public class ExamService {
 
     @Transactional(readOnly = true)
     public ExamResponse getById(Long id) {
-        return ExamResponse.from(findById(id));
+        Exam exam = findById(id);
+        if (exam.getSchoolClass() != null) {
+            accessControlService.assertCanAccessClass(exam.getSchoolClass().getId());
+        }
+        return ExamResponse.from(exam);
     }
 
     @Transactional
     public ExamResponse create(ExamRequest request, HttpServletRequest httpRequest) {
+        accessControlService.assertCanTeachSubjectInClass(request.getClassId(), request.getSubjectId());
         Exam exam = examMapper.toEntity(request);
         exam.setSchoolClass(classService.findById(request.getClassId()));
         exam.setSubject(subjectService.findById(request.getSubjectId()));
@@ -95,6 +116,12 @@ public class ExamService {
     @Transactional
     public ExamResponse update(Long id, ExamRequest request, HttpServletRequest httpRequest) {
         Exam exam = findById(id);
+        // Ni l'évaluation d'origine ni sa nouvelle cible ne doivent sortir du
+        // périmètre de l'enseignant.
+        if (exam.getSchoolClass() != null) {
+            accessControlService.assertCanAccessClass(exam.getSchoolClass().getId());
+        }
+        accessControlService.assertCanTeachSubjectInClass(request.getClassId(), request.getSubjectId());
         examMapper.updateEntity(request, exam);
         exam.setSchoolClass(classService.findById(request.getClassId()));
         exam.setSubject(subjectService.findById(request.getSubjectId()));
@@ -118,6 +145,9 @@ public class ExamService {
     @Transactional
     public ExamResponse changeStatus(Long id, ExamStatus status, HttpServletRequest httpRequest) {
         Exam exam = findById(id);
+        if (exam.getSchoolClass() != null) {
+            accessControlService.assertCanAccessClass(exam.getSchoolClass().getId());
+        }
         exam.setStatus(status);
         auditService.log("DELIBERATE", "Exam", id, "Statut évaluation -> " + status, httpRequest);
         return ExamResponse.from(examRepository.save(exam));
@@ -126,6 +156,9 @@ public class ExamService {
     @Transactional
     public void delete(Long id, HttpServletRequest httpRequest) {
         Exam exam = findById(id);
+        if (exam.getSchoolClass() != null) {
+            accessControlService.assertCanAccessClass(exam.getSchoolClass().getId());
+        }
         // Les notes d'une évaluation sont supprimées EN CASCADE par la base
         // (fk_grades_exam ON DELETE CASCADE) : sans cette garde, supprimer une
         // évaluation faisait disparaître silencieusement toutes ses notes.

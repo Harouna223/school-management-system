@@ -137,8 +137,7 @@ public class StudentController {
     public void exportPdf(HttpServletResponse response,
                           @RequestParam(required = false) String search,
                           @RequestParam(required = false) Long classId) throws IOException {
-        List<StudentResponse> students = studentService.search(search, classId, null, null, 0, 10000)
-                .getContent();
+        List<StudentResponse> students = studentService.allForExport(search, classId);
         List<String[]> rows = students.stream()
                 .map(s -> new String[]{s.getMatricule(), s.getLastName(), s.getFirstName(),
                         s.getGender() != null ? s.getGender().name() : "", s.getClassName(),
@@ -155,8 +154,7 @@ public class StudentController {
     public void exportExcel(HttpServletResponse response,
                             @RequestParam(required = false) String search,
                             @RequestParam(required = false) Long classId) throws IOException {
-        List<StudentResponse> students = studentService.search(search, classId, null, null, 0, 10000)
-                .getContent();
+        List<StudentResponse> students = studentService.allForExport(search, classId);
         List<String[]> rows = students.stream()
                 .map(s -> new String[]{s.getMatricule(), s.getLastName(), s.getFirstName(),
                         s.getGender() != null ? s.getGender().name() : "", s.getClassName(),

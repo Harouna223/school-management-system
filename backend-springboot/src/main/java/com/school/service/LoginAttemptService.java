@@ -1,15 +1,24 @@
 package com.school.service;
 
 import com.school.entity.User;
+import com.school.exception.TooManyLoginAttemptsException;
 import com.school.repository.RefreshTokenRepository;
 import com.school.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Comptabilisation des échecs de connexion.
@@ -34,8 +43,114 @@ public class LoginAttemptService {
     /** Durée du verrouillage en minutes. */
     public static final long LOCK_MINUTES = 15;
 
+    /** Échecs tolérés depuis une même IP sur la fenêtre glissante. */
+    public static final int MAX_FAILURES_PER_IP = 30;
+    /** Fenêtre d'observation des échecs par IP. */
+    static final Duration IP_WINDOW = Duration.ofMinutes(15);
+    /** Blocages progressifs : 1re série, 2e, puis 3e et suivantes. */
+    private static final Duration[] IP_BLOCK_DURATIONS = {
+            Duration.ofMinutes(1), Duration.ofMinutes(5), Duration.ofMinutes(15)};
+    /** Série d'échecs oubliée après une heure sans nouvelle tentative. */
+    private static final Duration STRIKE_RESET = Duration.ofHours(1);
+    /** Au-delà, purge des entrées inactives pour borner la mémoire. */
+    private static final int IP_CACHE_LIMIT = 10_000;
+
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+
+    /** Seuil par IP, ajustable par configuration (abaissé dans les tests ciblés). */
+    @Value("${app.security.login.max-failures-per-ip:30}")
+    private int maxFailuresPerIp = MAX_FAILURES_PER_IP;
+
+    /** État par adresse IP (mono-instance : suffisant pour cette défense en profondeur). */
+    private final Map<String, IpFailures> ipFailures = new ConcurrentHashMap<>();
+
+    /**
+     * Refuse la tentative si l'adresse IP a dépassé son quota d'échecs et se
+     * trouve encore dans sa période de blocage.
+     *
+     * @throws TooManyLoginAttemptsException avec le délai restant en secondes
+     */
+    public void assertIpAllowed(String ip) {
+        IpFailures failures = ipFailures.get(ipKey(ip));
+        if (failures == null) {
+            return;
+        }
+        synchronized (failures) {
+            Instant now = Instant.now();
+            if (failures.blockedUntil != null && failures.blockedUntil.isAfter(now)) {
+                long retryAfter = Math.max(1, Duration.between(now, failures.blockedUntil).toSeconds());
+                throw new TooManyLoginAttemptsException(retryAfter);
+            }
+            if (failures.blockedUntil != null) {
+                failures.blockedUntil = null; // blocage terminé
+            }
+        }
+    }
+
+    /**
+     * Comptabilise un échec pour l'adresse IP et déclenche un blocage progressif
+     * (1 min, 5 min, puis 15 min) au-delà du seuil de la fenêtre glissante.
+     */
+    public void registerIpFailure(String ip) {
+        String key = ipKey(ip);
+        IpFailures failures = ipFailures.computeIfAbsent(key, k -> new IpFailures());
+        synchronized (failures) {
+            Instant now = Instant.now();
+            if (failures.lastFailure != null
+                    && Duration.between(failures.lastFailure, now).compareTo(STRIKE_RESET) > 0) {
+                failures.strikes = 0;
+                failures.timestamps.clear();
+            }
+            failures.timestamps.addLast(now);
+            while (!failures.timestamps.isEmpty()
+                    && Duration.between(failures.timestamps.peekFirst(), now).compareTo(IP_WINDOW) > 0) {
+                failures.timestamps.removeFirst();
+            }
+            failures.lastFailure = now;
+            if (failures.timestamps.size() >= maxFailuresPerIp) {
+                Duration block = IP_BLOCK_DURATIONS[
+                        Math.min(failures.strikes, IP_BLOCK_DURATIONS.length - 1)];
+                failures.strikes++;
+                failures.blockedUntil = now.plus(block);
+                failures.timestamps.clear();
+                log.warn("Limitation par IP : {} bloquée {} min après {} échecs",
+                        key, block.toMinutes(), maxFailuresPerIp);
+            }
+        }
+        if (ipFailures.size() > IP_CACHE_LIMIT) {
+            purgeInactiveIps();
+        }
+    }
+
+    /** Connexion réussie : la série d'échecs de cette IP est remise à zéro. */
+    public void resetIp(String ip) {
+        ipFailures.remove(ipKey(ip));
+    }
+
+    private String ipKey(String ip) {
+        return ip == null || ip.isBlank() ? "unknown" : ip;
+    }
+
+    private void purgeInactiveIps() {
+        Instant threshold = Instant.now().minus(STRIKE_RESET);
+        Iterator<Map.Entry<String, IpFailures>> it = ipFailures.entrySet().iterator();
+        while (it.hasNext()) {
+            IpFailures failures = it.next().getValue();
+            synchronized (failures) {
+                if (failures.lastFailure == null || failures.lastFailure.isBefore(threshold)) {
+                    it.remove();
+                }
+            }
+        }
+    }
+
+    private static final class IpFailures {
+        private final Deque<Instant> timestamps = new ArrayDeque<>();
+        private Instant lastFailure;
+        private Instant blockedUntil;
+        private int strikes;
+    }
 
     /**
      * Enregistre un échec de connexion et verrouille le compte au-delà du seuil.

@@ -33,6 +33,12 @@ app:
   security:
     # Les tests utilisent des secrets connus : l'exigence de production ne s'applique pas.
     require-secure-secrets: false
+    login:
+      # Le contexte Spring (et donc le compteur par IP) est partagé entre
+      # classes d'intégration : un seuil élevé évite qu'un test de refus 401
+      # fasse basculer une classe suivante en 429. Le test dédié de limitation
+      # abaisse ce seuil dans SON propre contexte.
+      max-failures-per-ip: 200
   whatsapp:
     enabled: false
   sms:

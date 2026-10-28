@@ -66,13 +66,15 @@ class ExamServiceTest {
     private GradeRepository gradeRepository;
     @Mock
     private AcademicCalendarService academicCalendarService;
+    @Mock
+    private AccessControlService accessControlService;
 
     private ExamService service;
 
     @BeforeEach
     void setUp() {
         service = new ExamService(examRepository, examMapper, classService, subjectService,
-                auditService, gradeRepository, academicCalendarService);
+                auditService, gradeRepository, academicCalendarService, accessControlService);
     }
 
     // ------------------------------------------------------------------

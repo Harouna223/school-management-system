@@ -23,6 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -71,30 +72,38 @@ public class AuthService {
 
     @Transactional
     public AuthResponse login(LoginRequest request, HttpServletRequest httpRequest) {
+        String ip = clientIp(httpRequest);
+        loginAttemptService.assertIpAllowed(ip);
+
         User user = userRepository.findByUsername(request.getUsername()).orElse(null);
 
         if (user != null && user.getLockedUntil() != null
                 && user.getLockedUntil().isAfter(LocalDateTime.now())) {
-            long minutes = java.time.Duration.between(LocalDateTime.now(), user.getLockedUntil()).toMinutes() + 1;
-            throw new BusinessException("Compte temporairement verrouillé après plusieurs tentatives. "
-                    + "Réessayez dans " + minutes + " min.");
+            // Réponse STRICTEMENT identique à un mot de passe faux : verrouillé,
+            // désactivé et inexistant ne doivent pas être distinguables, sinon
+            // un attaquant cartographie les comptes de l'établissement.
+            loginAttemptService.registerIpFailure(ip);
+            throw new BadCredentialsException("Identifiants incorrects");
         }
 
         Authentication authentication;
         try {
             authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
-        } catch (LockedException ex) {
-            throw new BusinessException("Compte verrouillé. Contactez l'administrateur.");
-        } catch (DisabledException ex) {
-            throw new BusinessException("Ce compte est désactivé. Contactez l'administrateur.");
+        } catch (LockedException | DisabledException ex) {
+            // Compte verrouillé côté Spring Security ou désactivé : même réponse
+            // générique que des identifiants invalides.
+            loginAttemptService.registerIpFailure(ip);
+            throw new BadCredentialsException("Identifiants incorrects");
         } catch (AuthenticationException ex) {
+            loginAttemptService.registerIpFailure(ip);
             if (user != null) {
                 registerFailedAttempt(user);
             }
             throw ex;
         }
 
+        loginAttemptService.resetIp(ip);
         user = (User) authentication.getPrincipal();
         user.setFailedAttempts(0);
         user.setLockedUntil(null);
@@ -143,6 +152,10 @@ public class AuthService {
         PasswordPolicy.validate(request.getNewPassword());
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
+        // Un mot de passe changé doit invalider les sessions déjà ouvertes :
+        // sans cette purge, un jeton de rafraîchissement volé (ou oublié sur un
+        // poste partagé) survivait au changement pendant 7 jours.
+        refreshTokenRepository.deleteByUserId(user.getId());
         auditService.log("PASSWORD_CHANGE", "User", user.getId(), "Changement de mot de passe", null);
     }
 
@@ -150,7 +163,7 @@ public class AuthService {
     public AuthResponse refresh(RefreshTokenRequest request) {
         String token = request.getRefreshToken();
         RefreshToken refreshToken = refreshTokenRepository.findByToken(hashRefreshToken(token))
-                .orElseThrow(() -> new TokenRefreshException(token,
+                .orElseThrow(() -> new TokenRefreshException(
                         "Jeton de rafraîchissement inconnu"));
 
         if (refreshToken.isRevoked() || refreshToken.getExpiryDate().isBefore(LocalDateTime.now())) {
@@ -159,7 +172,7 @@ public class AuthService {
             // Transaction indépendante : l'exception ci-dessous annulerait la
             // suppression si elle partageait la transaction de refresh().
             loginAttemptService.revokeAllRefreshTokens(refreshToken.getUser().getId());
-            throw new TokenRefreshException(request.getRefreshToken(),
+            throw new TokenRefreshException(
                     "Jeton de rafraîchissement expiré ou révoqué, veuillez vous reconnecter");
         }
 
@@ -169,7 +182,7 @@ public class AuthService {
         // uniquement dans le filtre JWT, contournable via /api/auth/refresh.
         if (!user.isEnabled() || !user.isAccountNonLocked()) {
             loginAttemptService.revokeAllRefreshTokens(user.getId());
-            throw new TokenRefreshException(request.getRefreshToken(),
+            throw new TokenRefreshException(
                     "Compte désactivé ou verrouillé : veuillez contacter l'administrateur");
         }
 
@@ -293,6 +306,34 @@ public class AuthService {
         }
         user.setEnabled(true);
         userRepository.save(user);
+    }
+
+    /**
+     * Adresse IP d'origine de la tentative.
+     *
+     * <p>Derrière le nginx fourni, {@code getRemoteAddr()} vaut 127.0.0.1 pour
+     * TOUS les clients : sans lecture de l'en-tête transmis par le proxy, la
+     * limitation par IP deviendrait une limitation globale. L'en-tête n'est
+     * fiable que si le backend n'est pas joignable directement (voir
+     * {@code deploy/}).</p>
+     */
+    private String clientIp(HttpServletRequest request) {
+        if (request == null) {
+            return "unknown";
+        }
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            String first = forwarded.split(",")[0].trim();
+            if (!first.isEmpty()) {
+                return first;
+            }
+        }
+        String realIp = request.getHeader("X-Real-IP");
+        if (realIp != null && !realIp.isBlank()) {
+            return realIp.trim();
+        }
+        String remote = request.getRemoteAddr();
+        return remote != null && !remote.isBlank() ? remote : "unknown";
     }
 
     private String createRefreshToken(User user) {

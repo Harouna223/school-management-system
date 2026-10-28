@@ -166,7 +166,7 @@ public class FinanceController {
                                     @RequestParam(required = false) LocalDate from,
                                     @RequestParam(required = false) LocalDate to) throws IOException {
         List<ExpenseResponse> expenses = financeService
-                .searchExpenses(categoryId, from, to, 0, 10000).getContent();
+                .allExpensesForExport(categoryId, from, to);
         String[] headers = new String[]{"N°", "Date", "Catégorie", "Description", "Montant", "Enregistré par"};
         List<String[]> rows = expenseRows(expenses);
         java.math.BigDecimal total = expenses.stream()
@@ -182,7 +182,7 @@ public class FinanceController {
                                   @RequestParam(required = false) LocalDate from,
                                   @RequestParam(required = false) LocalDate to) throws IOException {
         List<ExpenseResponse> expenses = financeService
-                .searchExpenses(categoryId, from, to, 0, 10000).getContent();
+                .allExpensesForExport(categoryId, from, to);
         String[] headers = new String[]{"N°", "Date", "Catégorie", "Description", "Montant", "Enregistré par"};
         List<String[]> rows = expenseRows(expenses);
         java.math.BigDecimal total = expenses.stream()

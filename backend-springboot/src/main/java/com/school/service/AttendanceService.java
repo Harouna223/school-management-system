@@ -50,9 +50,11 @@ public class AttendanceService {
     private final EmailService emailService;
     private final SmsService smsService;
     private final PhoneNumberService phoneNumberService;
+    private final AccessControlService accessControlService;
 
     @Transactional(readOnly = true)
     public List<AttendanceResponse> listByClassAndDate(Long classId, LocalDate date) {
+        accessControlService.assertCanAccessClass(classId);
         return attendanceRepository.findBySchoolClassIdAndDate(classId, date).stream()
                 .map(AttendanceResponse::from).toList();
     }
@@ -70,6 +72,9 @@ public class AttendanceService {
      */
     @Transactional
     public AttendanceRecordResponse record(AttendanceRequest request, HttpServletRequest httpRequest) {
+        // Le pointage porte sur UNE classe : elle doit relever du périmètre de
+        // l'utilisateur (un enseignant ne pointe que ses classes).
+        accessControlService.assertCanAccessClass(request.getClassId());
         List<AttendanceResponse> saved = request.getEntries().stream()
                 .map(entry -> recordSingle(request.getClassId(), request.getDate(), entry, httpRequest))
                 .map(AttendanceResponse::from)
@@ -131,6 +136,15 @@ public class AttendanceService {
                                     HttpServletRequest httpRequest) {
         Student student = studentRepository.findById(entry.getStudentId())
                 .orElseThrow(() -> ResourceNotFoundException.of("Élève", entry.getStudentId()));
+
+        // Chaque élève pointé doit réellement appartenir à la classe demandée :
+        // sinon un pointage « classe 3 » créait une présence pour un élève de la
+        // classe 8, enregistrée sous SA classe, hors du périmètre de l'appelant.
+        if (student.getSchoolClass() == null
+                || !student.getSchoolClass().getId().equals(classId)) {
+            throw new BusinessException("L'élève " + student.getFullName()
+                    + " n'appartient pas à la classe pointée");
+        }
 
         Attendance attendance = attendanceRepository
                 .findByStudentIdAndDate(student.getId(), date)
@@ -194,6 +208,9 @@ public class AttendanceService {
                                       HttpServletRequest httpRequest) {
         Attendance attendance = attendanceRepository.findById(attendanceId)
                 .orElseThrow(() -> ResourceNotFoundException.of("Présence", attendanceId));
+        if (attendance.getSchoolClass() != null) {
+            accessControlService.assertCanAccessClass(attendance.getSchoolClass().getId());
+        }
         if (attendance.getStatus() != AttendanceStatus.ABSENT
                 && attendance.getStatus() != AttendanceStatus.LATE) {
             throw new BusinessException("Seules les absences et retards peuvent être justifiés");
@@ -224,6 +241,7 @@ public class AttendanceService {
      */
     @Transactional(readOnly = true)
     public List<com.school.dto.response.AttendanceReportRow> classReport(Long classId, LocalDate from, LocalDate to) {
+        accessControlService.assertCanAccessClass(classId);
         List<Student> students = studentRepository.findBySchoolClassId(classId);
         if (from == null) from = LocalDate.now().minusMonths(1);
         if (to == null) to = LocalDate.now();

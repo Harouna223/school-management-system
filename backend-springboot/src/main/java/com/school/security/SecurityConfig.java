@@ -79,6 +79,15 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/exams/bulletins/*/pdf")
                         .hasAnyAuthority("PERM_EXAM_READ", "PERM_GRADE_READ")
                         .requestMatchers(HttpMethod.GET, "/api/exams/**").hasAnyAuthority("PERM_EXAM_READ")
+                        // La SAISIE d'une note relève de GRADE_WRITE (ou d'EXAM_WRITE pour
+                        // la direction, comme auparavant) et pas seulement d'EXAM_WRITE :
+                        // l'ENSEIGNANT détient GRADE_WRITE mais pas EXAM_WRITE (réservé à
+                        // la planification). Sans cette règle spécifique, tout enseignant
+                        // recevait un 403 et ne pouvait saisir aucune note. Le périmètre
+                        // réel (classe + matière affectées, élève accessible) reste
+                        // contrôlé par GradeService.save via AccessControlService.
+                        .requestMatchers(HttpMethod.POST, "/api/exams/grades")
+                        .hasAnyAuthority("PERM_GRADE_WRITE", "PERM_EXAM_WRITE")
                         .requestMatchers("/api/exams/**").hasAnyAuthority("PERM_EXAM_WRITE")
                         .requestMatchers(HttpMethod.GET, "/api/attendances/**").hasAnyAuthority("PERM_ATTENDANCE_READ")
                         .requestMatchers("/api/attendances/**").hasAnyAuthority("PERM_ATTENDANCE_WRITE")

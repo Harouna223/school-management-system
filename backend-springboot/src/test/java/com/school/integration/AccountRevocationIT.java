@@ -129,13 +129,16 @@ class AccountRevocationIT extends AbstractIntegrationTest {
         return objectMapper.readTree(body).path("data");
     }
 
-    /** Un compte révoqué est refusé par un message dédié (400), pas par un 500. */
+    /**
+     * Un compte révoqué est refusé par la réponse uniforme du login (401), qui
+     * ne révèle pas si le compte existe, est désactivé ou verrouillé.
+     */
     private void connexionRefusee(String username) throws Exception {
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"username\":\"" + username + "\",\"password\":\"" + MOT_DE_PASSE + "\"}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message", containsString("désactivé")));
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message", containsString("Identifiants incorrects")));
     }
 
     private String loginAdmin() throws Exception {

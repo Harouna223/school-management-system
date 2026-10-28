@@ -62,6 +62,24 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.UNAUTHORIZED, ex.getMessage(), request);
     }
 
+    /**
+     * Limitation progressive par IP : 429 explicite avec le délai d'attente,
+     * pour que le client sache quand réessayer au lieu de boucler.
+     */
+    @ExceptionHandler(TooManyLoginAttemptsException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTooManyLoginAttempts(TooManyLoginAttemptsException ex,
+                                                                        HttpServletRequest request) {
+        log.warn("Trop de tentatives de connexion depuis {}", request.getRemoteAddr());
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header("Retry-After", String.valueOf(ex.getRetryAfterSeconds()))
+                .body(ApiResponse.<Void>builder()
+                        .success(false)
+                        .message(ex.getMessage())
+                        .path(request.getRequestURI())
+                        .timestamp(LocalDateTime.now())
+                        .build());
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiResponse<Void>> handleAccessDenied(AccessDeniedException ex,
                                                                 HttpServletRequest request) {

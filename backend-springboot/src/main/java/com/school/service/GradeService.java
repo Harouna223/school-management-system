@@ -65,6 +65,7 @@ public class GradeService {
 
     @Transactional(readOnly = true)
     public List<GradeResponse> listByExam(Long examId) {
+        assertCanReadExam(examService.findById(examId));
         return gradeRepository.findByExamId(examId).stream()
                 .map(GradeResponse::from).toList();
     }
@@ -76,6 +77,7 @@ public class GradeService {
     @Transactional(readOnly = true)
     public List<GradeResponse> listByExam(Long examId, Long yearId) {
         Exam exam = examService.findById(examId);
+        assertCanReadExam(exam);
         String year = yearId != null
                 ? academicCalendarService.resolveYear(yearId, null, null).getLabel()
                 : exam.getAcademicYear();
@@ -85,8 +87,16 @@ public class GradeService {
 
     @Transactional(readOnly = true)
     public List<GradeResponse> listByStudent(Long studentId) {
+        accessControlService.assertCanAccessStudent(studentId);
         return gradeRepository.findByStudentId(studentId).stream()
                 .map(GradeResponse::from).toList();
+    }
+
+    /** Évaluation hors du périmètre de l'enseignant = accès refusé. */
+    private void assertCanReadExam(Exam exam) {
+        if (exam.getSchoolClass() != null) {
+            accessControlService.assertCanAccessClass(exam.getSchoolClass().getId());
+        }
     }
 
     /**
@@ -97,6 +107,15 @@ public class GradeService {
         Exam exam = examService.findById(request.getExamId());
         Student student = studentRepository.findById(request.getStudentId())
                 .orElseThrow(() -> ResourceNotFoundException.of("Élève", request.getStudentId()));
+
+        // Écriture d'une note : l'enseignant doit être affecté à la matière
+        // DANS la classe de l'évaluation, et l'élève doit relever de son
+        // périmètre. Seul un porteur de GRADE_WRITE arrive ici, mais une
+        // permission élargie ne doit pas contourner l'affectation réelle.
+        accessControlService.assertCanTeachSubjectInClass(
+                exam.getSchoolClass() != null ? exam.getSchoolClass().getId() : null,
+                exam.getSubject() != null ? exam.getSubject().getId() : null);
+        accessControlService.assertCanAccessStudent(student.getId());
 
         BigDecimal maxValue = request.getMaxValue() != null ? request.getMaxValue()
                 : BigDecimal.valueOf(20);
@@ -356,6 +375,7 @@ public class GradeService {
 
     @Transactional(readOnly = true)
     public List<StudentRank> rankStudents(Long classId, Term term, Long yearId) {
+        accessControlService.assertCanAccessClass(classId);
         String year = academicCalendarService.resolveYear(yearId, null, null).getLabel();
         return classAverages(classId, term, year).stream()
                 .map(s -> new StudentRank(s.student().getId(), s.student().getFirstName(),
@@ -413,6 +433,7 @@ public class GradeService {
     @Transactional
     public List<BulletinResponse> generateBulletins(Long classId, Term term, Long yearId,
                                                     HttpServletRequest httpRequest) {
+        accessControlService.assertCanAccessClass(classId);
         String year = referenceYearLabel(yearId);
         List<StudentAverage> ranking = classAverages(classId, term, year).stream()
                 .sorted(Comparator.comparing(StudentAverage::average).reversed())
@@ -484,6 +505,7 @@ public class GradeService {
     @Transactional
     public List<BulletinResponse> runDeliberation(Long classId, Term term, Long yearId,
                                                   HttpServletRequest httpRequest) {
+        accessControlService.assertCanAccessClass(classId);
         String year = referenceYearLabel(yearId);
         generateBulletins(classId, term, yearId, httpRequest);
         List<Bulletin> bulletins = bulletinRepository
@@ -515,6 +537,7 @@ public class GradeService {
      */
     @Transactional(readOnly = true)
     public List<BulletinResponse> bulletinsByStudent(Long studentId) {
+        accessControlService.assertCanAccessStudent(studentId);
         return bulletinRepository.findByStudentIdOrderByAcademicYearDescTermDesc(studentId)
                 .stream().map(BulletinResponse::from)
                 .sorted(java.util.Comparator.comparingInt(
@@ -546,6 +569,7 @@ public class GradeService {
     public void exportClassBulletinsPdf(Long classId, Term term, Long yearId,
                                         jakarta.servlet.http.HttpServletResponse response)
             throws java.io.IOException {
+        accessControlService.assertCanAccessClass(classId);
         String year = referenceYearLabel(yearId);
         List<Bulletin> bulletins = bulletinsOfClass(classId, term, year);
         if (bulletins.isEmpty()) {
@@ -565,6 +589,7 @@ public class GradeService {
     public void exportDeliberationPv(Long classId, Term term, Long yearId,
                                      jakarta.servlet.http.HttpServletResponse response)
             throws java.io.IOException {
+        accessControlService.assertCanAccessClass(classId);
         String year = referenceYearLabel(yearId);
         List<Bulletin> bulletins = bulletinsOfClass(classId, term, year);
         bulletins.sort(Comparator.comparing(Bulletin::getRank,

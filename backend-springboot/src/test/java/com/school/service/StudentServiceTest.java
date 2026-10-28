@@ -102,6 +102,9 @@ class StudentServiceTest {
     private FileStorageService fileStorageService;
 
     @Mock
+    private AccessControlService accessControlService;
+
+    @Mock
     private HttpServletRequest httpRequest;
 
     @InjectMocks
