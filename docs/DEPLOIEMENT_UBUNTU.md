@@ -65,6 +65,11 @@ free -h
 
 ## 3. Installation (4 commandes)
 
+> **Serveur sans Internet** (ou installation entièrement hors ligne) : utiliser
+> le bundle autonome décrit dans
+> [DEPLOIEMENT_HORS_LIGNE.md](DEPLOIEMENT_HORS_LIGNE.md). Les deux procédures
+> installent la même pile ; seule la provenance des images diffère.
+
 ```bash
 sudo apt-get update && sudo apt-get install -y git
 sudo git clone https://github.com/Harouna223/school-management-system.git /opt/sahel-edu-install

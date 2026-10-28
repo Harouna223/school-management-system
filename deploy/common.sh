@@ -88,3 +88,72 @@ pick_free_port() {
   done
   printf '%s' "${1:-3307}"
 }
+
+# Cree $ENV_FILE avec des secrets aleatoires et renvoie le mot de passe admin
+# genere sur la sortie standard (a capturer avec $(...)). Le fichier n'est
+# jamais ecrase : l'appelant verifie d'abord son absence.
+#
+# Variables attendues : ENV_FILE, DATA_DIR, SCHOOL_NAME, DOMAIN.
+generate_env_file() {
+  local admin_password="${1:-}"
+  local old_umask db_password jwt_secret db_port cors_origins
+  old_umask="$(umask)"
+  db_password="$(openssl rand -base64 32 | tr -d '/+=' | cut -c1-28)"
+  jwt_secret="$(openssl rand -base64 48 | tr -d '\n')"
+  [[ -n "$admin_password" ]] || admin_password="$(openssl rand -base64 24 | tr -d '/+=' | cut -c1-16)"
+  db_port="$(pick_free_port 3307)"
+  cors_origins="${DOMAIN:+https://$DOMAIN}"
+  cors_origins="${cors_origins:-http://localhost}"
+
+  umask 077
+  cat > "$ENV_FILE" <<EOF
+# Genere par les scripts de deploiement le $(date -Is)
+# NE PAS COMMITTER CE FICHIER.
+
+# Base de donnees (publiee sur 127.0.0.1 uniquement)
+DB_PASSWORD=$db_password
+DB_NAME=school_management
+DB_PORT=$db_port
+
+# Application
+JWT_SECRET=$jwt_secret
+REQUIRE_SECURE_SECRETS=true
+ADMIN_PASSWORD=$admin_password
+SCHOOL_NAME=$SCHOOL_NAME
+CORS_ORIGINS=$cors_origins
+
+# Frontend : 0.0.0.0:80 en HTTP direct sur le LAN.
+# deploy/https.sh bascule sur 127.0.0.1:8081 derriere un nginx hote.
+FRONTEND_BIND=0.0.0.0
+FRONTEND_PORT=80
+BACKEND_PORT=8080
+
+# Cours video / PDF (stockage persistant sur l'hote)
+UPLOAD_HOST_DIR=$DATA_DIR/uploads
+COURSE_MAX_VIDEO_MB=500
+COURSE_MAX_PDF_MB=25
+COURSE_TOKEN_TTL_MINUTES=120
+MAX_FILE_SIZE=512MB
+MAX_REQUEST_SIZE=512MB
+
+# Notifications (laisser vide tant que non configure)
+WA_ENABLED=false
+WA_PROVIDER=meta
+WA_META_TOKEN=
+WA_META_PHONE_ID=
+WA_TWILIO_SID=
+WA_TWILIO_TOKEN=
+WA_TWILIO_FROM=
+SMS_ENABLED=false
+SMS_TWILIO_SID=
+SMS_TWILIO_TOKEN=
+SMS_TWILIO_FROM=
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=
+MAIL_PASSWORD=
+EOF
+  chmod 600 "$ENV_FILE"
+  umask "$old_umask"
+  printf '%s' "$admin_password"
+}

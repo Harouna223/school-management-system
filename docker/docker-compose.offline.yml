@@ -1,0 +1,28 @@
+# ============================================================
+# Sahel Edu - surcharges pour un demarrage HORS LIGNE
+#
+# A utiliser avec le fichier principal, apres chargement des images
+# par deploy/offline/install-offline.sh :
+#
+#   docker compose -f docker/docker-compose.yml \
+#                  -f docker/docker-compose.offline.yml up -d --no-build
+#
+# `pull_policy: never` interdit toute tentative de telechargement : si une
+# image manque, le demarrage echoue avec un message explicite au lieu de
+# rester bloque sur un registre injoignable.
+# ============================================================
+
+services:
+  mysql:
+    pull_policy: never
+
+  backend:
+    image: ${BACKEND_IMAGE:-sahel-edu-backend:local}
+    pull_policy: never
+
+  frontend:
+    image: ${FRONTEND_IMAGE:-sahel-edu-frontend:local}
+    pull_policy: never
+
+  db-backup:
+    pull_policy: never

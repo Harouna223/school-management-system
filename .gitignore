@@ -2,6 +2,9 @@ target/
 node_modules/
 dist/
 *.jar
+# Dockerfile de la variante "jar preconstruit" : malgre son extension, ce
+# n'est pas un artefact de build et il doit etre versionne.
+!docker/Dockerfile.backend.jar
 *.log
 .env
 .vscode/
@@ -50,3 +53,9 @@ frontend-react/dist-*/
 # Sauvegardes de bases de donnees (contiennent des donnees reelles) : ne jamais commiter.
 database/*backup*.sql
 database/*-backup.sql
+
+# Bundle de deploiement hors ligne : images Docker et paquets .deb volumineux.
+# Les scripts et la documentation restent versionnes, pas les artefacts.
+/deploy/offline/dist/
+/deploy/offline/images/
+/deploy/offline/docker-debs/

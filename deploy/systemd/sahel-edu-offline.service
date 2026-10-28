@@ -1,0 +1,28 @@
+[Unit]
+Description=Sahel Edu - pile Docker Compose hors ligne (frontend, backend, MySQL)
+Documentation=file:///opt/sahel-edu/docs/DEPLOIEMENT_HORS_LIGNE.md
+Requires=docker.service
+After=docker.service network.target
+# Volontairement PAS de network-online.target : le serveur doit demarrer
+# meme sans connexion Internet. Les clients du reseau local suffisent.
+Wants=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/sahel-edu
+# `--no-build` : les images sont prechargees depuis le bundle ; aucune
+# compilation ni telechargement n'est possible sur un serveur isole.
+# `up` sans -d : systemd suit l'etat de la pile et journalise les sorties.
+ExecStart=/usr/bin/docker compose -f docker/docker-compose.yml -f docker/docker-compose.offline.yml up --no-build --remove-orphans
+ExecReload=/usr/bin/docker compose -f docker/docker-compose.yml -f docker/docker-compose.offline.yml up -d --no-build --remove-orphans
+ExecStop=/usr/bin/docker compose -f docker/docker-compose.yml -f docker/docker-compose.offline.yml stop
+Restart=on-failure
+RestartSec=30
+TimeoutStartSec=900
+TimeoutStopSec=240
+# `docker compose stop` arrete proprement les conteneurs ; ne pas tuer le
+# processus avant qu'il ait termine.
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target

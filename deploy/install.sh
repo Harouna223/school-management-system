@@ -99,6 +99,7 @@ elif [[ -f "$REPO_ROOT/docker/docker-compose.yml" ]]; then
   rsync -a --delete \
     --exclude '.git' --exclude 'node_modules' --exclude 'target' --exclude 'dist' \
     --exclude 'docker/.env' --exclude 'uploads' \
+    --exclude 'deploy/offline/images' --exclude 'deploy/offline/docker-debs' \
     "$REPO_ROOT/" "$APP_DIR/"
 else
   log "clonage de $REPO_URL"
@@ -115,62 +116,7 @@ if [[ -f "$ENV_FILE" ]]; then
 else
   log "generation de docker/.env (secrets aleatoires)"
   GENERATED=1
-  DB_PASSWORD="$(openssl rand -base64 32 | tr -d '/+=' | cut -c1-28)"
-  JWT_SECRET="$(openssl rand -base64 48 | tr -d '\n')"
-  [[ -n "$ADMIN_PASSWORD" ]] || ADMIN_PASSWORD="$(openssl rand -base64 24 | tr -d '/+=' | cut -c1-16)"
-  DB_PORT="$(pick_free_port 3307)"
-  CORS_ORIGINS_VALUE="${DOMAIN:+https://$DOMAIN}"
-  CORS_ORIGINS_VALUE="${CORS_ORIGINS_VALUE:-http://localhost}"
-
-  umask 077
-  cat > "$ENV_FILE" <<EOF
-# Genere par deploy/install.sh le $(date -Is)
-# NE PAS COMMITTER CE FICHIER.
-
-# Base de donnees (publiee sur 127.0.0.1 uniquement)
-DB_PASSWORD=$DB_PASSWORD
-DB_NAME=school_management
-DB_PORT=$DB_PORT
-
-# Application
-JWT_SECRET=$JWT_SECRET
-REQUIRE_SECURE_SECRETS=true
-ADMIN_PASSWORD=$ADMIN_PASSWORD
-SCHOOL_NAME=$SCHOOL_NAME
-CORS_ORIGINS=$CORS_ORIGINS_VALUE
-
-# Frontend : 0.0.0.0:80 en HTTP direct sur le LAN.
-# deploy/https.sh bascule sur 127.0.0.1:8081 derriere un nginx hote.
-FRONTEND_BIND=0.0.0.0
-FRONTEND_PORT=80
-BACKEND_PORT=8080
-
-# Cours video / PDF (stockage persistant sur l'hote)
-UPLOAD_HOST_DIR=$DATA_DIR/uploads
-COURSE_MAX_VIDEO_MB=500
-COURSE_MAX_PDF_MB=25
-COURSE_TOKEN_TTL_MINUTES=120
-MAX_FILE_SIZE=512MB
-MAX_REQUEST_SIZE=512MB
-
-# Notifications (laisser vide tant que non configure)
-WA_ENABLED=false
-WA_PROVIDER=meta
-WA_META_TOKEN=
-WA_META_PHONE_ID=
-WA_TWILIO_SID=
-WA_TWILIO_TOKEN=
-WA_TWILIO_FROM=
-SMS_ENABLED=false
-SMS_TWILIO_SID=
-SMS_TWILIO_TOKEN=
-SMS_TWILIO_FROM=
-MAIL_HOST=smtp.gmail.com
-MAIL_PORT=587
-MAIL_USERNAME=
-MAIL_PASSWORD=
-EOF
-  chmod 600 "$ENV_FILE"
+  ADMIN_PASSWORD="$(generate_env_file "$ADMIN_PASSWORD")"
 fi
 
 # ------------------------------------------------------------------

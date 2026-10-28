@@ -101,6 +101,8 @@ d'administration des utilisateurs.
 ## Documentation
 
 - [Installation](docs/INSTALLATION.md) — prérequis et procédure détaillée
+- [Déploiement Ubuntu 24.04](docs/DEPLOIEMENT_UBUNTU.md) — Docker Compose, HTTPS, sauvegardes
+- [Déploiement hors ligne](docs/DEPLOIEMENT_HORS_LIGNE.md) — serveur sans Internet, bundle autonome
 - [Architecture](docs/ARCHITECTURE.md) — structure du projet et fonctionnement interne
 - [API](docs/API.md) — liste des endpoints
 - [Diagrammes](docs/DIAGRAMMES.md) — architecture, modèle de données, flux (UML/Mermaid)
