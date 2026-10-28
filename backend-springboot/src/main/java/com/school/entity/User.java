@@ -3,6 +3,7 @@ package com.school.entity;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.BatchSize;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -71,10 +72,17 @@ public class User implements UserDetails {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    @ManyToMany(fetch = FetchType.EAGER)
+    /**
+     * Rôles chargés à la demande : un utilisateur listé sans ses rôles ne doit
+     * pas déclencher un graphe EAGER à chaque lecture. Le filtre JWT les charge
+     * explicitement (voir {@code UserRepository.findByUsername}) car les
+     * autorités de la requête en dépendent.
+     */
+    @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(name = "user_roles",
             joinColumns = @JoinColumn(name = "user_id"),
             inverseJoinColumns = @JoinColumn(name = "role_id"))
+    @BatchSize(size = 25)
     @Builder.Default
     private Set<Role> roles = new HashSet<>();
 

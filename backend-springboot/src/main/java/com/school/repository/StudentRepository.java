@@ -6,6 +6,7 @@ import com.school.enums.StudentStatus;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -127,6 +128,12 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
     /** Enfants de TOUS les dossiers parent d'un même compte utilisateur. */
     List<Student> findByParentIdIn(java.util.Collection<Long> parentIds);
 
+    /**
+     * Élèves d'une classe. Le cycle scolaire (et donc le barème d'appréciation)
+     * se déduit du niveau : on charge la classe et son niveau en une requête
+     * pour ne pas les recharger élève par élève lors des classements.
+     */
+    @EntityGraph(attributePaths = {"schoolClass", "schoolClass.level"})
     List<Student> findBySchoolClassId(Long classId);
 
     Optional<Student> findByUserId(Long userId);

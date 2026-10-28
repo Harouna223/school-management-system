@@ -1,10 +1,13 @@
 import { Box, Typography } from '@mui/material'
 import Inbox from '@mui/icons-material/Inbox'
+import { useI18n } from '../i18n/I18nContext'
 
 /**
  * État vide premium : icône dans un halo, message et sous-message.
  */
-export default function EmptyState({ message = 'Aucune donnée disponible', icon: Icon = Inbox, hint }) {
+export default function EmptyState({ message, icon: Icon = Inbox, hint }) {
+  const { t } = useI18n()
+  const text = message === undefined ? t('common.empty') : message
   return (
     <Box
       display="flex"
@@ -37,7 +40,7 @@ export default function EmptyState({ message = 'Aucune donnée disponible', icon
         <Icon sx={{ fontSize: 34 }} />
       </Box>
       <Typography color="text.secondary" variant="body2" fontWeight={600}>
-        {message}
+        {text}
       </Typography>
       {hint && (
         <Typography color="text.disabled" variant="caption" sx={{ fontSize: 12 }}>

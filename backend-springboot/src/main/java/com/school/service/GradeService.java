@@ -4,6 +4,7 @@ import com.school.dto.request.GradeRequest;
 import com.school.dto.response.BulletinLineResponse;
 import com.school.dto.response.BulletinResponse;
 import com.school.dto.response.GradeResponse;
+import com.school.entity.AppreciationScale;
 import com.school.entity.Bulletin;
 import com.school.entity.Exam;
 import com.school.entity.Grade;
@@ -32,10 +33,12 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * Module notes : saisie, moyennes pondérées, classements, bulletins.
@@ -196,9 +199,16 @@ public class GradeService {
                                                     Long scaleId) {
         Student student = studentRepository.findById(studentId)
                 .orElseThrow(() -> ResourceNotFoundException.of("Élève", studentId));
-        EducationCycle cycle = cycleOf(student);
-        List<Grade> grades = gradeRepository.findByStudentIdAndTermAndYear(studentId, term, year);
+        // Barème résolu une seule fois pour toutes les lignes du bulletin.
+        AppreciationScale scale = appreciationScaleService.scaleFor(scaleId, cycleOf(student));
+        return buildLines(gradeRepository.findByStudentIdAndTermAndYear(studentId, term, year), scale);
+    }
 
+    /**
+     * Lignes de bulletin à partir de notes déjà chargées (évaluation et matière
+     * incluses) et d'un barème déjà résolu : aucune requête par ligne.
+     */
+    private List<BulletinLineResponse> buildLines(List<Grade> grades, AppreciationScale scale) {
         Map<Long, List<Grade>> bySubject = new LinkedHashMap<>();
         for (Grade grade : grades) {
             if (grade.getValue() == null || grade.getExam() == null
@@ -229,7 +239,7 @@ public class GradeService {
                             : round2(moyenne.multiply(BigDecimal.valueOf(coefficient))))
                     .moyenne(moyenne)
                     // Appréciation issue du barème configuré (cycle + version).
-                    .observation(appreciationScaleService.resolveForScale(scaleId, moyenne, cycle))
+                    .observation(appreciationScaleService.labelFor(scale, moyenne))
                     .build());
         }
         lines.sort(Comparator.comparing(BulletinLineResponse::getSubjectName,
@@ -347,13 +357,46 @@ public class GradeService {
     @Transactional(readOnly = true)
     public List<StudentRank> rankStudents(Long classId, Term term, Long yearId) {
         String year = academicCalendarService.resolveYear(yearId, null, null).getLabel();
-        List<Student> students = studentRepository.findBySchoolClassId(classId);
-        return students.stream()
-                .map(s -> new StudentRank(s.getId(), s.getFirstName(), s.getLastName(),
-                        s.getMatricule(), averageForStudent(s.getId(), term, yearId)))
-                .filter(r -> r.average() != null)
+        return classAverages(classId, term, year).stream()
+                .map(s -> new StudentRank(s.student().getId(), s.student().getFirstName(),
+                        s.student().getLastName(), s.student().getMatricule(), s.average()))
                 .sorted(Comparator.comparing(StudentRank::average).reversed())
                 .toList();
+    }
+
+    /** Élève et moyenne trimestrielle, pour les classements et les bulletins. */
+    private record StudentAverage(Student student, BigDecimal average) {
+    }
+
+    /**
+     * Moyennes de tous les élèves d'une classe en un seul passage : une requête
+     * de notes et une requête de barème par cycle, au lieu d'une série de
+     * requêtes par élève et par ligne (N+1 sur les moyennes et les rangs).
+     */
+    private List<StudentAverage> classAverages(Long classId, Term term, String year) {
+        List<Student> students = studentRepository.findBySchoolClassId(classId);
+        if (students.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, List<Grade>> gradesByStudent = gradeRepository
+                .findByStudentIdInAndTermAndYear(
+                        students.stream().map(Student::getId).toList(), term, year)
+                .stream()
+                .collect(Collectors.groupingBy(grade -> grade.getStudent().getId()));
+        Map<EducationCycle, AppreciationScale> scales = new EnumMap<>(EducationCycle.class);
+
+        List<StudentAverage> result = new ArrayList<>();
+        for (Student student : students) {
+            EducationCycle cycle = cycleOf(student);
+            AppreciationScale scale = cycle == null ? null
+                    : scales.computeIfAbsent(cycle, c -> appreciationScaleService.scaleFor(null, c));
+            BigDecimal average = generalAverage(buildLines(
+                    gradesByStudent.getOrDefault(student.getId(), List.of()), scale));
+            if (average != null) {
+                result.add(new StudentAverage(student, average));
+            }
+        }
+        return result;
     }
 
     /**
@@ -371,11 +414,12 @@ public class GradeService {
     public List<BulletinResponse> generateBulletins(Long classId, Term term, Long yearId,
                                                     HttpServletRequest httpRequest) {
         String year = referenceYearLabel(yearId);
-        List<StudentRank> ranking = rankStudents(classId, term, yearId);
+        List<StudentAverage> ranking = classAverages(classId, term, year).stream()
+                .sorted(Comparator.comparing(StudentAverage::average).reversed())
+                .toList();
 
         List<BigDecimal> averages = ranking.stream()
-                .map(StudentRank::average)
-                .filter(Objects::nonNull)
+                .map(StudentAverage::average)
                 .toList();
         BigDecimal classAverage = averages.isEmpty() ? null
                 : averages.stream().reduce(BigDecimal.ZERO, BigDecimal::add)
@@ -385,30 +429,37 @@ public class GradeService {
         BigDecimal classMax = averages.isEmpty() ? null
                 : averages.stream().max(BigDecimal::compareTo).orElse(null);
 
-        List<Bulletin> bulletins = ranking.stream().map(rank -> {
-            Student student = studentRepository.findById(rank.studentId())
-                    .orElseThrow(() -> ResourceNotFoundException.of("Élève", rank.studentId()));
-            Bulletin bulletin = bulletinRepository
-                    .findByStudentIdAndTermAndAcademicYear(rank.studentId(), term, year)
-                    .orElseGet(() -> Bulletin.builder()
-                            .student(student)
-                            .term(term)
-                            .academicYear(year)
-                            .build());
-            bulletin.setAverage(rank.average());
+        // Bulletins existants et barèmes chargés une seule fois pour toute la classe.
+        Map<Long, Bulletin> existing = bulletinRepository
+                .findByStudentIdInAndTermAndAcademicYear(
+                        ranking.stream().map(s -> s.student().getId()).toList(), term, year)
+                .stream()
+                .collect(Collectors.toMap(b -> b.getStudent().getId(), b -> b, (first, second) -> first));
+        Map<EducationCycle, AppreciationScale> scales = new EnumMap<>(EducationCycle.class);
+
+        List<Bulletin> bulletins = new ArrayList<>(ranking.size());
+        for (int index = 0; index < ranking.size(); index++) {
+            StudentAverage entry = ranking.get(index);
+            Student student = entry.student();
+            Bulletin bulletin = existing.getOrDefault(student.getId(), Bulletin.builder()
+                    .student(student)
+                    .term(term)
+                    .academicYear(year)
+                    .build());
+            bulletin.setAverage(entry.average());
             bulletin.setClassAverage(classAverage);
             bulletin.setClassMin(classMin);
             bulletin.setClassMax(classMax);
-            bulletin.setRank(ranking.indexOf(rank) + 1);
+            bulletin.setRank(index + 1);
             EducationCycle cycle = cycleOf(student);
+            AppreciationScale scale = cycle == null ? null
+                    : scales.computeIfAbsent(cycle, c -> appreciationScaleService.scaleFor(null, c));
             // Épingle la version du barème : la réimpression de CE bulletin
             // utilisera exactement la configuration qui l'a produit.
-            Long scaleId = appreciationScaleService.activeScaleId(cycle);
-            bulletin.setAppreciationScaleId(scaleId);
-            bulletin.setMention(appreciationScaleService.resolveForScale(
-                    scaleId, rank.average(), cycle));
-            return bulletin;
-        }).toList();
+            bulletin.setAppreciationScaleId(scale != null ? scale.getId() : null);
+            bulletin.setMention(appreciationScaleService.labelFor(scale, entry.average()));
+            bulletins.add(bulletin);
+        }
 
         List<Bulletin> saved = bulletinRepository.saveAll(bulletins);
         auditService.log("BULLETIN", "Bulletin", classId,

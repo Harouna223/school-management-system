@@ -7,6 +7,7 @@ import com.school.entity.User;
 import com.school.enums.NotificationType;
 import com.school.exception.ResourceNotFoundException;
 import com.school.repository.NotificationRepository;
+import com.school.utils.Pagination;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -40,7 +41,7 @@ public class NotificationService {
 
     public PageResponse<NotificationResponse> getMyNotifications(Long userId, int page, int size) {
         Page<Notification> result = notificationRepository
-                .findByUserIdOrderByCreatedAtDesc(userId, PageRequest.of(page, size));
+                .findByUserIdOrderByCreatedAtDesc(userId, Pagination.of(page, size));
         return PageResponse.from(result, NotificationResponse::from);
     }
 

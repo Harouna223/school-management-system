@@ -12,6 +12,7 @@ import com.school.exception.ResourceNotFoundException;
 import com.school.repository.BookRepository;
 import com.school.repository.BorrowingRepository;
 import jakarta.servlet.http.HttpServletRequest;
+import com.school.utils.Pagination;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -40,7 +41,7 @@ public class LibraryService {
     private final AuditService auditService;
 
     public PageResponse<BookResponse> searchBooks(String search, String category, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("title").ascending());
+        Pageable pageable = Pagination.of(page, size, Sort.by("title").ascending());
         Page<Book> result = bookRepository.search(search, category, pageable);
         return PageResponse.from(result, BookResponse::from);
     }
@@ -104,7 +105,7 @@ public class LibraryService {
 
     public PageResponse<BookResponse.BorrowingResponse> searchBorrowings(BorrowingStatus status,
                                                                          int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("borrowDate").descending());
+        Pageable pageable = Pagination.of(page, size, Sort.by("borrowDate").descending());
         Page<Borrowing> result = status != null
                 ? borrowingRepository.findByStatus(status, pageable)
                 : borrowingRepository.findAll(pageable);

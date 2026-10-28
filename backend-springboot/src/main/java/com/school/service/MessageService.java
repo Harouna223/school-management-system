@@ -11,6 +11,7 @@ import com.school.exception.ResourceNotFoundException;
 import com.school.repository.MessageRepository;
 import com.school.repository.UserRepository;
 import com.school.utils.SecurityUtils;
+import com.school.utils.Pagination;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -124,13 +125,13 @@ public class MessageService {
     }
 
     public PageResponse<MessageResponse> inbox(Long userId, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size);
+        Pageable pageable = Pagination.of(page, size);
         Page<Message> result = messageRepository.findByRecipientIdOrderByCreatedAtDesc(userId, pageable);
         return PageResponse.from(result, MessageResponse::from);
     }
 
     public PageResponse<MessageResponse> sent(Long userId, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size);
+        Pageable pageable = Pagination.of(page, size);
         Page<Message> result = messageRepository.findBySenderIdOrderByCreatedAtDesc(userId, pageable);
         return PageResponse.from(result, MessageResponse::from);
     }

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { fr } from './locales/fr'
 import { en } from './locales/en'
+import { setFormatLocale } from '../utils/format'
 
 const STORAGE_KEY = 'sms.lang'
 
@@ -27,6 +28,9 @@ export function I18nProvider({ children }) {
   }, [lang])
 
   const value = useMemo(() => {
+    // Appliqué pendant le rendu (et non dans l'effet) : les enfants formatent
+    // dates et montants dès ce rendu, pas au suivant.
+    setFormatLocale(lang)
     const t = (key, params) => {
       let text = translations[lang][key]
       if (text === undefined) {

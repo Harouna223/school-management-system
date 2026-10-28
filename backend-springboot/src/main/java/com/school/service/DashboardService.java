@@ -7,6 +7,7 @@ import com.school.entity.AuditLog;
 import com.school.enums.EducationCycle;
 import com.school.enums.StudentStatus;
 import com.school.repository.*;
+import com.school.utils.Pagination;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -161,7 +162,7 @@ public class DashboardService {
 
     public PageResponse<AuditLogResponse> auditLogs(String username, String action, String entity,
                                                     LocalDate from, LocalDate to, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size);
+        Pageable pageable = Pagination.of(page, size);
         LocalDateTime fromDt = from != null ? from.atStartOfDay() : null;
         LocalDateTime toDt = to != null ? to.atTime(LocalTime.MAX) : null;
         Page<AuditLog> result = auditLogRepository.search(

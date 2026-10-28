@@ -13,6 +13,7 @@ import com.school.exception.BusinessException;
 import com.school.exception.ResourceNotFoundException;
 import com.school.repository.*;
 import com.school.utils.CodeGenerator;
+import com.school.utils.Pagination;
 import com.school.utils.SecurityUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -65,7 +66,7 @@ public class FinanceService {
     public PageResponse<InvoiceResponse> searchInvoices(AccessControlService.StudentScope scope,
                                                         InvoiceStatus status,
                                                         int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Pageable pageable = Pagination.of(page, size, Sort.by("createdAt").descending());
         if (scope.isEmpty()) {
             return PageResponse.from(Page.empty(pageable), InvoiceResponse::from);
         }
@@ -139,7 +140,7 @@ public class FinanceService {
                                                         PaymentMethod method,
                                                         LocalDate from, LocalDate to,
                                                         int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("paymentDate").descending());
+        Pageable pageable = Pagination.of(page, size, Sort.by("paymentDate").descending());
         if (scope.isEmpty()) {
             return PageResponse.from(Page.empty(pageable), PaymentResponse::from);
         }
@@ -213,7 +214,7 @@ public class FinanceService {
 
     public PageResponse<ExpenseResponse> searchExpenses(Long categoryId, LocalDate from, LocalDate to,
                                                         int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("expenseDate").descending());
+        Pageable pageable = Pagination.of(page, size, Sort.by("expenseDate").descending());
         Page<Expense> result = expenseRepository.search(categoryId, from, to, pageable);
         return PageResponse.from(result, ExpenseResponse::from);
     }

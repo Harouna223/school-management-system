@@ -22,6 +22,7 @@ import com.school.repository.RoomRepository;
 import com.school.repository.SchoolClassRepository;
 import com.school.repository.SectionRepository;
 import jakarta.servlet.http.HttpServletRequest;
+import com.school.utils.Pagination;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -53,7 +54,7 @@ public class ClassService {
     @Transactional(readOnly = true)
     public PageResponse<ClassResponse> search(String search, Long levelId, Long sectionId,
                                               int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("name").ascending());
+        Pageable pageable = Pagination.of(page, size, Sort.by("name").ascending());
         Page<SchoolClass> result = classRepository.search(search, levelId, sectionId, pageable);
         return PageResponse.from(result, ClassResponse::from);
     }

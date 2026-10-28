@@ -12,6 +12,7 @@ import com.school.mapper.ExamMapper;
 import com.school.repository.ExamRepository;
 import com.school.repository.GradeRepository;
 import jakarta.servlet.http.HttpServletRequest;
+import com.school.utils.Pagination;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -41,7 +42,7 @@ public class ExamService {
     @Transactional(readOnly = true)
     public PageResponse<ExamResponse> search(String search, Long classId, Long subjectId,
                                              Term term, ExamStatus status, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("examDate").descending());
+        Pageable pageable = Pagination.of(page, size, Sort.by("examDate").descending());
         Page<Exam> result = examRepository.search(search, classId, subjectId, term, status, pageable);
         return PageResponse.from(result, ExamResponse::from);
     }

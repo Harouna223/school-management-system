@@ -1,9 +1,38 @@
-import { useState } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import { Outlet } from 'react-router-dom'
-import { Box } from '@mui/material'
+import { Box, LinearProgress } from '@mui/material'
 import Sidebar from '../components/Sidebar'
 import Navbar from '../components/Navbar'
-import Loader from '../components/Loader'
+import loadingService from '../services/loadingService'
+
+/**
+ * Barre de progression non bloquante : signale les requêtes API en cours sans
+ * intercepter les clics. L'ancien Loader plein écran apparaissait à chaque
+ * requête et bloquait toute l'interface (formulaires, navigation, scroll).
+ */
+function TopProgressBar() {
+  const pending = useSyncExternalStore(
+    loadingService.subscribe,
+    () => loadingService.isPending(),
+    () => false,
+  )
+  if (!pending) return null
+  return (
+    <Box
+      sx={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 3,
+        zIndex: (t) => t.zIndex.modal + 1,
+        pointerEvents: 'none',
+      }}
+    >
+      <LinearProgress sx={{ height: 3 }} />
+    </Box>
+  )
+}
 
 /**
  * Layout principal de l'application connectée (sidebar rétractable + navbar + contenu).
@@ -47,7 +76,7 @@ export default function DashboardLayout() {
           </Box>
         </Box>
       </Box>
-      <Loader />
+      <TopProgressBar />
     </Box>
   )
 }

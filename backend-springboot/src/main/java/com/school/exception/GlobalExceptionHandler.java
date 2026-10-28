@@ -65,7 +65,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiResponse<Void>> handleAccessDenied(AccessDeniedException ex,
                                                                 HttpServletRequest request) {
-        return build(HttpStatus.FORBIDDEN, "Accès refusé : permissions insuffisantes", request);
+        log.warn("Accès refusé sur {} : {}", request.getRequestURI(), ex.getMessage());
+        String message = ex.getMessage() != null && !ex.getMessage().isBlank()
+                ? ex.getMessage()
+                : "Accès refusé : permissions insuffisantes";
+        return build(HttpStatus.FORBIDDEN, message, request);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

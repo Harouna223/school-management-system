@@ -12,6 +12,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.util.List;
 import java.util.Optional;
@@ -89,7 +90,7 @@ class AccessControlServiceTest {
 
         try (MockedStatic<com.school.utils.SecurityUtils> utils = mockSecurity(user)) {
             assertThatThrownBy(() -> service.assertCanAccessStudent(30L))
-                    .isInstanceOf(BusinessException.class)
+                    .isInstanceOf(AccessDeniedException.class)
                     .hasMessageContaining("Accès refusé");
         }
     }
@@ -113,7 +114,7 @@ class AccessControlServiceTest {
 
         try (MockedStatic<com.school.utils.SecurityUtils> utils = mockSecurity(user)) {
             assertThatThrownBy(() -> service.assertCanAccessStudent(2L))
-                    .isInstanceOf(BusinessException.class)
+                    .isInstanceOf(AccessDeniedException.class)
                     .hasMessageContaining("Accès refusé");
         }
     }
@@ -174,7 +175,7 @@ class AccessControlServiceTest {
 
         try (MockedStatic<com.school.utils.SecurityUtils> utils = mockSecurity(user)) {
             assertThatThrownBy(() -> service.resolveStudentScope(30L))
-                    .isInstanceOf(BusinessException.class)
+                    .isInstanceOf(AccessDeniedException.class)
                     .hasMessageContaining("Accès refusé");
         }
     }
@@ -248,12 +249,12 @@ class AccessControlServiceTest {
     void staffOnlyRefuseUnParentEtUnEleve() {
         try (MockedStatic<com.school.utils.SecurityUtils> utils = mockSecurity(user(1L, "PARENT"))) {
             assertThatThrownBy(() -> service.assertStaffOnly("le pointage d'une classe"))
-                    .isInstanceOf(BusinessException.class)
+                    .isInstanceOf(AccessDeniedException.class)
                     .hasMessageContaining("Accès refusé");
         }
         try (MockedStatic<com.school.utils.SecurityUtils> utils = mockSecurity(user(2L, "ELEVE"))) {
             assertThatThrownBy(() -> service.assertStaffOnly("le pointage d'une classe"))
-                    .isInstanceOf(BusinessException.class)
+                    .isInstanceOf(AccessDeniedException.class)
                     .hasMessageContaining("Accès refusé");
         }
     }

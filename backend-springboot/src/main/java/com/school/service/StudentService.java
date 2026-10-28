@@ -21,6 +21,7 @@ import com.school.repository.StudentHistoryRepository;
 import com.school.repository.StudentRepository;
 import com.school.repository.UserRepository;
 import com.school.utils.CodeGenerator;
+import com.school.utils.Pagination;
 import com.school.utils.SecurityUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -57,7 +58,7 @@ public class StudentService {
     public PageResponse<StudentResponse> search(String search, Long classId,
                                                 StudentStatus status, EducationCycle cycle,
                                                 int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("lastName").ascending());
+        Pageable pageable = Pagination.of(page, size, Sort.by("lastName").ascending());
         Page<Student> result;
         Long userId = SecurityUtils.currentUserId();
         if (SecurityUtils.hasRole("PARENT")) {

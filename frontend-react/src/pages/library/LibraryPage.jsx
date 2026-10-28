@@ -31,11 +31,25 @@ export default function LibraryPage() {
   const [allBooks, setAllBooks] = useState([])
 
   useEffect(() => {
-    if (borrowDialog) {
-      libraryApi.books({ page: 0, size: 10000 })
-        .then((r) => setAllBooks(r.data.data.content || []))
-        .catch(() => {})
+    if (!borrowDialog) return
+    let cancelled = false
+    // Le backend plafonne size à 200 : on parcourt les pages au lieu de
+    // demander 10000 lignes en une fois (requête refusée).
+    const loadAllBooks = async () => {
+      const pageSize = 200
+      const collected = []
+      let page = 0
+      let totalPages = 1
+      do {
+        const { data } = await libraryApi.books({ page, size: pageSize })
+        collected.push(...(data.data.content || []))
+        totalPages = data.data.totalPages ?? 1
+        page += 1
+      } while (page < totalPages && page < 50)
+      if (!cancelled) setAllBooks(collected)
     }
+    loadAllBooks().catch(() => {})
+    return () => { cancelled = true }
   }, [borrowDialog])
 
   const loadBooks = async () => {

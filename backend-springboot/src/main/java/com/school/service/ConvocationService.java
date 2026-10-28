@@ -17,6 +17,7 @@ import com.school.repository.ParentRepository;
 import com.school.repository.StudentRepository;
 import com.school.repository.TeacherRepository;
 import com.school.utils.SecurityUtils;
+import com.school.utils.Pagination;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -112,7 +113,7 @@ public class ConvocationService {
     @Transactional(readOnly = true)
     public Page<ConvocationResponse> list(Long studentId, Long parentId, Long teacherId,
                                           ConvocationTarget target, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Pageable pageable = Pagination.of(page, size, Sort.by("createdAt").descending());
         Page<Convocation> result;
         if (studentId != null) {
             result = convocationRepository.findByStudentId(studentId, pageable);

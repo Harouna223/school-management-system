@@ -24,6 +24,7 @@ import com.school.repository.SubjectRepository;
 import com.school.repository.TeacherRepository;
 import com.school.repository.UserRepository;
 import com.school.utils.SecurityUtils;
+import com.school.utils.Pagination;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -70,8 +71,6 @@ public class CourseResourceService {
     private static final Set<String> STAFF_ROLES =
             Set.of("SUPER_ADMIN", "DIRECTEUR", "SECRETAIRE");
 
-    private static final int MAX_PAGE_SIZE = 100;
-
     private final CourseResourceRepository courseResourceRepository;
     private final CourseFileStorageService storageService;
     private final CourseAccessTokenService tokenService;
@@ -95,7 +94,7 @@ public class CourseResourceService {
                                                        CourseStatus status, Long subjectId,
                                                        Long classId, int page, int size) {
         User user = currentUser();
-        Pageable pageable = PageRequest.of(page, clampSize(size), Sort.by("createdAt").descending());
+        Pageable pageable = Pagination.of(page, size, Sort.by("createdAt").descending());
 
         if (isStaff(user)) {
             Page<CourseResource> result = courseResourceRepository.searchForStaff(
@@ -112,7 +111,7 @@ public class CourseResourceService {
             Long classIdOfStudent = studentClassId(user.getId());
             if (classIdOfStudent == null) {
                 return PageResponse.<CourseResourceResponse>builder()
-                        .content(List.of()).page(page).size(clampSize(size))
+                        .content(List.of()).page(page).size(size)
                         .totalElements(0).totalPages(0).first(true).last(true).build();
             }
             Page<CourseResource> result = courseResourceRepository.searchForClasses(
@@ -530,13 +529,6 @@ public class CourseResourceService {
             throw new BusinessException("Classe(s) introuvable(s) : " + unknown);
         }
         return found;
-    }
-
-    private int clampSize(int size) {
-        if (size <= 0) {
-            return 10;
-        }
-        return Math.min(size, MAX_PAGE_SIZE);
     }
 
     private String blankToNull(String value) {

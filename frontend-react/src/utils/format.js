@@ -1,19 +1,31 @@
 /**
+ * Locale d'affichage des nombres et des dates, alignée sur la langue de
+ * l'interface. Les fonctions restent utilisables hors composant React : la
+ * locale est poussée par le fournisseur i18n, pas lue via un hook.
+ */
+let currentLocale = 'fr-FR'
+
+/** Applique la langue active aux formats numériques et de date. */
+export function setFormatLocale(lang) {
+  currentLocale = lang === 'en' ? 'en-GB' : 'fr-FR'
+}
+
+/**
  * Formate un nombre en devise (FCFA par défaut).
  */
 export function formatCurrency(value, currency = 'FCFA') {
   if (value == null) return `0 ${currency}`
-  return new Intl.NumberFormat('fr-FR', {
+  return new Intl.NumberFormat(currentLocale, {
     maximumFractionDigits: 0,
   }).format(Number(value)) + ` ${currency}`
 }
 
 /**
- * Formate une date ISO en date lisible fr-FR.
+ * Formate une date ISO en date lisible selon la langue active.
  */
 export function formatDate(value) {
   if (!value) return '—'
-  return new Date(value).toLocaleDateString('fr-FR', {
+  return new Date(value).toLocaleDateString(currentLocale, {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
@@ -25,7 +37,7 @@ export function formatDate(value) {
  */
 export function formatDateTime(value) {
   if (!value) return '—'
-  return new Date(value).toLocaleString('fr-FR', {
+  return new Date(value).toLocaleString(currentLocale, {
     day: '2-digit',
     month: 'short',
     year: 'numeric',

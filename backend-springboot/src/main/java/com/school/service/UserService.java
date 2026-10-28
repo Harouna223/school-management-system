@@ -9,6 +9,7 @@ import com.school.exception.ResourceNotFoundException;
 import com.school.repository.RoleRepository;
 import com.school.repository.UserRepository;
 import com.school.utils.PasswordPolicy;
+import com.school.utils.Pagination;
 import com.school.utils.SecurityUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -47,7 +48,7 @@ public class UserService {
     private final AuditService auditService;
 
     public PageResponse<UserResponse> search(String search, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Pageable pageable = Pagination.of(page, size, Sort.by("createdAt").descending());
         Page<User> result = (search == null || search.isBlank())
                 ? userRepository.findAll(pageable)
                 : userRepository.findByUsernameContainingOrFirstNameContainingOrLastNameContaining(

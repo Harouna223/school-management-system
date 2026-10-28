@@ -20,6 +20,7 @@ import com.school.repository.TeacherMonthlyPaymentRepository;
 import com.school.repository.TeacherRepository;
 import com.school.repository.TeacherWorkHourRepository;
 import com.school.utils.CodeGenerator;
+import com.school.utils.Pagination;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -61,7 +62,7 @@ public class TeacherService {
     private final ScheduleRepository scheduleRepository;
 
     public PageResponse<TeacherResponse> search(String search, TeacherStatus status, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("lastName").ascending());
+        Pageable pageable = Pagination.of(page, size, Sort.by("lastName").ascending());
         Page<Teacher> result = teacherRepository.search(search, status, pageable);
         return PageResponse.from(result, TeacherResponse::from);
     }

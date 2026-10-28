@@ -14,6 +14,7 @@ import com.school.repository.ExamRepository;
 import com.school.repository.SubjectAssignmentRepository;
 import com.school.repository.SubjectRepository;
 import jakarta.servlet.http.HttpServletRequest;
+import com.school.utils.Pagination;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -41,7 +42,7 @@ public class SubjectService {
     private final AuditService auditService;
 
     public PageResponse<SubjectResponse> search(String search, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("name").ascending());
+        Pageable pageable = Pagination.of(page, size, Sort.by("name").ascending());
         Page<Subject> result = subjectRepository.search(search, pageable);
         return PageResponse.from(result, SubjectResponse::from);
     }

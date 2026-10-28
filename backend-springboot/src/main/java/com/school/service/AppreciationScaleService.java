@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Barèmes d'appréciation configurables par cycle scolaire.
@@ -77,11 +78,7 @@ public class AppreciationScaleService {
             log.warn("Appréciation non résolue : cycle scolaire inconnu pour la note {}", note);
             return NO_APPRECIATION;
         }
-        AppreciationScale scale = scaleRepository.findActiveWithBands(cycle)
-                .orElseThrow(() -> new BusinessException(
-                        "Aucun barème d'appréciation actif pour le cycle " + cycle
-                                + ". Configurez-le dans « Barèmes d'appréciation »."));
-        return labelOf(scale, note);
+        return labelFor(scaleFor(null, cycle), note);
     }
 
     /**
@@ -96,21 +93,43 @@ public class AppreciationScaleService {
         if (scaleId == null) {
             return resolve(note, cycle);
         }
-        AppreciationScale scale = scaleRepository.findWithBandsById(scaleId)
-                .orElseGet(() -> scaleRepository.findActiveWithBands(cycle)
-                        .orElseThrow(() -> new BusinessException(
-                                "Barème d'appréciation introuvable (id " + scaleId + ")")));
-        return labelOf(scale, note);
+        return labelFor(scaleFor(scaleId, cycle), note);
     }
 
-    /** Identifiant du barème actif d'un cycle, épinglé sur les bulletins générés. */
-    public Long activeScaleId(EducationCycle cycle) {
+    /**
+     * Barème à appliquer à un calcul de masse (bulletins d'une classe, lignes
+     * d'un bulletin) : à résoudre UNE fois par cycle, puis à passer à
+     * {@link #labelFor(AppreciationScale, BigDecimal)}.
+     *
+     * <p>Sans cette séparation, chaque ligne de bulletin relançait la requête du
+     * barème (N+1 sur les moyennes).</p>
+     *
+     * @param scaleId version épinglée ; {@code null} = barème actif du cycle
+     * @return le barème, ou {@code null} uniquement si le cycle est inconnu
+     */
+    public AppreciationScale scaleFor(Long scaleId, EducationCycle cycle) {
+        if (scaleId != null) {
+            Optional<AppreciationScale> pinned = scaleRepository.findWithBandsById(scaleId);
+            if (pinned.isPresent()) {
+                return pinned.get();
+            }
+        }
         if (cycle == null) {
             return null;
         }
         return scaleRepository.findActiveWithBands(cycle)
-                .map(AppreciationScale::getId)
-                .orElse(null);
+                .orElseThrow(() -> new BusinessException(scaleId != null
+                        ? "Barème d'appréciation introuvable (id " + scaleId + ")"
+                        : "Aucun barème d'appréciation actif pour le cycle " + cycle
+                        + ". Configurez-le dans « Barèmes d'appréciation »."));
+    }
+
+    /** Libellé d'une note pour un barème déjà résolu ({@code null} → « — »). */
+    public String labelFor(AppreciationScale scale, BigDecimal note) {
+        if (note == null || scale == null) {
+            return NO_APPRECIATION;
+        }
+        return labelOf(scale, note);
     }
 
     /** Vrai si le cycle possède un barème actif (message clair côté administration). */

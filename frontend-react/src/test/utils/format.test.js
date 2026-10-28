@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatCurrency, formatDate, formatGrade, initials, DAYS_FR, DAY_KEYS } from '../../utils/format'
+import { formatCurrency, formatDate, formatGrade, initials, DAYS_FR, DAY_KEYS, setFormatLocale } from '../../utils/format'
 
 describe('formatCurrency', () => {
   it('formate un montant avec FCFA par défaut', () => {
@@ -25,6 +25,17 @@ describe('formatDate', () => {
 
   it('formate une date ISO en fr-FR', () => {
     expect(formatDate('2026-09-01')).toMatch(/sept\./)
+  })
+})
+
+describe('setFormatLocale', () => {
+  it('suit la langue active pour les dates et les montants', () => {
+    setFormatLocale('en')
+    expect(formatDate('2026-09-01')).toMatch(/Sep/)
+    expect(formatCurrency(1500)).toMatch(/1,500 FCFA/)
+    setFormatLocale('fr')
+    expect(formatDate('2026-09-01')).toMatch(/sept\./)
+    expect(formatCurrency(1500)).toMatch(/1\s*500 FCFA/)
   })
 })
 

@@ -14,6 +14,7 @@ import com.school.exception.ResourceNotFoundException;
 import com.school.repository.CandidatureRepository;
 import com.school.repository.StudentRepository;
 import jakarta.servlet.http.HttpServletRequest;
+import com.school.utils.Pagination;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -119,7 +120,7 @@ public class CandidatureService {
 
     @Transactional(readOnly = true)
     public Page<CandidatureResponse> list(String fieldName, CandidatureStatus status, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Pageable pageable = Pagination.of(page, size, Sort.by("createdAt").descending());
         Page<Candidature> result;
         if (status != null) {
             result = candidatureRepository.findByStatus(status, pageable);

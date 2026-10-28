@@ -94,6 +94,9 @@ export const en = {
   'common.add': 'Add',
   'common.loading': 'Loading…',
   'common.noData': 'No data',
+  'common.empty': 'No data available',
+  'common.confirmTitle': 'Confirmation',
+  'common.confirm': 'Confirm',
   'common.back': 'Back',
 
   // Login

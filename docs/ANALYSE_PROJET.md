@@ -45,9 +45,21 @@
 > | Flyway / MySQL 8.4 | Flyway porté en 11.20.3 : plus d'avertissement de version non supportée. |
 > | Documentation | Compteurs, versions (Java 21, migrations `V2..V12`) et procédures de secrets resynchronisés. |
 >
-> **Toujours valides** : P1-1 (pagination non bornée), P1-2 (400 au lieu de 403), P1-5/P1-6 (N+1),
-> P1-7 (`@Valid` manquant), §6 (traçabilité du déploiement) et le reste de §10 (i18n partielle,
-> Tailwind inutilisé, loader global).
+> **Toujours valides** : §6 (traçabilité du déploiement), P1-3 (restauration de sauvegarde),
+> P1-8 à P1-14 et §10.3/§10.5/§10.6/§10.7.
+
+> **TRAITEMENT DU 2026-10-28 — constats P1 et frontend corrigés.** Vérifié par `mvn verify`
+> (unitaires + 56 tests d'intégration Testcontainers) puis `npm test` (105 tests) et `npm run build`.
+>
+> | Constat | Correctif appliqué |
+> |---|---|
+> | **P1-1** — pagination non bornée | `utils/Pagination.of(page, size, sort)` borne `size` à **200** et refuse `page < 0` (`PaginationTest`, 6 cas). 15 services migrés ; 22 `PageRequest.of` directs supprimés. Le front ne demande plus `size=10000` (`LibraryPage` pagine par 200). |
+> | **P1-2** — refus d'accès en 400 | Les refus IDOR lèvent `AccessDeniedException` → **403** (`GlobalExceptionHandler`). Tests d'accès et de sécurité des paiements alignés. |
+> | **P1-5** — N+1 des moyennes | `@EntityGraph` sur les requêtes de notes (élève, évaluation, matière) ; `rankStudents` et `generateBulletins` calculent toute la classe en **une requête de notes** (`findByStudentIdInAndTermAndYear`) et **une requête de bulletins** ; barème résolu une fois par cycle (`scaleFor`/`labelFor`). Test de non-régression : `classementChargeLesNotesEnUneRequete`. |
+> | **P1-6** — autorités EAGER | `User.roles` et `Role.permissions` passés en `LAZY` + `@BatchSize(25)` ; `UserRepository.findByUsername` les charge en une requête (`@EntityGraph`), donc le filtre JWT ne déclenche plus de graphe EAGER par appel. `Role.permissions` n'est plus exposé en JSON. |
+> | **P1-7** — `@Valid` manquant | Vérifié : **aucun corps de requête n'est une entité** (le *mass assignment* n'était plus possible) ; tous les DTO portent `@Valid`. Les 13 corps restants sont des `JsonNode`/`Map`/`List`/`Set` (configurations libres), et les 10 réponses d'entités brutes sont des référentiels sans relation (AcademicYear, Level, Section, Room). |
+> | **§10.2** — loader global bloquant | Le `Backdrop` plein écran du layout est remplacé par une **barre de progression non bloquante** (`TopProgressBar`). `Loader` reste disponible pour les chargements de page. |
+> | **§10.4** — i18n partielle | `EmptyState`, `ConfirmDialog` et `Loader` utilisent des clés (`common.empty`, `common.confirm*`, `common.loading`) ; `utils/format.js` suit la langue active (`setFormatLocale` piloté par `I18nProvider`). **Reste à faire** : la migration page par page (~60 pages encore en français codé en dur). |
 
 ---
 
@@ -283,6 +295,10 @@ filtrage sur les élèves rattachés à son compte, comme le fait déjà `Access
 
 ## 5. P1 — Robustesse et sécurité résiduelle
 
+> **Traitement du 2026-10-28** : les constats **1, 2, 5, 6 et 7** sont corrigés (détail dans
+> l'encadré en tête de document). Restent ouverts : 3 (restauration), 4 (déjà corrigé en amont,
+> cf. encadré du 2026-10-27), 8 à 14.
+
 | # | Constat | Preuve | Correctif |
 |---|---|---|---|
 | 1 | **Pagination non bornée** — 0 `@Max` dans les 29 contrôleurs, 23 `PageRequest.of(page, size)` directs ; le front demande `size=500` (`ConvocationsPage`) ; `page=0&size=1000000` accepté | grep `@Max` dans `controller/` → **0** | borner `size` (`@Max(200)`) et valider `page` |
@@ -416,7 +432,7 @@ langues**. Combinée au fait que `Admin@123` est effectivement le mot de passe s
 (§P0-3), l'application **public elle-même ses identifiants d'administration** sur son écran d'entrée.
 *Correctif :* supprimer la clé `login.encrypted` (ou la vider hors développement).
 
-### 10.2 Le loader global bloque toute l'interface à chaque requête 🟠 *vérifié*
+### 10.2 Le loader global bloque toute l'interface à chaque requête ✅ *corrigé le 2026-10-28*
 
 `api/axios.js:16-27` incrémente un compteur global pour **toute** URL hors `/auth/`. `Loader.jsx`
 s'abonne à ce compteur ; il est monté **sans la prop `open`** dans `DashboardLayout.jsx:50`, donc
@@ -433,7 +449,7 @@ n'importe quelle page. **L'impact réel est faible** car le backend applique ses
 permission et renvoie 403 — mais l'interface ne doit pas être considérée comme un contrôle.
 *Correctif :* revalider les rôles via un `GET /auth/me` au démarrage.
 
-### 10.4 i18n déclaré mais quasi inutilisé 🟠 *vérifié*
+### 10.4 i18n déclaré mais quasi inutilisé 🟠 *partiellement corrigé le 2026-10-28*
 
 Infrastructure complète (contexte + `fr.js`/`en.js`, **128 clés symétriques**), mais **seulement
 5 fichiers sur 78** appellent `useI18n` : `Sidebar`, `Navbar`, `DataTable`, `LoginPage`,

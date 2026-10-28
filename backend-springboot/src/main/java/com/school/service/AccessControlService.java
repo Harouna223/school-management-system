@@ -7,6 +7,7 @@ import com.school.exception.ResourceNotFoundException;
 import com.school.repository.ParentRepository;
 import com.school.repository.StudentRepository;
 import com.school.utils.SecurityUtils;
+import org.springframework.security.access.AccessDeniedException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -37,7 +38,7 @@ public class AccessControlService {
      * - ELEVE : autorisé seulement si c'est son propre profil
      * - ENSEIGNANT, COMPTABLE et autres : autorisé
      *
-     * @throws BusinessException si l'accès est refusé
+     * @throws AccessDeniedException si l'accès est refusé
      */
     public void assertCanAccessStudent(Long studentId) {
         if (isAdmin()) return; // admins: full access
@@ -46,7 +47,7 @@ public class AccessControlService {
                     .orElseThrow(() -> ResourceNotFoundException.of("Élève", studentId));
             if (student.getParent() == null
                     || !currentParentIds().contains(student.getParent().getId())) {
-                throw new BusinessException("Accès refusé : cet élève n'est pas lié à votre compte");
+                throw new AccessDeniedException("Accès refusé : cet élève n'est pas lié à votre compte");
             }
             return;
         }
@@ -54,7 +55,7 @@ public class AccessControlService {
             Student current = studentRepository.findByUserId(SecurityUtils.currentUserId())
                     .orElseThrow(() -> new BusinessException("Aucun profil élève lié à votre compte"));
             if (!current.getId().equals(studentId)) {
-                throw new BusinessException("Accès refusé : vous ne pouvez consulter que votre propre profil");
+                throw new AccessDeniedException("Accès refusé : vous ne pouvez consulter que votre propre profil");
             }
             return;
         }
@@ -139,11 +140,11 @@ public class AccessControlService {
      * permission de lecture du module.
      *
      * @param resource libellé de la ressource, utilisé dans le message d'erreur
-     * @throws BusinessException si le compte courant est un parent ou un élève
+     * @throws AccessDeniedException si le compte courant est un parent ou un élève
      */
     public void assertStaffOnly(String resource) {
         if (hasStudentScope()) {
-            throw new BusinessException("Accès refusé : " + resource
+            throw new AccessDeniedException("Accès refusé : " + resource
                     + " n'est pas accessible depuis un compte parent ou élève");
         }
     }

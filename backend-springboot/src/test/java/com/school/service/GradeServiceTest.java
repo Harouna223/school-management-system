@@ -278,7 +278,8 @@ class GradeServiceTest {
     void bulletinCalculeLesSeptColonnes() {
         Subject maths = matiere(1L, "Mathématiques", 4);
         when(studentRepository.findById(1L)).thenReturn(Optional.of(eleveBulleting()));
-        when(appreciationScaleService.resolveForScale(any(), any(), any())).thenReturn("Assez bien");
+        when(appreciationScaleService.scaleFor(any(), any())).thenReturn(null);
+        when(appreciationScaleService.labelFor(any(), any())).thenReturn("Assez bien");
         when(gradeRepository.findByStudentIdAndTermAndYear(1L, Term.T1, "2026-2027")).thenReturn(List.of(
                 noteDe(maths, com.school.enums.ExamType.DEVOIR, 1, "12", "20"),
                 noteDe(maths, com.school.enums.ExamType.CONTROLE, 1, "16", "20"),
@@ -302,7 +303,8 @@ class GradeServiceTest {
     void bulletinSansCompositionNePenalisePas() {
         Subject svt = matiere(2L, "SVT", 2);
         when(studentRepository.findById(1L)).thenReturn(Optional.of(eleveBulleting()));
-        when(appreciationScaleService.resolveForScale(any(), any(), any())).thenReturn("Bien");
+        when(appreciationScaleService.scaleFor(any(), any())).thenReturn(null);
+        when(appreciationScaleService.labelFor(any(), any())).thenReturn("Bien");
         when(gradeRepository.findByStudentIdAndTermAndYear(1L, Term.T1, "2026-2027")).thenReturn(List.of(
                 noteDe(svt, com.school.enums.ExamType.DEVOIR, 1, "15", "20")));
 
@@ -339,5 +341,36 @@ class GradeServiceTest {
 
         // Maths : (12+10)/2 = 11 → ×4 = 44 ; SVT : 15 → ×2 = 30 ; (44+30)/6 = 12,33
         assertThat(service.averageForStudent(1L, Term.T1, null)).isEqualByComparingTo("12.33");
+    }
+
+    @Test
+    @DisplayName("classement : une seule requête de notes pour toute la classe (pas de N+1)")
+    void classementChargeLesNotesEnUneRequete() {
+        Subject maths = matiere(1L, "Mathématiques", 4);
+        Student premier = Student.builder().id(2L).firstName("B").lastName("Deux").matricule("ST-2")
+                .educationCycle(com.school.enums.EducationCycle.COLLEGE).build();
+        Student second = Student.builder().id(3L).firstName("C").lastName("Trois").matricule("ST-3")
+                .educationCycle(com.school.enums.EducationCycle.COLLEGE).build();
+        when(studentRepository.findBySchoolClassId(3L)).thenReturn(List.of(premier, second));
+        when(appreciationScaleService.scaleFor(any(), any())).thenReturn(null);
+        when(gradeRepository.findByStudentIdInAndTermAndYear(any(), any(), any())).thenReturn(List.of(
+                noteDeEleve(premier, maths, "12"),
+                noteDeEleve(second, maths, "16")));
+
+        var classement = service.rankStudents(3L, Term.T1);
+
+        assertThat(classement).extracting(GradeService.StudentRank::average)
+                .containsExactly(new BigDecimal("16.00"), new BigDecimal("12.00"));
+        org.mockito.Mockito.verify(gradeRepository)
+                .findByStudentIdInAndTermAndYear(any(), any(), any());
+        org.mockito.Mockito.verify(gradeRepository, org.mockito.Mockito.never())
+                .findByStudentIdAndTermAndYear(any(), any(), any());
+    }
+
+    private static Grade noteDeEleve(Student eleve, Subject matiere, String valeur) {
+        Exam exam = Exam.builder().id(200L).name("E").type(com.school.enums.ExamType.DEVOIR)
+                .coefficient(1).subject(matiere).build();
+        return Grade.builder().id(1L).student(eleve).exam(exam)
+                .value(new BigDecimal(valeur)).maxValue(new BigDecimal("20")).build();
     }
 }

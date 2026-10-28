@@ -20,6 +20,7 @@ import com.school.repository.TeacherMonthClosureRepository;
 import com.school.repository.TeacherRepository;
 import com.school.repository.TeacherWorkHourRepository;
 import com.school.utils.SecurityUtils;
+import com.school.utils.Pagination;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -129,7 +130,7 @@ public class TeacherHoursService {
     public PageResponse<TeacherWorkHourResponse> search(Long teacherId, Long subjectId, Long classId,
                                                         LocalDate from, LocalDate to, Long yearId,
                                                         int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "date")
+        Pageable pageable = Pagination.of(page, size, Sort.by(Sort.Direction.DESC, "date")
                 .and(Sort.by(Sort.Direction.DESC, "id")));
         Page<TeacherWorkHour> result = workHourRepository.search(
                 teacherId, subjectId, classId, from, to, yearId, pageable);

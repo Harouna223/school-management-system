@@ -6,7 +6,6 @@ import com.school.entity.Parent;
 import com.school.entity.Role;
 import com.school.entity.Student;
 import com.school.entity.User;
-import com.school.exception.BusinessException;
 import com.school.repository.ParentRepository;
 import com.school.repository.StudentRepository;
 import com.school.service.AccessControlService;
@@ -21,6 +20,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.List;
@@ -116,7 +116,7 @@ class PaymentControllerSecurityTest {
         authentifier(parentUser);
 
         assertThatThrownBy(() -> controller.searchPayments(30L, null, null, null, 0, 10))
-                .isInstanceOf(BusinessException.class)
+                .isInstanceOf(AccessDeniedException.class)
                 .hasMessageContaining("Accès refusé");
     }
 
@@ -164,7 +164,7 @@ class PaymentControllerSecurityTest {
         authentifier(parentUser);
 
         assertThatThrownBy(() -> controller.receiptPdf(42L, null))
-                .isInstanceOf(BusinessException.class)
+                .isInstanceOf(AccessDeniedException.class)
                 .hasMessageContaining("Accès refusé");
     }
 }

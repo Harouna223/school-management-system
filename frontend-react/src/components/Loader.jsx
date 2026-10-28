@@ -1,18 +1,22 @@
 import { useSyncExternalStore } from 'react'
 import { Backdrop, CircularProgress, Typography, Box } from '@mui/material'
 import loadingService from '../services/loadingService'
+import { useI18n } from '../i18n/I18nContext'
 
 /**
- * Loader plein écran (global) : s'affiche automatiquement tant que des requêtes
- * API sont en cours (service de chargement global) ou via la prop `open`.
+ * Voile de chargement d'une PAGE (pas du layout) : à monter uniquement quand la
+ * page n'a encore rien à afficher. Le layout global utilise une fine barre de
+ * progression non bloquante.
  */
-export default function Loader({ open, label = 'Chargement…' }) {
+export default function Loader({ open, label }) {
+  const { t } = useI18n()
   const pending = useSyncExternalStore(
     loadingService.subscribe,
     () => loadingService.isPending(),
     () => false,
   )
   const visible = open !== undefined ? open : pending
+  const text = label === undefined ? t('common.loading') : label
   return (
     <Backdrop
       open={visible}
@@ -25,9 +29,9 @@ export default function Loader({ open, label = 'Chargement…' }) {
     >
       <Box display="flex" flexDirection="column" alignItems="center" gap={2}>
         <CircularProgress color="inherit" />
-        {label && (
+        {text && (
           <Typography variant="body2" sx={{ color: 'background.paper', fontWeight: 600 }}>
-            {label}
+            {text}
           </Typography>
         )}
       </Box>

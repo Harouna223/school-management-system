@@ -2,6 +2,7 @@ package com.school.repository;
 
 import com.school.entity.Bulletin;
 import com.school.enums.Term;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.repository.query.Param;
 
@@ -18,9 +19,17 @@ public interface BulletinRepository extends JpaRepository<Bulletin, Long> {
 
     List<Bulletin> findByStudentId(Long studentId);
 
+    /** Bulletins d'une classe, avec l'élève déjà chargé (nom, matricule, classe). */
+    @EntityGraph(attributePaths = {"student", "student.schoolClass"})
     List<Bulletin> findByStudentSchoolClassIdAndTermAndAcademicYear(Long classId,
                                                                     Term term,
                                                                     String academicYear);
+
+    /** Bulletins existants d'un ensemble d'élèves : un seul chargement pour une classe. */
+    @EntityGraph(attributePaths = {"student", "student.schoolClass"})
+    List<Bulletin> findByStudentIdInAndTermAndAcademicYear(java.util.Collection<Long> studentIds,
+                                                           Term term,
+                                                           String academicYear);
 
     /**
      * Année scolaire la plus récente pour laquelle des bulletins existent pour
