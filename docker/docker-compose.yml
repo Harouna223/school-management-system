@@ -69,7 +69,11 @@ services:
       MAX_FILE_SIZE: ${MAX_FILE_SIZE:-512MB}
       MAX_REQUEST_SIZE: ${MAX_REQUEST_SIZE:-512MB}
       SCHOOL_NAME: ${SCHOOL_NAME:-École Moderne de Technologie}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin@123}
+      # Aucune valeur par défaut : au premier démarrage, un ADMIN_PASSWORD vide ou
+      # égal à « Admin@123 » fait échouer le backend (REQUIRE_SECURE_SECRETS=true).
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      # Documentation interactive : à passer à false en production.
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-true}
       WA_ENABLED: ${WA_ENABLED:-false}
       WA_PROVIDER: ${WA_PROVIDER:-meta}
       WA_META_TOKEN: ${WA_META_TOKEN:-}

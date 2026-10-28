@@ -30,6 +30,9 @@ app:
   admin:
     username: admin
     password: Admin@123
+  security:
+    # Les tests utilisent des secrets connus : l'exigence de production ne s'applique pas.
+    require-secure-secrets: false
   whatsapp:
     enabled: false
   sms:

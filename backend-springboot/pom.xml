@@ -25,9 +25,20 @@
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
         <poi.version>5.2.5</poi.version>
         <zxing.version>3.5.3</zxing.version>
+        <!-- Flyway 11 connait MySQL 8.4 (la 9.22 fournie par Spring Boot 3.2
+             avertissait « MySQL 8.4 is newer than this version of Flyway »).
+             Verifie par les tests d'integration sur MySQL 8.4 jetable. -->
+        <flyway.version>11.20.3</flyway.version>
         <!-- Testcontainers : base MySQL jetable pour les tests d'intégration (PHASE 6).
-             Version alignée sur celle gérée par Spring Boot 3.2.x. -->
-        <testcontainers.version>1.19.7</testcontainers.version>
+             1.21.x embarque docker-java 3.4 qui négocie l'API Docker >= 1.44,
+             exigée par Docker Engine 29 (l'API 1.54 renvoyait « Could not find
+             a valid Docker environment » avec 1.19.7). -->
+        <testcontainers.version>1.21.3</testcontainers.version>
+        <!-- Docker Engine 29 refuse les appels d'API < 1.44 (400 Bad Request sur
+             /v1.32/info) alors que docker-java utilise 1.32 par defaut : sans ce
+             reglage, Testcontainers ne detecte plus aucun environnement Docker.
+             Surchargeable avec -Ddocker.api.version=... pour un moteur plus ancien. -->
+        <docker.api.version>1.44</docker.api.version>
         <!-- Passer à true pour exécuter uniquement les tests d'intégration
              (« mvn verify -DskipUnitTests=true »), par exemple en CI après
              l'étape des tests unitaires. -->
@@ -238,6 +249,11 @@
                     <includes>
                         <include>**/*IT.java</include>
                     </includes>
+                    <!-- docker-java fige l'API Docker en 1.32 ; Docker Engine 29
+                         exige >= 1.44. Ce property est lu par Testcontainers. -->
+                    <systemPropertyVariables>
+                        <api.version>${docker.api.version}</api.version>
+                    </systemPropertyVariables>
                 </configuration>
                 <executions>
                     <execution>

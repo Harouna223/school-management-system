@@ -15,9 +15,9 @@ import java.sql.Statement;
  * <ol>
  *   <li><b>Testcontainers</b> (preferé) : conteneur MySQL 8.4 jetable, demarre
  *       une seule fois pour toute la JVM. C'est le mode utilise en CI.</li>
- *   <li><b>Repli</b> : si Docker n'est pas joignable depuis la JVM (cas connu
- *       sous Docker Desktop / WSL2 sur Windows), une base MySQL de test dediee
- *       est utilisee (variable {@code TEST_DB_URL} ou defaut local).</li>
+ *   <li><b>Repli</b> : uniquement si {@code TEST_DB_URL} est explicitement fourni
+ *       (cas connu sous Docker Desktop / WSL2 sur Windows), une base MySQL de test
+ *       dediee est utilisee.
  * </ol>
  *
  * <p><b>SECURITE :</b> le repli est refuse si le nom de la base ne contient pas
@@ -42,6 +42,7 @@ public final class MySqlTestContainer {
         String url;
         String user;
         String password;
+        String explicitTestDbUrl = propertyOrNull("TEST_DB_URL");
         try {
             MySQLContainer<?> tc = new MySQLContainer<>("mysql:8.4")
                     .withDatabaseName("school_test")
@@ -53,9 +54,17 @@ public final class MySqlTestContainer {
             password = tc.getPassword();
             log.info("Base de test : conteneur MySQL jetable (Testcontainers)");
         } catch (Throwable ex) {
-            log.warn("Docker non joignable depuis la JVM ({}) - repli sur une base de test dediee.",
+            // Sans TEST_DB_URL explicite, echouer avec la cause reelle plutot que
+            // de masquer une panne Docker derriere un repli sur une base absente.
+            if (explicitTestDbUrl == null) {
+                throw new IllegalStateException(
+                        "Impossible de demarrer le conteneur MySQL de test (Testcontainers). "
+                                + "Definissez TEST_DB_URL pour utiliser une base existante. "
+                                + "Cause : " + ex.getMessage(), ex);
+            }
+            log.warn("Docker non joignable depuis la JVM ({}) - repli sur TEST_DB_URL.",
                     ex.getMessage());
-            url = externalTestDbUrl();
+            url = externalTestDbUrl(explicitTestDbUrl);
             user = property("TEST_DB_USER", "sms_test");
             password = property("TEST_DB_PASSWORD", "sms_test");
         }
@@ -82,11 +91,8 @@ public final class MySqlTestContainer {
         }
     }
 
-    /** URL de la base de test de repli (port libre par defaut). */
-    private static String externalTestDbUrl() {
-        String url = property("TEST_DB_URL",
-                "jdbc:mysql://localhost:3308/school_test"
-                        + "?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC");
+    /** URL de la base de test de repli, fournie explicitement par TEST_DB_URL. */
+    private static String externalTestDbUrl(String url) {
         assertIsSafeTestDatabase(databaseNameOf(url));
         return url;
     }
@@ -107,11 +113,16 @@ public final class MySqlTestContainer {
     }
 
     private static String property(String key, String fallback) {
+        String value = propertyOrNull(key);
+        return value == null ? fallback : value;
+    }
+
+    private static String propertyOrNull(String key) {
         String value = System.getProperty(key);
         if (value == null || value.isBlank()) {
             value = System.getenv(key);
         }
-        return (value == null || value.isBlank()) ? fallback : value;
+        return (value == null || value.isBlank()) ? null : value;
     }
 
     private MySqlTestContainer() {

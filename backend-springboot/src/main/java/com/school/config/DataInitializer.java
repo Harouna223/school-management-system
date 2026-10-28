@@ -59,8 +59,13 @@ public class DataInitializer implements CommandLineRunner {
     @Value("${app.admin.username:admin}")
     private String adminUsername;
 
-    @Value("${app.admin.password:Admin@123}")
+    @Value("${app.admin.password:}")
     private String adminPassword;
+
+    @Value("${app.security.require-secure-secrets:true}")
+    private boolean requireSecureSecrets;
+
+    private static final String DEFAULT_ADMIN_PASSWORD = "Admin@123";
 
     /** Toutes les permissions du système. */
     private static final List<String> ALL_PERMISSIONS = List.of(
@@ -282,6 +287,15 @@ public class DataInitializer implements CommandLineRunner {
     private void initializeAdmin() {
         if (userRepository.existsByUsername(adminUsername)) {
             return;
+        }
+        if (adminPassword == null || adminPassword.isBlank()) {
+            throw new IllegalStateException(
+                    "ADMIN_PASSWORD est vide : définissez un mot de passe administrateur avant le premier démarrage.");
+        }
+        if (requireSecureSecrets && DEFAULT_ADMIN_PASSWORD.equals(adminPassword)) {
+            throw new IllegalStateException(
+                    "SECURITE : ADMIN_PASSWORD utilise encore la valeur par défaut « Admin@123 » "
+                            + "alors que REQUIRE_SECURE_SECRETS=true. Définissez un mot de passe fort.");
         }
         Optional<Role> superAdminRole = roleRepository.findByName("SUPER_ADMIN");
         if (superAdminRole.isEmpty()) {
