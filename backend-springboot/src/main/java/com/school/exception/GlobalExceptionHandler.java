@@ -7,6 +7,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.context.MessageSourceResolvable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.validation.FieldError;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -167,6 +169,27 @@ public class GlobalExceptionHandler {
                                                                    HttpServletRequest request) {
         log.warn("Argument invalide sur {} : {}", request.getRequestURI(), ex.getMessage());
         return build(HttpStatus.BAD_REQUEST, "Paramètre invalide : " + ex.getMessage(), request);
+    }
+
+    /**
+     * Corps de requête illisible : JSON mal formé, vide, ou de forme inattendue
+     * (tableau au lieu d'objet). Sans ce gestionnaire, l'exception tombait dans
+     * le catch-all et le client recevait un 500 alors que la faute est dans la
+     * requête — cas observé sur {@code POST /api/auth/login}.
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUnreadableBody(HttpMessageNotReadableException ex,
+                                                                  HttpServletRequest request) {
+        log.warn("Corps de requête illisible sur {} : {}", request.getRequestURI(), ex.getMessage());
+        return build(HttpStatus.BAD_REQUEST, "Corps de requête illisible ou mal formé", request);
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUnsupportedMediaType(HttpMediaTypeNotSupportedException ex,
+                                                                       HttpServletRequest request) {
+        log.warn("Type de média non supporté sur {} : {}", request.getRequestURI(), ex.getContentType());
+        return build(HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+                "Type de contenu non supporté : utilisez application/json", request);
     }
 
     @ExceptionHandler(Exception.class)
