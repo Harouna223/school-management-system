@@ -17,13 +17,11 @@ import {
   Button,
   Skeleton
 } from '@mui/material'
-import {
-  ArrowBack,
-  PictureAsPdf,
-  Phone,
-  Email,
-  Cake
-} from '@mui/icons-material'
+import ArrowBack from '@mui/icons-material/ArrowBack'
+import PictureAsPdf from '@mui/icons-material/PictureAsPdf'
+import Phone from '@mui/icons-material/Phone'
+import Email from '@mui/icons-material/Email'
+import Cake from '@mui/icons-material/Cake'
 import PageHeader from '../../components/PageHeader'
 import FileAvatar from '../../components/FileAvatar'
 import { studentApi, attendanceApi, paymentApi, examApi } from '../../api/endpoints'

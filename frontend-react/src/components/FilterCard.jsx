@@ -1,5 +1,5 @@
 import { Box, Typography } from '@mui/material'
-import { Tune } from '@mui/icons-material'
+import Tune from '@mui/icons-material/Tune'
 
 /**
  * Carte de filtres standardisée : conteneur premium pour les barres

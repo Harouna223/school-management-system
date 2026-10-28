@@ -4,17 +4,15 @@ import { useSelector } from 'react-redux'
 import {
   Grid, Card, CardContent, CardActionArea, Typography, Box, Chip, Divider, Avatar,
 } from '@mui/material'
-import {
-  Class as ClassesIcon,
-  MenuBook as SubjectsIcon,
-  AccessTime as HoursIcon,
-  Paid as SalaryIcon,
-  CalendarMonth as ScheduleIcon,
-  EditNote as GradesIcon,
-  ReceiptLong as ReceiptIcon,
-  ArrowForward as ArrowIcon,
-  CheckCircleOutline as PaidIcon,
-} from '@mui/icons-material'
+import ClassesIcon from '@mui/icons-material/Class'
+import SubjectsIcon from '@mui/icons-material/MenuBook'
+import HoursIcon from '@mui/icons-material/AccessTime'
+import SalaryIcon from '@mui/icons-material/Paid'
+import ScheduleIcon from '@mui/icons-material/CalendarMonth'
+import GradesIcon from '@mui/icons-material/EditNote'
+import ReceiptIcon from '@mui/icons-material/ReceiptLong'
+import ArrowIcon from '@mui/icons-material/ArrowForward'
+import PaidIcon from '@mui/icons-material/CheckCircleOutline'
 import StatCard from '../../components/StatCard'
 import MiniMetric from '../../components/MiniMetric'
 import PortalHero from '../../components/PortalHero'

@@ -1,6 +1,6 @@
 import { Box, Typography, Button } from '@mui/material'
 import { Link } from 'react-router-dom'
-import { Home } from '@mui/icons-material'
+import Home from '@mui/icons-material/Home'
 
 export default function NotFoundPage() {
   return (

@@ -4,17 +4,15 @@ import { useSelector } from 'react-redux'
 import {
   Grid, Card, CardContent, CardActionArea, Typography, Box, Chip, Divider, Avatar,
 } from '@mui/material'
-import {
-  MenuBook as GradesIcon,
-  FactCheck as AttendanceIcon,
-  Payments as PaymentsIcon,
-  EmojiEvents as RankIcon,
-  TrendingUp as TrendIcon,
-  CalendarMonth as ScheduleIcon,
-  WarningAmber as WarningIcon,
-  ArrowForward as ArrowIcon,
-  School as SchoolIcon,
-} from '@mui/icons-material'
+import GradesIcon from '@mui/icons-material/MenuBook'
+import AttendanceIcon from '@mui/icons-material/FactCheck'
+import PaymentsIcon from '@mui/icons-material/Payments'
+import RankIcon from '@mui/icons-material/EmojiEvents'
+import TrendIcon from '@mui/icons-material/TrendingUp'
+import ScheduleIcon from '@mui/icons-material/CalendarMonth'
+import WarningIcon from '@mui/icons-material/WarningAmber'
+import ArrowIcon from '@mui/icons-material/ArrowForward'
+import SchoolIcon from '@mui/icons-material/School'
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
 } from 'recharts'

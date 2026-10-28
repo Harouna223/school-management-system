@@ -20,20 +20,18 @@ import {
   Chip,
   Button,
 } from '@mui/material'
-import {
-  Menu as MenuIcon,
-  Notifications as NotificationsIcon,
-  DarkMode,
-  LightMode,
-  AccountCircle,
-  Logout,
-  Search as SearchIcon,
-  MailOutline as MailIcon,
-  ChevronLeft,
-  ChevronRight,
-  DoneAll,
-  KeyboardArrowDown,
-} from '@mui/icons-material'
+import MenuIcon from '@mui/icons-material/Menu'
+import NotificationsIcon from '@mui/icons-material/Notifications'
+import DarkMode from '@mui/icons-material/DarkMode'
+import LightMode from '@mui/icons-material/LightMode'
+import AccountCircle from '@mui/icons-material/AccountCircle'
+import Logout from '@mui/icons-material/Logout'
+import SearchIcon from '@mui/icons-material/Search'
+import MailIcon from '@mui/icons-material/MailOutline'
+import ChevronLeft from '@mui/icons-material/ChevronLeft'
+import ChevronRight from '@mui/icons-material/ChevronRight'
+import DoneAll from '@mui/icons-material/DoneAll'
+import KeyboardArrowDown from '@mui/icons-material/KeyboardArrowDown'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import FileAvatar from './FileAvatar'

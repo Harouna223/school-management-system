@@ -3,47 +3,45 @@ import {
   Drawer, Box, List, ListItemButton, ListItemIcon, ListItemText,
   Divider, Typography, Collapse, Tooltip,
 } from '@mui/material'
-import {
-  Dashboard as DashboardIcon,
-  People as StudentsIcon,
-  School as TeachersIcon,
-  Class as ClassesIcon,
-  MenuBook as SubjectsIcon,
-  CalendarMonth as ScheduleIcon,
-  FactCheck as AttendanceIcon,
-  Assignment as GradesIcon,
-  Quiz as ExamsIcon,
-  Payments as PaymentsIcon,
-  AccountBalanceWallet as FinanceIcon,
-  LocalLibrary as LibraryIcon,
-  VideoLibrary as CoursesIcon,
-  PlayLesson as MyCoursesIcon,
-  Group as HrIcon,
-  Notifications as MessagesIcon,
-  Campaign as AnnouncementsIcon,
-  FamilyRestroom as ChildrenIcon,
-  Logout as LogoutIcon,
-  ExpandLess,
-  ExpandMore,
-  ManageAccounts,
-  Shield,
-  Settings as SettingsIcon,
-  Tune as ScalesIcon,
-  Apartment as SchoolInfoIcon,
-  Palette as DocumentThemeIcon,
-  Badge as StudentCardIcon,
-  ChevronLeft,
-  ChevronRight,
-  Assessment as ReportsIcon,
-  Assignment as AssignmentIcon,
-  EditNote as EditNoteIcon,
-  Event as ConvocationIcon,
-  Layers as LevelsIcon,
-  Splitscreen as SectionsIcon,
-  MeetingRoom as RoomsIcon,
-  Receipt as FeeTypesIcon,
-  Paid as TeacherPayrollIcon,
-} from '@mui/icons-material'
+import DashboardIcon from '@mui/icons-material/Dashboard'
+import StudentsIcon from '@mui/icons-material/People'
+import TeachersIcon from '@mui/icons-material/School'
+import ClassesIcon from '@mui/icons-material/Class'
+import SubjectsIcon from '@mui/icons-material/MenuBook'
+import ScheduleIcon from '@mui/icons-material/CalendarMonth'
+import AttendanceIcon from '@mui/icons-material/FactCheck'
+import GradesIcon from '@mui/icons-material/Assignment'
+import ExamsIcon from '@mui/icons-material/Quiz'
+import PaymentsIcon from '@mui/icons-material/Payments'
+import FinanceIcon from '@mui/icons-material/AccountBalanceWallet'
+import LibraryIcon from '@mui/icons-material/LocalLibrary'
+import CoursesIcon from '@mui/icons-material/VideoLibrary'
+import MyCoursesIcon from '@mui/icons-material/PlayLesson'
+import HrIcon from '@mui/icons-material/Group'
+import MessagesIcon from '@mui/icons-material/Notifications'
+import AnnouncementsIcon from '@mui/icons-material/Campaign'
+import ChildrenIcon from '@mui/icons-material/FamilyRestroom'
+import LogoutIcon from '@mui/icons-material/Logout'
+import ExpandLess from '@mui/icons-material/ExpandLess'
+import ExpandMore from '@mui/icons-material/ExpandMore'
+import ManageAccounts from '@mui/icons-material/ManageAccounts'
+import Shield from '@mui/icons-material/Shield'
+import SettingsIcon from '@mui/icons-material/Settings'
+import ScalesIcon from '@mui/icons-material/Tune'
+import SchoolInfoIcon from '@mui/icons-material/Apartment'
+import DocumentThemeIcon from '@mui/icons-material/Palette'
+import StudentCardIcon from '@mui/icons-material/Badge'
+import ChevronLeft from '@mui/icons-material/ChevronLeft'
+import ChevronRight from '@mui/icons-material/ChevronRight'
+import ReportsIcon from '@mui/icons-material/Assessment'
+import AssignmentIcon from '@mui/icons-material/Assignment'
+import EditNoteIcon from '@mui/icons-material/EditNote'
+import ConvocationIcon from '@mui/icons-material/Event'
+import LevelsIcon from '@mui/icons-material/Layers'
+import SectionsIcon from '@mui/icons-material/Splitscreen'
+import RoomsIcon from '@mui/icons-material/MeetingRoom'
+import FeeTypesIcon from '@mui/icons-material/Receipt'
+import TeacherPayrollIcon from '@mui/icons-material/Paid'
 import { useNavigate, useLocation, NavLink } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { logout } from '../redux/slices/authSlice'

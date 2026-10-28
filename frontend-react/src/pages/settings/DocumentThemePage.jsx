@@ -5,10 +5,18 @@ import {
   CircularProgress, Tooltip, Table, TableBody, TableCell, TableHead, TableRow,
   Collapse,
 } from '@mui/material'
-import {
-  CheckCircle, RestartAlt, Save, Visibility, History, Palette, Article, Tune,
-  Preview as PreviewIcon, Undo, ExpandMore, ExpandLess,
-} from '@mui/icons-material'
+import CheckCircle from '@mui/icons-material/CheckCircle'
+import RestartAlt from '@mui/icons-material/RestartAlt'
+import Save from '@mui/icons-material/Save'
+import Visibility from '@mui/icons-material/Visibility'
+import History from '@mui/icons-material/History'
+import Palette from '@mui/icons-material/Palette'
+import Article from '@mui/icons-material/Article'
+import Tune from '@mui/icons-material/Tune'
+import PreviewIcon from '@mui/icons-material/Preview'
+import Undo from '@mui/icons-material/Undo'
+import ExpandMore from '@mui/icons-material/ExpandMore'
+import ExpandLess from '@mui/icons-material/ExpandLess'
 import { documentThemeApi } from '../../api/endpoints'
 import { extractError } from '../../api/axios'
 import { useToast } from '../../hooks/useToast'

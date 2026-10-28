@@ -5,9 +5,13 @@ import {
   IconButton, Divider, Alert, Table, TableBody, TableCell, TableHead, TableRow,
   Tooltip, Paper,
 } from '@mui/material'
-import {
-  Add, ContentCopy, DeleteOutline, Edit, PlayArrow, StopCircle, Visibility,
-} from '@mui/icons-material'
+import Add from '@mui/icons-material/Add'
+import ContentCopy from '@mui/icons-material/ContentCopy'
+import DeleteOutline from '@mui/icons-material/DeleteOutline'
+import Edit from '@mui/icons-material/Edit'
+import PlayArrow from '@mui/icons-material/PlayArrow'
+import StopCircle from '@mui/icons-material/StopCircle'
+import Visibility from '@mui/icons-material/Visibility'
 import PageHeader from '../../components/PageHeader'
 import FilterCard from '../../components/FilterCard'
 import EmptyState from '../../components/EmptyState'

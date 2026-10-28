@@ -15,30 +15,28 @@ import {
   Skeleton,
   Button
 } from '@mui/material'
-import {
-  People,
-  School,
-  Class,
-  MenuBook,
-  Payments,
-  AccountBalanceWallet,
-  FactCheck,
-  LocalLibrary,
-  CurrencyExchange,
-  ReceiptLong,
-  EventBusy,
-  AutoStories,
-  BeachAccess,
-  History,
-  Groups,
-  PersonAddAlt1,
-  ArrowForward,
-  Schedule,
-  TrendingUp,
-  AccessTime,
-  Save,
-  HowToReg
-} from '@mui/icons-material'
+import People from '@mui/icons-material/People'
+import School from '@mui/icons-material/School'
+import Class from '@mui/icons-material/Class'
+import MenuBook from '@mui/icons-material/MenuBook'
+import Payments from '@mui/icons-material/Payments'
+import AccountBalanceWallet from '@mui/icons-material/AccountBalanceWallet'
+import FactCheck from '@mui/icons-material/FactCheck'
+import LocalLibrary from '@mui/icons-material/LocalLibrary'
+import CurrencyExchange from '@mui/icons-material/CurrencyExchange'
+import ReceiptLong from '@mui/icons-material/ReceiptLong'
+import EventBusy from '@mui/icons-material/EventBusy'
+import AutoStories from '@mui/icons-material/AutoStories'
+import BeachAccess from '@mui/icons-material/BeachAccess'
+import History from '@mui/icons-material/History'
+import Groups from '@mui/icons-material/Groups'
+import PersonAddAlt1 from '@mui/icons-material/PersonAddAlt1'
+import ArrowForward from '@mui/icons-material/ArrowForward'
+import Schedule from '@mui/icons-material/Schedule'
+import TrendingUp from '@mui/icons-material/TrendingUp'
+import AccessTime from '@mui/icons-material/AccessTime'
+import Save from '@mui/icons-material/Save'
+import HowToReg from '@mui/icons-material/HowToReg'
 import {
   ResponsiveContainer,
   AreaChart,

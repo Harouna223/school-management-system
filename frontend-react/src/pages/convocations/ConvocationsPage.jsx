@@ -16,7 +16,11 @@ import {
   Avatar,
   TablePagination
 } from '@mui/material'
-import { Add, Delete, Event, Place, Person } from '@mui/icons-material'
+import Add from '@mui/icons-material/Add'
+import Delete from '@mui/icons-material/Delete'
+import Event from '@mui/icons-material/Event'
+import Place from '@mui/icons-material/Place'
+import Person from '@mui/icons-material/Person'
 import PageHeader from '../../components/PageHeader'
 import { useToast } from '../../hooks/useToast'
 import { convocationApi, studentApi, parentApi, teacherApi } from '../../api/endpoints'

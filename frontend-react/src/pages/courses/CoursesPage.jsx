@@ -2,9 +2,11 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   Grid, TextField, MenuItem, Button, Box, Chip, Tooltip, Stack, Typography,
 } from '@mui/material'
-import {
-  Archive, Publish, Unpublished, Videocam, PictureAsPdf,
-} from '@mui/icons-material'
+import Archive from '@mui/icons-material/Archive'
+import Publish from '@mui/icons-material/Publish'
+import Unpublished from '@mui/icons-material/Unpublished'
+import Videocam from '@mui/icons-material/Videocam'
+import PictureAsPdf from '@mui/icons-material/PictureAsPdf'
 import PageHeader from '../../components/PageHeader'
 import DataTable from '../../components/DataTable'
 import ConfirmDialog from '../../components/ConfirmDialog'

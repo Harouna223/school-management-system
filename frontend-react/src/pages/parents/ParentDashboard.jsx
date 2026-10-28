@@ -5,16 +5,14 @@ import {
   Grid, Card, CardContent, CardActionArea, Typography, Box, Chip,
   Button, Divider,
 } from '@mui/material'
-import {
-  FamilyRestroom as ChildrenIcon,
-  TrendingUp as TrendIcon,
-  FactCheck as AttendanceIcon,
-  Payments as PaymentsIcon,
-  MenuBook as GradesIcon,
-  EmojiEvents as RankIcon,
-  ArrowForward as ArrowIcon,
-  School as SchoolIcon,
-} from '@mui/icons-material'
+import ChildrenIcon from '@mui/icons-material/FamilyRestroom'
+import TrendIcon from '@mui/icons-material/TrendingUp'
+import AttendanceIcon from '@mui/icons-material/FactCheck'
+import PaymentsIcon from '@mui/icons-material/Payments'
+import GradesIcon from '@mui/icons-material/MenuBook'
+import RankIcon from '@mui/icons-material/EmojiEvents'
+import ArrowIcon from '@mui/icons-material/ArrowForward'
+import SchoolIcon from '@mui/icons-material/School'
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell,
 } from 'recharts'

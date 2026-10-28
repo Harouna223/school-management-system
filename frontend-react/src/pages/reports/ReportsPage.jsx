@@ -2,7 +2,10 @@ import { useState, useEffect } from 'react'
 import {
   Box, Card, Grid, TextField, Button, Typography, Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, FormControl, InputLabel, Select, MenuItem,
 } from '@mui/material'
-import { Assessment, TableView, PictureAsPdf, Download } from '@mui/icons-material'
+import Assessment from '@mui/icons-material/Assessment'
+import TableView from '@mui/icons-material/TableView'
+import PictureAsPdf from '@mui/icons-material/PictureAsPdf'
+import Download from '@mui/icons-material/Download'
 import PageHeader from '../../components/PageHeader'
 import { useToast } from '../../hooks/useToast'
 import { attendanceApi, financeApi, classApi } from '../../api/endpoints'

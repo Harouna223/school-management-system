@@ -1,5 +1,6 @@
 import { Card, Typography, Box, Skeleton } from '@mui/material'
-import { TrendingUp, TrendingDown } from '@mui/icons-material'
+import TrendingUp from '@mui/icons-material/TrendingUp'
+import TrendingDown from '@mui/icons-material/TrendingDown'
 
 const colorMap = {
   primary: { grad: 'linear-gradient(135deg, #3b82f6, #2563eb)', accent: '#2563eb' },

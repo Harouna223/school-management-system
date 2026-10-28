@@ -15,7 +15,12 @@ import {
   IconButton,
   Avatar
 } from '@mui/material'
-import { Add, Delete, Edit, MenuBook, Event, Group } from '@mui/icons-material'
+import Add from '@mui/icons-material/Add'
+import Delete from '@mui/icons-material/Delete'
+import Edit from '@mui/icons-material/Edit'
+import MenuBook from '@mui/icons-material/MenuBook'
+import Event from '@mui/icons-material/Event'
+import Group from '@mui/icons-material/Group'
 import PageHeader from '../../components/PageHeader'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { useToast } from '../../hooks/useToast'

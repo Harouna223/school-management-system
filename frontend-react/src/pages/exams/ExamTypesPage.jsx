@@ -6,9 +6,11 @@ import {
   Typography,
   Box
 } from '@mui/material'
-import {
-  Quiz, Assignment, School, WorkspacePremium, Add,
-} from '@mui/icons-material'
+import Quiz from '@mui/icons-material/Quiz'
+import Assignment from '@mui/icons-material/Assignment'
+import School from '@mui/icons-material/School'
+import WorkspacePremium from '@mui/icons-material/WorkspacePremium'
+import Add from '@mui/icons-material/Add'
 import PageHeader from '../../components/PageHeader'
 
 const TYPES = {

@@ -3,12 +3,17 @@ import {
   Grid, TextField, MenuItem, Button, Dialog, DialogTitle, DialogContent, DialogActions,
   Box, Typography, Tabs, Tab, Chip, IconButton, Tooltip, Alert,
 } from '@mui/material'
-import {
-  Schedule as HoursIcon, History as HistoryIcon, Payments as PayIcon,
-  Paid as RatesIcon, Lock, LockOpen,
-  FileDownload as DownloadIcon, Edit as EditIcon, Delete as DeleteIcon,
-  ReceiptLong as ReceiptIcon, TableChart as ExcelIcon,
-} from '@mui/icons-material'
+import HoursIcon from '@mui/icons-material/Schedule'
+import HistoryIcon from '@mui/icons-material/History'
+import PayIcon from '@mui/icons-material/Payments'
+import RatesIcon from '@mui/icons-material/Paid'
+import Lock from '@mui/icons-material/Lock'
+import LockOpen from '@mui/icons-material/LockOpen'
+import DownloadIcon from '@mui/icons-material/FileDownload'
+import EditIcon from '@mui/icons-material/Edit'
+import DeleteIcon from '@mui/icons-material/Delete'
+import ReceiptIcon from '@mui/icons-material/ReceiptLong'
+import ExcelIcon from '@mui/icons-material/TableChart'
 import PageHeader from '../../components/PageHeader'
 import DataTable from '../../components/DataTable'
 import ConfirmDialog from '../../components/ConfirmDialog'

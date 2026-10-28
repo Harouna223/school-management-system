@@ -19,10 +19,13 @@ import {
   TableCell,
   TableBody
 } from '@mui/material'
-import {
-  PictureAsPdf, MenuBook, FactCheck, Assignment, Timeline as TimelineIcon,
-  Description, Receipt,
-} from '@mui/icons-material'
+import PictureAsPdf from '@mui/icons-material/PictureAsPdf'
+import MenuBook from '@mui/icons-material/MenuBook'
+import FactCheck from '@mui/icons-material/FactCheck'
+import Assignment from '@mui/icons-material/Assignment'
+import TimelineIcon from '@mui/icons-material/Timeline'
+import Description from '@mui/icons-material/Description'
+import Receipt from '@mui/icons-material/Receipt'
 import PageHeader from '../../components/PageHeader'
 import StatusChip from '../../components/StatusChip'
 import Loader from '../../components/Loader'

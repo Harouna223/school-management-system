@@ -3,11 +3,21 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Grid, TextField, MenuItem, Button, Box, Chip, Typography,
   IconButton, Menu, Dialog, DialogTitle, DialogContent, DialogActions, Tooltip,
 } from '@mui/material'
-import {
-  QrCode2, PictureAsPdf, TableView, People, PersonAddAlt1, CheckCircle, UploadFile,
-  MoreVert, SwapHoriz, PersonOff, RestartAlt, History, WhatsApp as WhatsAppIcon,
-  CreditCard, FactCheck,
-} from '@mui/icons-material'
+import QrCode2 from '@mui/icons-material/QrCode2'
+import PictureAsPdf from '@mui/icons-material/PictureAsPdf'
+import TableView from '@mui/icons-material/TableView'
+import People from '@mui/icons-material/People'
+import PersonAddAlt1 from '@mui/icons-material/PersonAddAlt1'
+import CheckCircle from '@mui/icons-material/CheckCircle'
+import UploadFile from '@mui/icons-material/UploadFile'
+import MoreVert from '@mui/icons-material/MoreVert'
+import SwapHoriz from '@mui/icons-material/SwapHoriz'
+import PersonOff from '@mui/icons-material/PersonOff'
+import RestartAlt from '@mui/icons-material/RestartAlt'
+import History from '@mui/icons-material/History'
+import WhatsAppIcon from '@mui/icons-material/WhatsApp'
+import CreditCard from '@mui/icons-material/CreditCard'
+import FactCheck from '@mui/icons-material/FactCheck'
 import PageHeader from '../../components/PageHeader'
 import DataTable from '../../components/DataTable'
 import ConfirmDialog from '../../components/ConfirmDialog'

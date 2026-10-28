@@ -14,7 +14,9 @@ import {
   Tabs,
   Tab
 } from '@mui/material'
-import { EventBusy, Description, Payments as PaymentsIcon } from '@mui/icons-material'
+import EventBusy from '@mui/icons-material/EventBusy'
+import Description from '@mui/icons-material/Description'
+import PaymentsIcon from '@mui/icons-material/Payments'
 import PageHeader from '../../components/PageHeader'
 import DataTable from '../../components/DataTable'
 import ConfirmDialog from '../../components/ConfirmDialog'

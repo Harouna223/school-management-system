@@ -26,7 +26,11 @@ import {
   DialogContent,
   DialogActions,
 } from '@mui/material'
-import { ArrowBack, Save, Upload, School, PictureAsPdf } from '@mui/icons-material'
+import ArrowBack from '@mui/icons-material/ArrowBack'
+import Save from '@mui/icons-material/Save'
+import Upload from '@mui/icons-material/Upload'
+import School from '@mui/icons-material/School'
+import PictureAsPdf from '@mui/icons-material/PictureAsPdf'
 import PageHeader from '../../components/PageHeader'
 import FileAvatar from '../../components/FileAvatar'
 import { useToast } from '../../hooks/useToast'

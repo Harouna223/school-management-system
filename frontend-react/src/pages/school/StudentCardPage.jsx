@@ -4,10 +4,19 @@ import {
   Divider, Alert, Chip, CircularProgress, Avatar, Switch, FormControlLabel, Slider,
   Tooltip, ToggleButton, ToggleButtonGroup,
 } from '@mui/material'
-import {
-  Badge as BadgeIcon, CloudUpload, DeleteOutline, Download, Image as ImageIcon,
-  Palette, RestartAlt, Save, Tune, Visibility, TextFields, ListAlt, PhotoCamera,
-} from '@mui/icons-material'
+import BadgeIcon from '@mui/icons-material/Badge'
+import CloudUpload from '@mui/icons-material/CloudUpload'
+import DeleteOutline from '@mui/icons-material/DeleteOutline'
+import Download from '@mui/icons-material/Download'
+import ImageIcon from '@mui/icons-material/Image'
+import Palette from '@mui/icons-material/Palette'
+import RestartAlt from '@mui/icons-material/RestartAlt'
+import Save from '@mui/icons-material/Save'
+import Tune from '@mui/icons-material/Tune'
+import Visibility from '@mui/icons-material/Visibility'
+import TextFields from '@mui/icons-material/TextFields'
+import ListAlt from '@mui/icons-material/ListAlt'
+import PhotoCamera from '@mui/icons-material/PhotoCamera'
 import PageHeader from '../../components/PageHeader'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import FileImage from '../../components/FileImage'

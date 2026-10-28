@@ -11,7 +11,10 @@ import {
   CircularProgress,
   Divider,
 } from '@mui/material'
-import { Visibility, VisibilityOff, Lock, Person } from '@mui/icons-material'
+import Visibility from '@mui/icons-material/Visibility'
+import VisibilityOff from '@mui/icons-material/VisibilityOff'
+import Lock from '@mui/icons-material/Lock'
+import Person from '@mui/icons-material/Person'
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { login } from '../../redux/slices/authSlice'

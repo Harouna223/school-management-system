@@ -1,6 +1,6 @@
 import { useCallback, useState, useEffect } from 'react'
 import { Grid, TextField, Button, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material'
-import { Add } from '@mui/icons-material'
+import Add from '@mui/icons-material/Add'
 import PageHeader from '../../components/PageHeader'
 import DataTable from '../../components/DataTable'
 import ConfirmDialog from '../../components/ConfirmDialog'

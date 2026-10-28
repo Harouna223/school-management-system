@@ -4,10 +4,18 @@ import {
   Button, Stack, Divider, Alert, Chip, Dialog, DialogTitle, DialogContent,
   DialogActions, CircularProgress, Avatar,
 } from '@mui/material'
-import {
-  Business, ContactPhone, Badge, Image as ImageIcon, Notes, Save, RestartAlt,
-  Visibility, CloudUpload, DeleteOutline, School as SchoolIcon, Download,
-} from '@mui/icons-material'
+import Business from '@mui/icons-material/Business'
+import ContactPhone from '@mui/icons-material/ContactPhone'
+import Badge from '@mui/icons-material/Badge'
+import ImageIcon from '@mui/icons-material/Image'
+import Notes from '@mui/icons-material/Notes'
+import Save from '@mui/icons-material/Save'
+import RestartAlt from '@mui/icons-material/RestartAlt'
+import Visibility from '@mui/icons-material/Visibility'
+import CloudUpload from '@mui/icons-material/CloudUpload'
+import DeleteOutline from '@mui/icons-material/DeleteOutline'
+import SchoolIcon from '@mui/icons-material/School'
+import Download from '@mui/icons-material/Download'
 import PageHeader from '../../components/PageHeader'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import FileImage from '../../components/FileImage'

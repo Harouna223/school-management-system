@@ -18,7 +18,13 @@ import {
   Typography,
   Chip,
 } from '@mui/material'
-import { Search, Edit, Delete, Visibility, Badge, KeyboardArrowDown, Download } from '@mui/icons-material'
+import Search from '@mui/icons-material/Search'
+import Edit from '@mui/icons-material/Edit'
+import Delete from '@mui/icons-material/Delete'
+import Visibility from '@mui/icons-material/Visibility'
+import Badge from '@mui/icons-material/Badge'
+import KeyboardArrowDown from '@mui/icons-material/KeyboardArrowDown'
+import Download from '@mui/icons-material/Download'
 import EmptyState from './EmptyState'
 import { useI18n } from '../i18n/I18nContext'
 

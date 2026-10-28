@@ -22,7 +22,10 @@ import {
   Tabs,
   Tab
 } from '@mui/material'
-import { Check, Close, Schedule, WhatsApp as WhatsAppIcon } from '@mui/icons-material'
+import Check from '@mui/icons-material/Check'
+import Close from '@mui/icons-material/Close'
+import Schedule from '@mui/icons-material/Schedule'
+import WhatsAppIcon from '@mui/icons-material/WhatsApp'
 import PageHeader from '../../components/PageHeader'
 import FilterCard from '../../components/FilterCard'
 import { useToast } from '../../hooks/useToast'

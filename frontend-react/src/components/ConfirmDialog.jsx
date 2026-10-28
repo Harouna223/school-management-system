@@ -1,5 +1,6 @@
 import { Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Box, Typography } from '@mui/material'
-import { WarningAmber, DeleteOutline } from '@mui/icons-material'
+import WarningAmber from '@mui/icons-material/WarningAmber'
+import DeleteOutline from '@mui/icons-material/DeleteOutline'
 
 /**
  * Dialogue de confirmation moderne avant une action destructive.

@@ -3,7 +3,10 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Typography,
   CircularProgress, Alert, Chip, Stack, IconButton,
 } from '@mui/material'
-import { Close, Download, PictureAsPdf, Videocam } from '@mui/icons-material'
+import Close from '@mui/icons-material/Close'
+import Download from '@mui/icons-material/Download'
+import PictureAsPdf from '@mui/icons-material/PictureAsPdf'
+import Videocam from '@mui/icons-material/Videocam'
 import {
   courseApi, courseDownloadUrl, coursePreviewUrl, courseStreamUrl,
 } from '../api/endpoints'

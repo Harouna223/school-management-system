@@ -3,7 +3,16 @@ import {
   Grid, TextField, MenuItem, Button, Box,
   Dialog, DialogTitle, DialogContent, DialogActions, Tabs, Tab,
 } from '@mui/material'
-import { PictureAsPdf, Receipt, AddCard, Payments as PaymentsIcon, Payments, AccountBalanceWallet, TableView, WarningAmber, NotificationsActive, WhatsApp as WhatsAppIcon } from '@mui/icons-material'
+import PictureAsPdf from '@mui/icons-material/PictureAsPdf'
+import Receipt from '@mui/icons-material/Receipt'
+import AddCard from '@mui/icons-material/AddCard'
+import PaymentsIcon from '@mui/icons-material/Payments'
+import Payments from '@mui/icons-material/Payments'
+import AccountBalanceWallet from '@mui/icons-material/AccountBalanceWallet'
+import TableView from '@mui/icons-material/TableView'
+import WarningAmber from '@mui/icons-material/WarningAmber'
+import NotificationsActive from '@mui/icons-material/NotificationsActive'
+import WhatsAppIcon from '@mui/icons-material/WhatsApp'
 import PageHeader from '../../components/PageHeader'
 import DataTable from '../../components/DataTable'
 import StatCard from '../../components/StatCard'

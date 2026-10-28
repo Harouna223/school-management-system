@@ -17,7 +17,11 @@ import {
   TableRow,
   Paper,
 } from '@mui/material'
-import { UploadFile, Download, CheckCircle, ErrorOutline, Close } from '@mui/icons-material'
+import UploadFile from '@mui/icons-material/UploadFile'
+import Download from '@mui/icons-material/Download'
+import CheckCircle from '@mui/icons-material/CheckCircle'
+import ErrorOutline from '@mui/icons-material/ErrorOutline'
+import Close from '@mui/icons-material/Close'
 import { studentApi } from '../../api/endpoints'
 import { extractError } from '../../api/axios'
 import { downloadBlob } from '../../utils/format'

@@ -16,7 +16,11 @@ import {
   Avatar,
   TablePagination
 } from '@mui/material'
-import { Add, Delete, Person, School, PersonAdd } from '@mui/icons-material'
+import Add from '@mui/icons-material/Add'
+import Delete from '@mui/icons-material/Delete'
+import Person from '@mui/icons-material/Person'
+import School from '@mui/icons-material/School'
+import PersonAdd from '@mui/icons-material/PersonAdd'
 import PageHeader from '../../components/PageHeader'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { useToast } from '../../hooks/useToast'

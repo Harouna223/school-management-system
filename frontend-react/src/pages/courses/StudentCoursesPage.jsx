@@ -3,7 +3,10 @@ import {
   Grid, Card, CardActionArea, CardContent, CardActions, Box, Typography,
   TextField, MenuItem, Button, Chip, Stack, Skeleton, Pagination,
 } from '@mui/material'
-import { Videocam, PictureAsPdf, PlayArrow, Visibility } from '@mui/icons-material'
+import Videocam from '@mui/icons-material/Videocam'
+import PictureAsPdf from '@mui/icons-material/PictureAsPdf'
+import PlayArrow from '@mui/icons-material/PlayArrow'
+import Visibility from '@mui/icons-material/Visibility'
 import PageHeader from '../../components/PageHeader'
 import EmptyState from '../../components/EmptyState'
 import FilterCard from '../../components/FilterCard'

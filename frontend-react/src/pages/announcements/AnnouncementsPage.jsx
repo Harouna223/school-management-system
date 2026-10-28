@@ -3,7 +3,9 @@ import {
   Grid, TextField, MenuItem, Button, Dialog, DialogTitle, DialogContent, DialogActions,
   Card, CardContent, Typography, Box, Chip, IconButton, FormControlLabel, Switch,
 } from '@mui/material'
-import { PushPin, DeleteOutline, Campaign } from '@mui/icons-material'
+import PushPin from '@mui/icons-material/PushPin'
+import DeleteOutline from '@mui/icons-material/DeleteOutline'
+import Campaign from '@mui/icons-material/Campaign'
 import { useSelector } from 'react-redux'
 import PageHeader from '../../components/PageHeader'
 import ConfirmDialog from '../../components/ConfirmDialog'

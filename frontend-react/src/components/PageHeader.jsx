@@ -1,5 +1,5 @@
 import { Box, Typography, Button, Chip } from '@mui/material'
-import { Add } from '@mui/icons-material'
+import Add from '@mui/icons-material/Add'
 
 /**
  * En-tête de page premium : titre, sous-titre, badge optionnel,

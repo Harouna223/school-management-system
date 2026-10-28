@@ -1,5 +1,5 @@
 import { Box, Typography } from '@mui/material'
-import { Inbox } from '@mui/icons-material'
+import Inbox from '@mui/icons-material/Inbox'
 
 /**
  * État vide premium : icône dans un halo, message et sous-message.

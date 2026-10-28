@@ -14,7 +14,12 @@ import {
   IconButton,
   Avatar
 } from '@mui/material'
-import { Add, Delete, Edit, Person, School, Work } from '@mui/icons-material'
+import Add from '@mui/icons-material/Add'
+import Delete from '@mui/icons-material/Delete'
+import Edit from '@mui/icons-material/Edit'
+import Person from '@mui/icons-material/Person'
+import School from '@mui/icons-material/School'
+import Work from '@mui/icons-material/Work'
 import PageHeader from '../../components/PageHeader'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { useToast } from '../../hooks/useToast'

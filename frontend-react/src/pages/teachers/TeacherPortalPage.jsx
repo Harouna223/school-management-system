@@ -5,13 +5,11 @@ import {
   Table, TableHead, TableRow, TableCell, TableBody,
   TextField, MenuItem, IconButton,
 } from '@mui/material'
-import {
-  CalendarMonth as ScheduleIcon,
-  Group as ClassesIcon,
-  EditNote as GradesIcon,
-  Save as SaveIcon,
-  ReceiptLong as ReceiptIcon,
-} from '@mui/icons-material'
+import ScheduleIcon from '@mui/icons-material/CalendarMonth'
+import ClassesIcon from '@mui/icons-material/Group'
+import GradesIcon from '@mui/icons-material/EditNote'
+import SaveIcon from '@mui/icons-material/Save'
+import ReceiptIcon from '@mui/icons-material/ReceiptLong'
 import PageHeader from '../../components/PageHeader'
 import StatusChip from '../../components/StatusChip'
 import Loader from '../../components/Loader'

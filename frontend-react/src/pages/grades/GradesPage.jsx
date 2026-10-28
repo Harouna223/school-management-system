@@ -4,7 +4,12 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Dialog, DialogTitle, DialogContent, DialogActions, Avatar, IconButton,
 } from '@mui/material'
-import { PictureAsPdf, Assignment, Leaderboard, EmojiEvents, Gavel, Save } from '@mui/icons-material'
+import PictureAsPdf from '@mui/icons-material/PictureAsPdf'
+import Assignment from '@mui/icons-material/Assignment'
+import Leaderboard from '@mui/icons-material/Leaderboard'
+import EmojiEvents from '@mui/icons-material/EmojiEvents'
+import Gavel from '@mui/icons-material/Gavel'
+import Save from '@mui/icons-material/Save'
 import PageHeader from '../../components/PageHeader'
 import FilterCard from '../../components/FilterCard'
 import { useToast } from '../../hooks/useToast'

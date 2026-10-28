@@ -4,14 +4,12 @@ import {
   Grid, Card, CardContent, Typography, Box, Tabs, Tab, Chip, Button,
   Table, TableHead, TableRow, TableCell, TableBody, Divider,
 } from '@mui/material'
-import {
-  School as SchoolIcon,
-  MenuBook as GradesIcon,
-  CalendarMonth as ScheduleIcon,
-  PictureAsPdf as PdfIcon,
-  FactCheck as AttendanceIcon,
-  Payments as PaymentsIcon
-} from '@mui/icons-material'
+import SchoolIcon from '@mui/icons-material/School'
+import GradesIcon from '@mui/icons-material/MenuBook'
+import ScheduleIcon from '@mui/icons-material/CalendarMonth'
+import PdfIcon from '@mui/icons-material/PictureAsPdf'
+import AttendanceIcon from '@mui/icons-material/FactCheck'
+import PaymentsIcon from '@mui/icons-material/Payments'
 import PageHeader from '../../components/PageHeader'
 import StatusChip from '../../components/StatusChip'
 import Loader from '../../components/Loader'

@@ -1,5 +1,8 @@
 import { Box, Paper, Typography } from '@mui/material'
-import { School, FactCheck, Payments, BarChart } from '@mui/icons-material'
+import School from '@mui/icons-material/School'
+import FactCheck from '@mui/icons-material/FactCheck'
+import Payments from '@mui/icons-material/Payments'
+import BarChart from '@mui/icons-material/BarChart'
 import logo from '../assets/logo.svg'
 
 const FEATURES = [

@@ -4,7 +4,9 @@ import {
   MenuItem, FormControlLabel, Switch, Box, Typography, LinearProgress, Alert,
   Stack, Chip,
 } from '@mui/material'
-import { CloudUpload, Videocam, PictureAsPdf } from '@mui/icons-material'
+import CloudUpload from '@mui/icons-material/CloudUpload'
+import Videocam from '@mui/icons-material/Videocam'
+import PictureAsPdf from '@mui/icons-material/PictureAsPdf'
 import { courseApi } from '../../api/endpoints'
 import { extractError } from '../../api/axios'
 

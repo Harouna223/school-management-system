@@ -6,7 +6,9 @@ import {
   Grid, TextField, MenuItem, Button, Card, CardContent, Typography, Divider, Box, Dialog,
   DialogTitle, DialogContent, DialogActions,
 } from '@mui/material'
-import { ArrowBack, Save, Upload } from '@mui/icons-material'
+import ArrowBack from '@mui/icons-material/ArrowBack'
+import Save from '@mui/icons-material/Save'
+import Upload from '@mui/icons-material/Upload'
 import PageHeader from '../../components/PageHeader'
 import FileAvatar from '../../components/FileAvatar'
 import { useToast } from '../../hooks/useToast'

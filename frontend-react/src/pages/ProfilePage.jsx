@@ -3,7 +3,8 @@ import {
   Grid, Card, CardContent, Typography, Box, Button, Divider, Dialog,
   DialogTitle, DialogContent, DialogActions, TextField, IconButton,
 } from '@mui/material'
-import { LockReset, Key } from '@mui/icons-material'
+import LockReset from '@mui/icons-material/LockReset'
+import Key from '@mui/icons-material/Key'
 import { useSelector } from 'react-redux'
 import { formatDate, initials } from '../utils/format'
 import PageHeader from '../components/PageHeader'
