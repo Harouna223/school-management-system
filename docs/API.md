@@ -1,5 +1,10 @@
 # Référence API
 
+> **Source de vérité :** la spécification OpenAPI générée par l'application
+> (`/v3/api-docs`, interface `/swagger-ui.html`) couvre les **284 mappings** réels.
+> Ce document décrit les routes principales ; il est volontairement plus concis
+> et peut retarder sur les modules les plus récents.
+
 Toutes les routes sont préfixées par `/api` et exigent un token Bearer JWT (sauf login/refresh/register).
 
 ## Format des réponses

@@ -29,33 +29,35 @@ Le schéma est la propriété exclusive de Flyway :
 ### Option 1 — Docker (recommandé)
 
 > **Prérequis :** Docker Desktop démarré. Le port MySQL est défini dans `docker/.env` (`DB_PORT`).
-> Sur cette machine : **3307** (un ancien MySQL local 5.6 occupe déjà le 3306).
+> L'exemple utilise **3308** pour ne pas entrer en conflit avec un MySQL local sur 3306.
 
 ```bash
-# 1. Créer le fichier d'environnement puis y définir JWT_SECRET (obligatoire)
+# 1. Créer le fichier d'environnement puis y définir JWT_SECRET et ADMIN_PASSWORD
 cp docker/.env.example docker/.env
-openssl rand -base64 48   # coller la valeur obtenue dans docker/.env, ligne JWT_SECRET=
+openssl rand -base64 48   # coller la valeur dans docker/.env, ligne JWT_SECRET=
+# renseigner aussi ADMIN_PASSWORD (au moins 8 caractères, lettres + chiffres)
 
 # 2. Construire et démarrer
 docker compose -f docker/docker-compose.yml up -d --build
 ```
 
-> ⚠️ **`JWT_SECRET` est obligatoire.** Sa valeur par défaut a été retirée du dépôt et
-> `REQUIRE_SECURE_SECRETS=true` par défaut fait **échouer le démarrage** du backend tant que le
-> secret est absent, vide, resté celui du dépôt ou plus court que 32 octets décodés.
+> ⚠️ **`JWT_SECRET` et `ADMIN_PASSWORD` sont obligatoires au premier démarrage.**
+> `REQUIRE_SECURE_SECRETS=true` par défaut fait **échouer le backend** tant que le secret JWT est
+> absent, vide, resté celui du dépôt ou plus court que 32 octets décodés, et refuse de créer le
+> compte admin avec un mot de passe vide ou égal à `Admin@123`.
 
 | Service | Accès |
 |---|---|
 | Frontend | http://localhost |
-| API + Swagger | http://localhost:8080/swagger-ui.html |
+| API + Swagger | http://localhost:8080/swagger-ui.html (`SWAGGER_ENABLED=false` en production) |
 | MySQL | localhost:`DB_PORT` (root / root) — voir `docker/.env` |
 
-Connexion : `admin` / `Admin@123` (modifiable via `ADMIN_PASSWORD`).
+Connexion : `admin` / le mot de passe défini dans `ADMIN_PASSWORD`.
 
 ### Option 2 — Développement local
 
 1. **Base de données** : rien à créer. Flyway est la source de vérité du schéma et le crée
-   intégralement (`V1__baseline.sql` puis `V2..V10`) au premier démarrage du backend.
+   intégralement (`V1__baseline.sql` puis `V2..V12`) au premier démarrage du backend.
    `database/schema.sql` est un **héritage** : il n'est plus exécuté et ne correspond plus au
    schéma courant — ne pas l'utiliser.
    Astuce : utiliser le MySQL Docker sur un autre port ne change rien à votre MySQL local :
@@ -88,9 +90,13 @@ Connexion : `admin` / `Admin@123` (modifiable via `ADMIN_PASSWORD`).
 
 | Rôle | Utilisateur | Mot de passe |
 |---|---|---|
-| Super admin | `admin` | `Admin@123` |
+| Super admin | `admin` | défini par `ADMIN_PASSWORD` (obligatoire) |
 
-L'admin est créé automatiquement au démarrage par `DataInitializer` (s'il n'existe pas). Les autres comptes (directeur, comptable, secrétaire, enseignant, parent, élève) sont créés depuis l'interface d'administration des utilisateurs.
+L'admin est créé automatiquement au démarrage par `DataInitializer` (s'il n'existe pas).
+Le mot de passe doit être fourni via `ADMIN_PASSWORD` : vide ou égal à `Admin@123`, le démarrage
+échoue tant que le compte n'existe pas (`REQUIRE_SECURE_SECRETS=true`). Les autres comptes
+(directeur, comptable, secrétaire, enseignant, parent, élève) sont créés depuis l'interface
+d'administration des utilisateurs.
 
 ## Documentation
 

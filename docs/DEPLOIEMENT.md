@@ -474,14 +474,16 @@ cp docker/.env.example docker/.env
 # Générer les secrets
 JWT_SECRET=$(openssl rand -base64 64)
 DB_PASS=$(openssl rand -base64 24 | tr -dc 'a-zA-Z0-9')
+ADMIN_PASS=$(openssl rand -base64 18 | tr -dc 'a-zA-Z0-9')
 
 # Configurer .env
 sed -i "s/DB_PASSWORD=.*/DB_PASSWORD=$DB_PASS/" docker/.env
 sed -i "s/JWT_SECRET=.*/JWT_SECRET=$JWT_SECRET/" docker/.env
-sed -i "s/ADMIN_PASSWORD=.*/ADMIN_PASSWORD=Admin@123/" docker/.env
+sed -i "s/ADMIN_PASSWORD=.*/ADMIN_PASSWORD=$ADMIN_PASS/" docker/.env
 sed -i "s/FRONTEND_PORT=.*/FRONTEND_PORT=$PORT_FRONT/" docker/.env
 sed -i "s/DB_PORT=.*/DB_PORT=$PORT_MYSQL/" docker/.env
 sed -i "s|CORS_ORIGINS=.*|CORS_ORIGINS=http://$ECOLE.school,https://$ECOLE.school|" docker/.env
+sed -i "s/SWAGGER_ENABLED=.*/SWAGGER_ENABLED=false/" docker/.env
 
 # Créer docker-compose.override.yml
 cat > docker-compose.override.yml << EOF
@@ -510,8 +512,8 @@ echo "✅ Instance $ECOLE déployée"
 echo "   Frontend : http://localhost:$PORT_FRONT"
 echo "   Backend  : http://localhost:$PORT_BACK"
 echo "   MySQL    : localhost:$PORT_MYSQL"
-echo "   Admin    : admin / Admin@123"
-echo "   ⚠️  Changez le mot de passe admin après la première connexion !"
+echo "   Admin    : admin / $ADMIN_PASS"
+echo "   ⚠️  Conservez ce mot de passe : il n'est plus affiché ensuite."
 ```
 
 ---
@@ -545,7 +547,7 @@ Si vous gérez des dizaines d'écoles et souhaitez une seule instance, un refact
 
 Avant d'ouvrir l'application aux utilisateurs :
 
-- [ ] **Mot de passe admin** changé (pas `Admin@123`)
+- [ ] **Mot de passe admin** renseigné via `ADMIN_PASSWORD` (le backend refuse `Admin@123`)
 - [ ] **Clé JWT** générée (pas la valeur par défaut) — et `REQUIRE_SECURE_SECRETS=true`
       pour que le backend **refuse de démarrer** tant que le secret reste faible
 - [ ] **Mot de passe MySQL** fort (pas `root`)

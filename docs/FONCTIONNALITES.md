@@ -12,11 +12,11 @@
 | Élément | Valeur |
 |---|---|
 | **Frontend** | React 18, Vite, Material UI 5, Redux Toolkit, Recharts, Formik/Yup, Axios |
-| **Backend** | Java 17, Spring Boot 3.2, Spring Security JWT, Spring Data JPA, MapStruct |
+| **Backend** | Java 21, Spring Boot 3.2, Spring Security JWT, Spring Data JPA, MapStruct |
 | **Base de données** | MySQL 8 (utf8mb4) |
 | **Documents** | OpenPDF (PDF) — Apache POI (Excel) — ZXing (QR Code) |
 | **Déploiement** | Docker Compose (nginx + backend + MySQL) |
-| **Accès** | http://localhost (admin / Admin@123) |
+| **Accès** | http://localhost — compte `admin`, mot de passe défini par `ADMIN_PASSWORD` |
 
 ### Architecture multi-cycle
 
@@ -262,12 +262,12 @@ Réservée aux rôles d'administration.
 ## 17. Architecture technique
 
 ```
-backend-springboot/          Spring Boot 3.2 / Java 17
-├── controller/              28 contrôleurs REST
-├── service/                 40 services métier
-├── repository/              47 repositories JPA
-├── entity/                  47 entités
-├── enums/                   25 énumérations
+backend-springboot/          Spring Boot 3.2 / Java 21
+├── controller/              32 contrôleurs REST
+├── service/                 47 services métier
+├── repository/              52 repositories JPA
+├── entity/                  53 entités
+├── enums/                   27 énumérations
 ├── security/                JWT, filtres, config
 ├── dto/                     request / response
 ├── pdf/                     SchoolDocumentTheme
@@ -275,7 +275,7 @@ backend-springboot/          Spring Boot 3.2 / Java 17
 └── utils/                   CodeGenerator, PasswordPolicy, AmountToWords…
 
 frontend-react/              React 18 / Vite / MUI 5
-├── pages/                   45 pages (scolarité, portails, administration, modules annexes)
+├── pages/                   52 pages (scolarité, portails, administration, modules annexes)
 ├── components/              DataTable, StatCard, PageHeader, StatusChip…
 ├── api/                     axios + endpoints centralisés
 ├── redux/                   auth, toast, theme

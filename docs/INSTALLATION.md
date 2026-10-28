@@ -3,7 +3,7 @@
 ## 1. Prérequis
 
 ### Développement local
-- **Java 17+** (testé avec JDK 21 Temurin)
+- **Java 21** (cible du `pom.xml`, testé avec JDK 21 Temurin)
 - **Maven 3.9+**
 - **Node.js 18+** et npm
 - **MySQL 8+** (ou compatible, ex. MariaDB)
@@ -25,7 +25,12 @@ docker compose -f docker/docker-compose.yml ps
 ```
 
 Le schéma de base de données est créé automatiquement par Flyway au premier démarrage du backend
-(migration `V1__baseline.sql`, puis `V2..V10`). Aucune initialisation SQL manuelle n'est nécessaire.
+(migration `V1__baseline.sql`, puis `V2..V12`). Aucune initialisation SQL manuelle n'est nécessaire.
+
+> **Secrets obligatoires au premier démarrage** : `JWT_SECRET` et `ADMIN_PASSWORD` doivent être
+> renseignés dans `docker/.env` (copie de `docker/.env.example`). Le backend refuse de démarrer
+> si l'un des deux est vide, et refuse également un mot de passe admin égal à `Admin@123`
+> tant que `REQUIRE_SECURE_SECRETS` reste à sa valeur par défaut (`true`).
 
 **Arrêt** : `docker compose -f docker/docker-compose.yml down` (ajouter `-v` pour supprimer aussi les volumes).
 
@@ -63,7 +68,8 @@ cd backend-springboot
 mvn spring-boot:run
 ```
 
-Variables d'environnement (toutes optionnelles) :
+Variables d'environnement — **`JWT_SECRET` et `ADMIN_PASSWORD` sont obligatoires au premier
+démarrage** ; les autres ont une valeur par défaut.
 
 | Variable | Défaut | Description |
 |---|---|---|
@@ -72,13 +78,15 @@ Variables d'environnement (toutes optionnelles) :
 | `DB_NAME` | `school_management` | Nom de la base |
 | `DB_USERNAME` | `root` | Utilisateur MySQL |
 | `DB_PASSWORD` | `root` | Mot de passe MySQL |
-| `JWT_SECRET` | secret de dev | Clé JWT (Base64) — **à changer en production** |
+| `JWT_SECRET` | — (**requis**) | Clé JWT (Base64) — générer avec `openssl rand -base64 64` |
+| `ADMIN_PASSWORD` | — (**requis**) | Mot de passe initial de l'admin |
+| `REQUIRE_SECURE_SECRETS` | `true` | Refuse le démarrage si `ADMIN_PASSWORD=Admin@123` |
+| `SWAGGER_ENABLED` | `true` | Expose `/v3/api-docs` et `/swagger-ui.html` — mettre à `false` en production |
 | `SERVER_PORT` | `8080` | Port HTTP du backend |
 | `CORS_ORIGINS` | `http://localhost:5173,http://localhost:3000` | Origines autorisées |
 | `UPLOAD_DIR` | `./uploads` | Dossier des fichiers téléversés |
-| `ADMIN_PASSWORD` | `Admin@123` | Mot de passe initial de l'admin |
 
-Swagger UI : http://localhost:8080/swagger-ui.html
+Swagger UI (si `SWAGGER_ENABLED=true`) : http://localhost:8080/swagger-ui.html
 
 ### 3.3 Frontend
 

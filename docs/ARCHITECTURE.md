@@ -32,15 +32,15 @@ school-management-system/
 ├── backend-springboot/
 │   └── src/main/java/com/school/
 │       ├── config/             # AppProperties, OpenApiConfig, WebConfig, DataInitializer
-│       ├── controller/         # 28 contrôleurs REST (/api/...)
+│       ├── controller/         # 32 contrôleurs REST (/api/...)
 │       ├── dto/                # DTOs request/response (validation Jakarta)
-│       ├── entity/             # 27 entités JPA
+│       ├── entity/             # 53 entités JPA
 │       ├── enums/              # Rôles, statuts, types...
 │       ├── exception/          # Exceptions métier + GlobalExceptionHandler
 │       ├── mapper/             # MapStruct (entité ↔ DTO)
-│       ├── repository/         # Spring Data JPA
+│       ├── repository/         # Spring Data JPA (52 repositories)
 │       ├── security/           # JwtService, filtres, SecurityConfig, UserDetails
-│       ├── service/            # 21 services métier
+│       ├── service/            # 47 services métier
 │       └── utils/              # CodeGenerator, SecurityUtils
 │   └── src/main/resources/
 │       ├── application.yml     # Configuration (env vars)
@@ -52,7 +52,7 @@ school-management-system/
 │       ├── context/            # ThemeContext (dark/light)
 │       ├── hooks/              # useToast, useFetch, usePagination
 │       ├── layouts/            # DashboardLayout, AuthLayout
-│       ├── pages/              # 20 pages (élèves, notes, paiements...)
+│       ├── pages/              # 52 pages (élèves, notes, paiements...)
 │       ├── redux/              # store + slices (auth, theme, toast)
 │       ├── routes/             # Router + guards (rôles)
 │       ├── styles/             # index.css, thèmes MUI

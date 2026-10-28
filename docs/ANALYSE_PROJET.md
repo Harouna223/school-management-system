@@ -33,6 +33,22 @@
 > **Conservés** : les modules **Stages, Mémoires, Alumni et Admission**, ainsi que les permissions
 > `LMD_READ` / `LMD_WRITE` qui les protègent.
 
+> **TRAITEMENT DU 2026-10-27 — les constats suivants sont désormais corrigés.** Ce rapport reste
+> un instantané du 9 octobre ; le tableau ci-dessous indique ce qui a changé depuis, dans le code.
+>
+> | Constat | Correctif appliqué |
+> |---|---|
+> | **P0-3** — secrets par défaut dans le dépôt | `JWT_SECRET` et `ADMIN_PASSWORD` n'ont plus de valeur par défaut : vides, le backend **refuse de démarrer** (`DataInitializer`, `application.yml`). `REQUIRE_SECURE_SECRETS=true` bloque en plus `Admin@123`. Swagger est pilotable par `SWAGGER_ENABLED` (fermé en production). |
+> | §10.1 — identifiants affichés sur l'écran de connexion | La clé `login.encrypted` n'expose plus de couple `admin / mot de passe`. |
+> | §9 — hygiène du dépôt (artefacts de diagnostic à la racine) | Les 145 fichiers `_*` sont sortis du dépôt, y compris `_health.json` qui y était suivi par erreur (archive réversible hors du projet). |
+> | Tests d'intégration | Testcontainers 1.21.3 + API Docker 1.44 (Docker Engine 29), plus aucun repli silencieux vers une base externe. |
+> | Flyway / MySQL 8.4 | Flyway porté en 11.20.3 : plus d'avertissement de version non supportée. |
+> | Documentation | Compteurs, versions (Java 21, migrations `V2..V12`) et procédures de secrets resynchronisés. |
+>
+> **Toujours valides** : P1-1 (pagination non bornée), P1-2 (400 au lieu de 403), P1-5/P1-6 (N+1),
+> P1-7 (`@Valid` manquant), §6 (traçabilité du déploiement) et le reste de §10 (i18n partielle,
+> Tailwind inutilisé, loader global).
+
 ---
 
 ## 1. Synthèse exécutive
