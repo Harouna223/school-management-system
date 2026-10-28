@@ -64,7 +64,6 @@ erDiagram
   STUDENTS ||--o{ GRADES : ""
   EXAMS ||--o{ SCHEDULES : ""
   STUDENTS ||--o{ BULLETINS : ""
-  BULLETINS ||--o{ BULLETIN_SUBJECTS : "" : "agrégats par matière"
 
   FEE_TYPES ||--o{ INVOICES : ""
   STUDENTS ||--o{ INVOICES : ""

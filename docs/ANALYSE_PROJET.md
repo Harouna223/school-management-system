@@ -25,9 +25,9 @@
 > donc avec les endpoints concernés.
 >
 > **Restent valides** : P0-1 (installation neuve cassée par `schema.sql` — à revérifier au regard de
-> Flyway), P0-3 (secrets par défaut dans le dépôt), P1-1 (pagination non bornée), P1-2 (refus d'accès
+> Flyway), P1-1 (pagination non bornée), P1-2 (refus d'accès
 > renvoyés en 400 au lieu de 403), P1-5/P1-6 (N+1), P1-7 (`@Valid` manquant), §6 (traçabilité du
-> déploiement), §9 (hygiène du dépôt) et l'essentiel de §10 (frontend : i18n partielle, Tailwind
+> déploiement) et l'essentiel de §10 (frontend : i18n partielle, Tailwind
 > inutilisé, loader global).
 >
 > **Conservés** : les modules **Stages, Mémoires, Alumni et Admission**, ainsi que les permissions
@@ -375,6 +375,12 @@ ni couvertes par la CI** :
 ---
 
 ## 9. Hygiène du dépôt et conformité de la documentation
+
+> **État au 2026-10-28** : les artefacts de la racine (fichiers `_*`, `.verify-*`,
+> `AUDIT_SUMMARY.md`, `backend_full_tail.txt`, `backend_health_debug.txt`) sont sortis du dépôt et
+> archivés hors du projet. `docs/AUDIT.md` reste un document historique assumé ; `DIAGRAMMES.md` ne
+> référence plus la table fantôme `BULLETIN_SUBJECTS` ; `DEPLOIEMENT_CLIENT.md` décrivait déjà
+> `ddl-auto: validate`. Le tableau de dérive ci-dessous est donc un constat daté, pas un état courant.
 
 **Racine :** 53 artefacts, **1,29 Mo** — dont `_blog.txt` (1,04 Mo, 81 % du volume).
 **4 de ces fichiers sont réellement suivis par Git** malgré le `.gitignore` :
