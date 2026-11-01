@@ -160,6 +160,7 @@ un simple changement de numéro de version.
 | MUI | 5.18 → 9.5 | `@mui/icons-material/MailOutline` n'existe plus : 3 suites de tests ne compilent même pas | Recenser les icônes et API retirées, migrer par paliers (5 → 7 → 9) |
 | eslint | 9 → 10 | `eslint-plugin-react@7.37.5` plafonne à `^9.7` : `npm install` échoue en `ERESOLVE` | Bloqué en amont, rien à faire côté projet avant une version compatible |
 | Tailwind CSS | 3.4 → 4.3 | Le plugin PostCSS a été déplacé : `It looks like you're trying to use tailwindcss directly as a PostCSS plugin` | Installer `@tailwindcss/postcss`, réécrire `postcss.config` et migrer la configuration CSS-first |
+| OpenPDF | 1.3.39 → 3.0.5 | Le paquet change de nom : `package com.lowagie.text.pdf does not exist` | Renommer les imports `com.lowagie.*` en `com.github.librepdf.openpdf.*` — 72 occurrences dans 7 fichiers, dont `ReportService` et `SchoolDocumentTheme` |
 
 **Couplage `eslint` / `@eslint/js`** : ces deux paquets doivent partager la même
 majeure (`@eslint/js` 10 exige `eslint` ^10). Le motif `eslint*` ne capturait

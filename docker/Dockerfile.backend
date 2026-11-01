@@ -9,9 +9,23 @@ WORKDIR /app
 COPY backend-springboot/pom.xml .
 # Le cache Maven (BuildKit) survit aux coupures reseau : relancer le build
 # reprend les telechargements au lieu de tout refaire depuis zero.
-RUN --mount=type=cache,target=/root/.m2 mvn dependency:go-offline -B
+#
+# Les deux commandes reessayent en cas de reponse 429 : le cache `--mount` ne
+# survit PAS d'une execution CI a l'autre (il n'est pas exporte vers le cache
+# GHA), donc chaque build retélécharge tout l'arbre de dependances. Depuis que
+# la CI construit les images a chaque pull request, Maven Central a repondu
+# "429 Too Many Requests" et fait echouer un build dont le code etait sain.
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn -B \
+        -Dmaven.wagon.http.retryHandler.count=5 \
+        -Dmaven.wagon.http.retryHandler.class=standard \
+        dependency:go-offline
 COPY backend-springboot/src ./src
-RUN --mount=type=cache,target=/root/.m2 mvn clean package -DskipTests -B
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn -B \
+        -Dmaven.wagon.http.retryHandler.count=5 \
+        -Dmaven.wagon.http.retryHandler.class=standard \
+        clean package -DskipTests
 
 # ---- Étape 2 : image d'exécution ----
 FROM eclipse-temurin:21-jre
