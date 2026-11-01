@@ -178,9 +178,17 @@ Cette règle a été écrite après l'avoir vue échouer : avec `minor, patch` s
 **aucune** ne compilait seule. Le regroupement des majeures n'est pas un confort
 de lecture, c'est une contrainte de compilation.
 
-Ces trois PR ont été fermées : Dependabot ne représente pas une version dont la
-PR a été fermée, donc elles ne reviendront pas avant la version suivante. C'est
-ce tableau qui fait office de rappel.
+Traitement retenu :
+
+- **Spring Boot 4 et MUI 9** restent ouverts en PR groupées (**#36** et **#37**),
+  une par migration. Ce sont les points d'entrée du travail : la PR contient
+  déjà le diff de dépendances, et la CI dit précisément ce qui casse. Rouge ici
+  est une information, pas un défaut.
+- **eslint 10, OpenPDF 3 et Tailwind 4** ont été fermées : aucune action n'est
+  possible dans l'immédiat (blocage amont pour eslint, renommage mécanique
+  pour OpenPDF, réécriture de configuration pour Tailwind). Dependabot ne
+  représentera pas une version dont la PR a été fermée, donc pas de bruit
+  récurrent ; ce tableau fait office de rappel.
 
 **Décision assumée** : `ignore: version-update:semver-major` n'est **pas**
 utilisé. La documentation GitHub ne dit pas clairement si `ignore` s'applique
