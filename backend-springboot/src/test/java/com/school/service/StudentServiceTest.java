@@ -21,7 +21,6 @@ import com.school.repository.ParentRepository;
 import com.school.repository.SchoolClassRepository;
 import com.school.repository.StudentHistoryRepository;
 import com.school.repository.StudentRepository;
-import com.school.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -85,9 +84,6 @@ class StudentServiceTest {
 
     @Mock
     private StudentHistoryRepository studentHistoryRepository;
-
-    @Mock
-    private UserRepository userRepository;
 
     @Mock
     private StudentMapper studentMapper;
@@ -157,7 +153,7 @@ class StudentServiceTest {
         });
     }
 
-    /** Par defaut, aucun compte pour cet eleve : `uniqueUsername` trouve « aicha.kamdem » libre. */
+    /** Matricule libre : le compteur repart de zero et aucun code n'est encore pris. */
     private void matriculeLibre() {
         when(studentRepository.count()).thenReturn(0L);
         when(studentRepository.existsByMatricule(anyString())).thenReturn(false);
@@ -380,21 +376,21 @@ class StudentServiceTest {
     }
 
     @Test
-    @DisplayName("create suffixe le nom d'utilisateur quand il est deja pris")
-    void createSuffixeUnNomDUtilisateurDejaPris() {
+    @DisplayName("create transmet le nom d'utilisateur brut : l'unicite est garantie par AuthService")
+    void createNeGerePlusLUniciteDuNomDUtilisateur() {
         matriculeLibre();
         saveEleveRenvoieSonArgument();
         when(studentMapper.toEntity(any())).thenReturn(eleve(null, null, null, null));
         when(authService.createLinkedAccount(anyString(), anyString(), any(), anyString(), anyString(), anyString()))
                 .thenReturn(User.builder().id(50L).build());
-        // « aicha.kamdem » et « aicha.kamdem2 » sont pris, « aicha.kamdem3 » est libre.
-        when(userRepository.existsByUsername("aicha.kamdem")).thenReturn(true);
-        when(userRepository.existsByUsername("aicha.kamdem2")).thenReturn(true);
-        when(userRepository.existsByUsername("aicha.kamdem3")).thenReturn(false);
 
         studentService.create(demandeDeBase(), httpRequest);
 
-        verify(authService).createLinkedAccount(eq("aicha.kamdem3"), anyString(), any(),
+        // La suffixation (« aicha.kamdem2 ») vit dans AuthService.createLinkedAccount,
+        // a un seul endroit. C'est justement sa duplication ici qui avait laisse
+        // linkParentAccount sans protection, donc sans garde-fou contre le
+        // rattachement au compte d'autrui.
+        verify(authService).createLinkedAccount(eq("aicha.kamdem"), anyString(), any(),
                 anyString(), anyString(), eq("ELEVE"));
     }
 
@@ -532,6 +528,29 @@ class StudentServiceTest {
                 eq("h.siby@school.td"), eq("Harouna"), eq("Siby"), eq("PARENT"));
         verify(authService, never()).createLinkedAccount(eq("harouna.siby"), eq("Parent@123"),
                 any(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("create transmet le nom du compte parent sans le suffixer lui-meme")
+    void createTransmetLeNomDUtilisateurDuParent() {
+        matriculeLibre();
+        saveEleveRenvoieSonArgument();
+        when(studentMapper.toEntity(any())).thenReturn(eleve(null, null, null, null));
+        Parent p = parent(3L);
+        when(parentRepository.findById(3L)).thenReturn(Optional.of(p));
+        when(parentRepository.save(any(Parent.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(authService.createLinkedAccount(anyString(), anyString(), any(), anyString(), anyString(), anyString()))
+                .thenReturn(User.builder().id(52L).build());
+        StudentRequest requete = demandeDeBase();
+        requete.setParentId(3L);
+        requete.setCreateParentAccount(Boolean.TRUE);
+
+        studentService.create(requete, httpRequest);
+
+        // Le parent passe par le meme point d'entree que l'eleve : c'est
+        // AuthService qui suffixe un nom deja pris, jamais le service appelant.
+        verify(authService).createLinkedAccount(eq("harouna.siby"), anyString(),
+                eq("h.siby@school.td"), eq("Harouna"), eq("Siby"), eq("PARENT"));
     }
 
     @Test

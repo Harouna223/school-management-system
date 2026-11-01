@@ -19,7 +19,6 @@ import com.school.repository.ParentRepository;
 import com.school.repository.SchoolClassRepository;
 import com.school.repository.StudentHistoryRepository;
 import com.school.repository.StudentRepository;
-import com.school.repository.UserRepository;
 import com.school.utils.CodeGenerator;
 import com.school.utils.Pagination;
 import com.school.utils.SecurityUtils;
@@ -48,7 +47,6 @@ public class StudentService {
     private final ParentRepository parentRepository;
     private final SchoolClassRepository schoolClassRepository;
     private final StudentHistoryRepository studentHistoryRepository;
-    private final UserRepository userRepository;
     private final StudentMapper studentMapper;
     private final AuthService authService;
     private final AuditService auditService;
@@ -168,7 +166,7 @@ public class StudentService {
                 generatedStudentPassword = rawPassword;
             }
             User account = authService.createLinkedAccount(
-                    uniqueUsername(request.getUsername() != null ? request.getUsername() : defaultUsername(request)),
+                    request.getUsername() != null ? request.getUsername() : defaultUsername(request),
                     rawPassword,
                     email,
                     request.getFirstName(), request.getLastName(), "ELEVE");
@@ -238,7 +236,7 @@ public class StudentService {
                 generatedStudentPassword = rawPassword;
             }
             User account = authService.createLinkedAccount(
-                    uniqueUsername(request.getUsername() != null ? request.getUsername() : defaultUsername(request)),
+                    request.getUsername() != null ? request.getUsername() : defaultUsername(request),
                     rawPassword,
                     email,
                     request.getFirstName(), request.getLastName(), "ELEVE");
@@ -489,6 +487,10 @@ public class StudentService {
         if (Boolean.TRUE.equals(r.getCreateParentAccount()) && parent.getUser() == null) {
             String username = r.getParentUsername() != null && !r.getParentUsername().isBlank()
                     ? r.getParentUsername() : defaultParentUsername(parent);
+            // Aucune gestion d'unicité ici : `AuthService.createLinkedAccount`
+            // suffixe systématiquement un nom déjà pris et se passe d'un email
+            // déjà rattaché. C'est cette garantie, posée à un seul endroit, qui
+            // empêche un parent homonyme d'être rattaché au compte d'autrui.
             parent.setUser(authService.createLinkedAccount(
                     username, rawPassword, parent.getEmail(),
                     parent.getFirstName(), parent.getLastName(), "PARENT"));
@@ -505,19 +507,5 @@ public class StudentService {
     private String defaultUsername(StudentRequest r) {
         return (r.getFirstName() + "." + r.getLastName())
                 .toLowerCase().replaceAll("[^a-z0-9.]", "");
-    }
-
-    /**
-     * Garantit un nom d'utilisateur unique : si le nom demandé (ou généré
-     * automatiquement) est déjà pris, un suffixe numérique est ajouté.
-     */
-    private String uniqueUsername(String base) {
-        String candidate = base == null || base.isBlank() ? "eleve" : base;
-        int suffix = 2;
-        while (userRepository.existsByUsername(candidate)) {
-            candidate = base + suffix;
-            suffix++;
-        }
-        return candidate;
     }
 }

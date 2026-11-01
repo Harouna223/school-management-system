@@ -132,7 +132,12 @@ public class TeacherService {
         }
         String generatedPassword = null;
         String accountUsername = null;
-        if (Boolean.TRUE.equals(request.getCreateUserAccount())) {
+        // `teacher.getUser() == null` : sans cette garde, chaque modification
+        // d'un enseignant déjà rattaché recréait un compte. Depuis que le nom
+        // d'utilisateur est rendu unique, cela produisait « jean.kamdem2 » à
+        // chaque enregistrement et laissait le compte d'origine orphelin.
+        // Même règle que StudentService.update.
+        if (Boolean.TRUE.equals(request.getCreateUserAccount()) && teacher.getUser() == null) {
             String rawPassword = request.getPassword();
             if (rawPassword == null || rawPassword.isBlank()) {
                 rawPassword = CodeGenerator.randomPassword();

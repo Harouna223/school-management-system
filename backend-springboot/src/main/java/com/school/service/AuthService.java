@@ -17,6 +17,7 @@ import com.school.repository.UserRepository;
 import com.school.security.JwtService;
 import com.school.utils.PasswordPolicy;
 import com.school.utils.SecurityUtils;
+import com.school.utils.UsernameGenerator;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,6 +40,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
@@ -249,20 +251,35 @@ public class AuthService {
     }
 
     /**
-     * Création d'un compte pour un élève / enseignant (auto).
+     * Création d'un compte rattaché à un dossier (élève, parent, enseignant).
+     *
+     * <p>Cette méthode <b>n'échoue jamais sur un conflit d'unicité</b> : le
+     * dossier qu'elle accompagne est l'objet principal, le compte n'en est
+     * qu'un accessoire. Un compte impossible à créer ne doit donc jamais
+     * empêcher une inscription.</p>
+     *
+     * <ul>
+     *   <li><b>Nom d'utilisateur déjà pris</b> : un suffixe numérique est ajouté
+     *       ({@code jean.dupont2}). Auparavant le compte existant était
+     *       <em>réutilisé</em> : le nouveau dossier se retrouvait rattaché au
+     *       compte d'une autre personne, qui accédait alors à ses données.</li>
+     *   <li><b>Email déjà rattaché</b> : le compte est créé <em>sans</em> email.
+     *       L'adresse reste portée par le dossier (élève, parent, enseignant),
+     *       où elle est purement informative ; l'identifiant de connexion est le
+     *       nom d'utilisateur. Un même email est par ailleurs légitime pour des
+     *       frères et sœurs, ce qui rendait le refus absurde.</li>
+     * </ul>
+     *
+     * <p>Seul un rôle absent de la base interrompt la création : c'est une
+     * erreur de configuration, pas une donnée saisie par l'utilisateur.</p>
      */
     @Transactional
     public User createLinkedAccount(String username, String rawPassword, String email,
                                     String firstName, String lastName, String roleName) {
-        if (userRepository.existsByUsername(username)) {
-            return userRepository.findByUsername(username)
-                    .orElseThrow(() -> new com.school.exception.BusinessException(
-                            "Incohérence : utilisateur trouvé puis perdu"));
-        }
         User user = User.builder()
-                .username(username)
+                .username(availableUsername(username, roleName))
                 .password(passwordEncoder.encode(rawPassword))
-                .email(email)
+                .email(availableEmail(email))
                 .firstName(firstName)
                 .lastName(lastName)
                 .enabled(true)
@@ -271,6 +288,38 @@ public class AuthService {
                 .orElseThrow(() -> new BusinessException("Rôle non configuré : " + roleName));
         user.getRoles().add(role);
         return userRepository.save(user);
+    }
+
+    /**
+     * Nom d'utilisateur libre, garanti sans collision : suffixe numérique si le
+     * nom demandé est déjà attribué.
+     */
+    private String availableUsername(String username, String roleName) {
+        String fallback = roleName == null || roleName.isBlank()
+                ? "utilisateur" : roleName.toLowerCase(Locale.ROOT);
+        return UsernameGenerator.unique(username, fallback, userRepository::existsByUsername);
+    }
+
+    /**
+     * Email utilisable, ou {@code null} si l'adresse appartient déjà à un compte.
+     *
+     * <p>{@code users.email} est {@code UNIQUE}. Refuser l'adresse bloquait
+     * l'inscription (409 opaque hier, 400 explicite ensuite) : on préfère un
+     * compte sans email — l'email n'est pas un identifiant de connexion — plutôt
+     * qu'un dossier impossible à enregistrer. Le cas est journalisé pour rester
+     * visible côté exploitation.</p>
+     */
+    private String availableEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return null;
+        }
+        String trimmed = email.trim();
+        if (userRepository.existsByEmail(trimmed)) {
+            log.warn("Email {} déjà rattaché à un autre compte : le nouveau compte est créé sans email",
+                    trimmed);
+            return null;
+        }
+        return trimmed;
     }
 
     /**

@@ -511,18 +511,24 @@ class AuthServiceTest {
     }
 
     @Test
-    @DisplayName("la création d'un compte lié réutilise le compte existant sans le modifier")
-    void createLinkedAccountReutiliseLeCompteExistant() {
+    @DisplayName("la création d'un compte lié ne réutilise JAMAIS un compte existant")
+    void createLinkedAccountNeReutilisePasUnCompteExistant() {
         User existant = utilisateur(7L, "eleve6");
         when(userRepository.existsByUsername("eleve6")).thenReturn(true);
-        when(userRepository.findByUsername("eleve6")).thenReturn(Optional.of(existant));
+        when(userRepository.existsByUsername("eleve62")).thenReturn(false);
+        when(roleRepository.findByName("ELEVE")).thenReturn(Optional.of(role("ELEVE")));
+        when(passwordEncoder.encode("MotDePasse1")).thenReturn("hache");
+        when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        User retourne = service.createLinkedAccount("eleve6", "MotDePasse1", "e@ecole.cm",
+        User cree = service.createLinkedAccount("eleve6", "MotDePasse1", "e@ecole.cm",
                 "Aicha", "Kamdem", "ELEVE");
 
-        assertThat(retourne).isSameAs(existant);
-        verify(userRepository, never()).save(any());
-        verifyNoInteractions(passwordEncoder);
+        // Réutiliser le compte homonyme rattachait le nouveau dossier au compte
+        // d'une AUTRE personne, qui accédait alors à ses données. Un suffixe est
+        // toujours préférable à une réutilisation silencieuse.
+        assertThat(cree).isNotSameAs(existant);
+        assertThat(cree.getUsername()).isEqualTo("eleve62");
+        verify(userRepository).save(any());
     }
 
     @Test
@@ -556,6 +562,44 @@ class AuthServiceTest {
                 .hasMessageContaining("non configuré");
 
         verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("un email déjà rattaché ne bloque plus : le compte est créé sans email")
+    void createLinkedAccountIgnoreUnEmailDejaUtilise() {
+        when(userRepository.existsByUsername("neuf")).thenReturn(false);
+        when(userRepository.existsByEmail("pris@ecole.cm")).thenReturn(true);
+        when(roleRepository.findByName("ELEVE")).thenReturn(Optional.of(role("ELEVE")));
+        when(passwordEncoder.encode("MotDePasse1")).thenReturn("hache");
+        when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // `users.email` est UNIQUE. Refuser l'adresse faisait échouer toute
+        // l'inscription (409 opaque, puis 400) — y compris pour des frères et
+        // sœurs partageant l'email du parent. L'email n'étant pas un identifiant
+        // de connexion, le compte est créé sans, et le dossier garde le sien.
+        User cree = service.createLinkedAccount("neuf", "MotDePasse1", "pris@ecole.cm",
+                "Jean", "Kamdem", "ELEVE");
+
+        assertThat(cree.getEmail()).isNull();
+        assertThat(cree.getUsername()).isEqualTo("neuf");
+        verify(userRepository).save(any());
+    }
+
+    @Test
+    @DisplayName("la création d'un compte lié accepte l'absence d'email sans interroger la base")
+    void createLinkedAccountAccepteUnEmailAbsent() {
+        when(userRepository.existsByUsername("neuf")).thenReturn(false);
+        when(roleRepository.findByName("ELEVE")).thenReturn(Optional.of(role("ELEVE")));
+        when(passwordEncoder.encode("MotDePasse1")).thenReturn("hache");
+        when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        User cree = service.createLinkedAccount("neuf", "MotDePasse1", null,
+                "Jean", "Kamdem", "ELEVE");
+
+        assertThat(cree.getEmail()).isNull();
+        // La colonne autorise NULL et MySQL n'applique pas l'unicité aux valeurs
+        // nulles : inutile d'interroger la base pour rien.
+        verify(userRepository, never()).existsByEmail(anyString());
     }
 
     // ------------------------------------------------------------------

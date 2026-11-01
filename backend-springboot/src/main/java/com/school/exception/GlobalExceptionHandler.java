@@ -27,6 +27,7 @@ import jakarta.validation.ConstraintViolationException;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -115,11 +116,60 @@ public class GlobalExceptionHandler {
                 "Fichier trop volumineux : la limite autorisée est dépassée", request);
     }
 
+    /**
+     * Violation d'une contrainte de base.
+     *
+     * <p>Un message unique « Donnée en conflit » ne désignait aucun champ :
+     * l'administrateur qui inscrivait un élève recevait un 409 sans piste,
+     * alors que la cause était le plus souvent une adresse email déjà
+     * rattachée à un autre compte. MySQL nomme précisément la clé violée
+     * (« Duplicate entry 'x@y.cm' for key 'users.uk_users_email' ») : on s'en
+     * sert pour répondre quelque chose d'exploitable.</p>
+     */
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiResponse<Void>> handleDataIntegrity(DataIntegrityViolationException ex,
                                                                  HttpServletRequest request) {
-        log.error("Violation d'intégrité : {}", ex.getMessage());
-        return build(HttpStatus.CONFLICT, "Donnée en conflit : la ressource existe déjà ou est référencée", request);
+        String message = describeConstraint(ex);
+        log.error("Violation d'intégrité sur {} : {} — cause : {}",
+                request.getRequestURI(), message, ex.getMostSpecificCause().getMessage());
+        return build(HttpStatus.CONFLICT, message, request);
+    }
+
+    /**
+     * Traduit la contrainte violée en message destiné à l'utilisateur.
+     *
+     * <p>Le libellé d'origine est conservé pour les cas non répertoriés : mieux
+     * vaut un message générique qu'une erreur masquée.</p>
+     */
+    private String describeConstraint(DataIntegrityViolationException ex) {
+        String detail = ex.getMostSpecificCause().getMessage();
+        String normalized = detail == null ? "" : detail.toLowerCase(Locale.ROOT);
+
+        if (normalized.contains("uk_users_email")) {
+            return "Cette adresse email est déjà utilisée par un autre compte : "
+                    + "laissez le champ Email vide pour qu'une adresse unique soit générée.";
+        }
+        if (normalized.contains("uk_users_username")) {
+            return "Ce nom d'utilisateur est déjà utilisé par un autre compte.";
+        }
+        if (normalized.contains("uk_students_matricule")) {
+            return "Ce matricule est déjà attribué à un autre élève.";
+        }
+        if (normalized.contains("uk_teachers_employee_no")) {
+            return "Ce numéro d'enseignant est déjà attribué.";
+        }
+        if (normalized.contains("cannot be null")) {
+            return "Un champ obligatoire est vide : vérifiez le formulaire avant d'enregistrer.";
+        }
+        if (normalized.contains("cannot add or update a child row")
+                || normalized.contains("foreign key")) {
+            return "Référence introuvable : la classe, le parent ou l'année sélectionnée "
+                    + "n'existe plus. Rechargez la page et réessayez.";
+        }
+        if (normalized.contains("uk_")) {
+            return "Cette donnée existe déjà : un enregistrement identique est présent.";
+        }
+        return "Donnée en conflit : la ressource existe déjà ou est référencée";
     }
 
     @ExceptionHandler(NoResourceFoundException.class)

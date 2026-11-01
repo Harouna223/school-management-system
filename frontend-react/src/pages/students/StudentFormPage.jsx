@@ -170,8 +170,17 @@ const [history, setHistory] = useState({ bulletins: [], grades: [] })
         saved = await studentApi.create(payload)
         success(`Élève inscrit : ${saved.data.data.matricule}`)
       }
+      // La photo est un envoi séparé, APRÈS l'enregistrement du dossier. Un
+      // échec ici ne doit pas faire croire que l'inscription a échoué : sans ce
+      // try/catch, le message d'erreur s'affichait alors que l'élève existait
+      // déjà, et l'administrateur relançait la création (doublon).
       if (photo && saved.data.data.id) {
-        await studentApi.uploadPhoto(saved.data.data.id, photo)
+        try {
+          await studentApi.uploadPhoto(saved.data.data.id, photo)
+        } catch {
+          toastError('Élève enregistré, mais la photo n\'a pas pu être envoyée. '
+            + 'Vous pouvez la rajouter depuis la fiche de l\'élève.')
+        }
       }
       // Le serveur génère un mot de passe aléatoire quand aucun n'est fourni.
       // Il n'est affiché qu'ICI, une seule fois : on bloque la navigation tant

@@ -3,6 +3,7 @@ package com.school.exception;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -10,8 +11,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.sql.SQLException;
 import java.util.Map;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -98,6 +101,51 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.message").value("Erreur interne du serveur"));
     }
 
+    // ------------------------------------------------------------------
+    // Violations d'intégrité : le 409 doit désigner le champ en cause
+    // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("un email déjà utilisé est nommé dans le 409, pas noyé dans un message générique")
+    void duplicateEmailIsNamed() throws Exception {
+        mockMvc.perform(post("/api/students")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .param("cause", "Duplicate entry 'aicha@ecole.td' for key 'users.uk_users_email'"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message", containsString("adresse email")));
+    }
+
+    @Test
+    @DisplayName("un matricule déjà attribué est nommé dans le 409")
+    void duplicateMatriculeIsNamed() throws Exception {
+        mockMvc.perform(post("/api/students")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .param("cause", "Duplicate entry 'ETU-2026-000017' for key 'students.uk_students_matricule'"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message", containsString("matricule")));
+    }
+
+    @Test
+    @DisplayName("une clé étrangère absente donne une piste au lieu d'un conflit muet")
+    void foreignKeyViolationIsExplained() throws Exception {
+        mockMvc.perform(post("/api/students")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .param("cause", "Cannot add or update a child row: a foreign key constraint fails"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message", containsString("Référence introuvable")));
+    }
+
+    @Test
+    @DisplayName("une contrainte inconnue conserve le message générique")
+    void unknownConstraintKeepsGenericMessage() throws Exception {
+        mockMvc.perform(post("/api/students")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .param("cause", "panne de stockage non répertoriée"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message")
+                        .value("Donnée en conflit : la ressource existe déjà ou est référencée"));
+    }
+
     @RestController
     static class LoginProbeController {
 
@@ -109,6 +157,16 @@ class GlobalExceptionHandlerTest {
                 throw new IllegalStateException("panne simulée");
             }
             return Map.of("username", credentials.username());
+        }
+
+        /**
+         * Simule une violation de contrainte avec le message SQL réel de MySQL,
+         * pour vérifier la traduction faite par le handler.
+         */
+        @PostMapping("/api/students")
+        Map<String, String> createStudent(
+                @org.springframework.web.bind.annotation.RequestParam("cause") String cause) {
+            throw new DataIntegrityViolationException("insert failed", new SQLException(cause));
         }
 
         record Credentials(String username, String password) {
