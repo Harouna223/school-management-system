@@ -115,6 +115,28 @@ contre le bourrage d'identifiants.
 | 6 | Aucun rate limiting nginx sur `/api/auth/login` | Le `LoginAttemptService` protège le compte, pas la disponibilité (credential stuffing volumétrique) | `limit_req_zone` sur `/api/auth/` |
 | 7 | Pas de `mem_limit`, `read_only`, `cap_drop` dans compose | Une fuite mémoire JVM ou un conteneur compromis déstabilise l'hôte | Limites + `cap_drop: ALL` + `read_only` sur le frontend |
 
+**État au 2026-11-01** — traité depuis la rédaction de ce tableau :
+
+- **#2 (base en root)** : corrigé. Compte `sahel_app` limité à `school_management`,
+  créé par `install.sh` ou par `deploy/update.sh` sur une installation existante.
+  Modèle de privilèges vérifié sur une instance MySQL réelle.
+- **#6 (rate limiting nginx)** : corrigé. `limit_req` sur `/api/auth/`, 120 req/min
+  par IP. La limitation applicative par IP était par ailleurs **contournable** :
+  l'en-tête `X-Forwarded-For` était complété au lieu d'être écrasé, alors que le
+  backend lit sa première valeur. Corrigé dans les deux nginx.
+- **#4 (sauvegardes)** : partiellement traité. `OFFSITE_DIR` existait déjà ; la
+  copie hors site est désormais vérifiée octet par octet, et un dump sans aucune
+  table est refusé (`gzip -t` seul déclarait valide un dump inutilisable).
+  **Reste ouvert** : `OFFSITE_DIR` demeure facultatif, et aucun chiffrement.
+- **#3 (CSP)** : partiellement traité. `script-src` n'autorise plus
+  `'unsafe-inline'` — vérifié dans un navigateur : la page se charge sans
+  violation, un script en ligne injecté est bloqué. `style-src 'unsafe-inline'`
+  reste **nécessaire** (MUI/Emotion injecte ses styles à l'exécution).
+  **Reste ouvert** : les jetons sont toujours en `localStorage`.
+
+Non traités : **#1** (conteneurs root), **#5** (Spring Boot 3.2.5), **#7**
+(limites de ressources).
+
 ### P2 — dette à planifier
 
 8. **God classes** : `ReportService` 1 224 lignes, `SchoolDocumentTheme` 752,
