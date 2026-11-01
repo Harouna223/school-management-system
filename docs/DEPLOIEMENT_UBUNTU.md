@@ -241,6 +241,33 @@ La sauvegarde (`sahel-edu-backup`) reste volontairement en root : `mysqldump
 ne doit pas recevoir. Ce conteneur n'expose aucun port et n'accepte aucune
 entrée utilisateur.
 
+### Limitation de débit des connexions
+
+Le nginx du conteneur frontend plafonne les routes d'authentification à
+**120 requêtes par minute et par adresse IP**, avec une réserve de 40 requêtes
+instantanées. Au-delà, la réponse est un `429` accompagné d'un message JSON
+lisible par l'interface.
+
+Ce plafond ne vise pas le mot de passe deviné — le backend verrouille déjà le
+compte ciblé et compte les échecs par IP — mais la saturation de Tomcat : un
+déluge de requêtes atteindrait le serveur Java avant que le code applicatif ne
+puisse réagir. La valeur est volontairement généreuse pour qu'une classe entière
+se connectant à 8 h derrière une même adresse publique passe sans encombre.
+
+Seules les cinq routes `/api/auth/*` (login, refresh, logout, register,
+change-password) sont concernées : `/api/` est appelé en permanence par
+l'interface et un plafond global casserait l'usage normal.
+
+Pour ajuster, modifier `limit_req_zone` dans `docker/nginx.conf` puis
+reconstruire l'image frontend (`deploy/update.sh`).
+
+L'en-tête `X-Forwarded-For` est **écrasé** par chaque nginx avec l'adresse réelle
+du client, et non complété. C'est indispensable : le backend lit la première
+valeur de cet en-tête, donc un en-tête fabriqué par le client permettait de
+contourner la limitation par IP. Le conteneur restaure l'adresse d'origine via
+`set_real_ip_from` (plages Docker uniquement), ce qui la rend fiable derrière le
+nginx hôte.
+
 ---
 
 ## 6. Sauvegarde et restauration
