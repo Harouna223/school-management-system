@@ -1,0 +1,115 @@
+# ============================================================
+# Sahel Edu - veille automatique des dependances
+#
+# Constat a l'origine de ce fichier : Spring Boot 3.2.5 (mai 2024) est reste en
+# place jusqu'en novembre 2026, alors que sa branche n'etait plus maintenue et
+# ne recevait donc plus de correctifs de securite. Rien ne signalait ce
+# vieillissement. Dependabot ouvre une pull request des qu'une version sort, et
+# la CI existante verifie automatiquement qu'elle ne casse rien.
+#
+# Les mises a jour sont REGROUPEES : une PR par dependance produirait un flot
+# que personne ne suit sur un projet maintenu a peu de monde, ce qui reviendrait
+# a ne pas avoir de veille du tout.
+# ============================================================
+version: 2
+updates:
+  # --- Backend (Maven) -------------------------------------------------
+  - package-ecosystem: maven
+    directory: "/backend-springboot"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "05:00"
+      timezone: Africa/Dakar
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+    labels:
+      - dependencies
+      - backend
+    groups:
+      # Spring Boot et springdoc DOIVENT avancer ensemble : springdoc 2.5 ne
+      # connait pas Spring Framework 6.2. Deux PR separees donneraient une
+      # branche qui compile mais dont la documentation OpenAPI ne se genere
+      # plus -- exactement la rupture silencieuse constatee lors du passage
+      # a Boot 3.5.
+      spring:
+        patterns:
+          - "org.springframework*"
+          - "org.springdoc*"
+      # Bibliotheques de test : meme nature de risque, verification identique.
+      tests:
+        patterns:
+          - "org.junit*"
+          - "org.mockito*"
+          - "org.assertj*"
+          - "org.testcontainers*"
+
+  # --- Frontend (npm) ---------------------------------------------------
+  - package-ecosystem: npm
+    directory: "/frontend-react"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "05:00"
+      timezone: Africa/Dakar
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+    labels:
+      - dependencies
+      - frontend
+    groups:
+      # MUI et Emotion sont indissociables (styles injectes a l'execution).
+      mui:
+        patterns:
+          - "@mui/*"
+          - "@emotion/*"
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "react-router-dom"
+          - "@types/react*"
+      # Outillage de build et de test : le risque est une CI cassee, pas un
+      # changement de comportement applicatif.
+      tooling:
+        patterns:
+          - "vite"
+          - "vitest"
+          - "eslint*"
+          - "@vitejs/*"
+          - "jsdom"
+          - "@testing-library/*"
+
+  # --- Images Docker des Dockerfiles -----------------------------------
+  - package-ecosystem: docker
+    directory: "/docker"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "05:00"
+      timezone: Africa/Dakar
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "deps"
+    labels:
+      - dependencies
+      - docker
+
+  # --- Actions utilisees par la CI -------------------------------------
+  # Les actions GitHub sont du code execute avec les secrets du depot : les
+  # laisser vieillir est un risque de chaine d'approvisionnement.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "05:00"
+      timezone: Africa/Dakar
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "ci"
+    labels:
+      - dependencies
+      - ci
