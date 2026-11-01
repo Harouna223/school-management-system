@@ -36,7 +36,7 @@
              1.21.x embarque docker-java 3.4 qui négocie l'API Docker >= 1.44,
              exigée par Docker Engine 29 (l'API 1.54 renvoyait « Could not find
              a valid Docker environment » avec 1.19.7). -->
-        <testcontainers.version>1.21.3</testcontainers.version>
+        <testcontainers.version>1.21.4</testcontainers.version>
         <!-- Docker Engine 29 refuse les appels d'API < 1.44 (400 Bad Request sur
              /v1.32/info) alors que docker-java utilise 1.32 par defaut : sans ce
              reglage, Testcontainers ne detecte plus aucun environnement Docker.
