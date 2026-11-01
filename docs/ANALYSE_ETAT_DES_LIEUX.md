@@ -144,11 +144,11 @@ contre le bourrage d'identifiants.
   hebdomadaire. C'était la cause racine : sans veille, 3.5.16 vieillira
   exactement comme 3.2.5 et personne ne le verra. Voir la section suivante
   pour les majeures volontairement écartées.
-- **#7 (validation des images)** : corrigé. Le job `docker` construisait les
-  images sans jamais les démarrer, et uniquement sur push vers `main` — une
-  montée d'image de base passait donc au vert sans avoir été construite. Il
-  tourne désormais sur les pull requests et **démarre réellement** les deux
-  images contre un MySQL 8.4 : le backend doit répondre
+- **Validation des images Docker** (hors tableau) : corrigé. Le job `docker`
+  construisait les images sans jamais les démarrer, et uniquement sur push vers
+  `main` — une montée d'image de base passait donc au vert sans avoir été
+  construite. Il tourne désormais sur les pull requests et **démarre réellement**
+  les deux images contre un MySQL 8.4 : le backend doit répondre
   `{"status":"UP"}` sur `/actuator/health/liveness` (Flyway applique les
   migrations au passage), et nginx doit servir `index.html`. Vérifié : `UP`
   en 12 s sur `eclipse-temurin:21-jre` et en 15 s sur `eclipse-temurin:24-jre`,
