@@ -108,16 +108,29 @@ updates:
         update-types:
           - minor
           - patch
+      # eslint et @eslint/js DOIVENT partager la meme majeure : `@eslint/js` 10
+      # exige `eslint` ^10. Le motif `eslint*` ne capturait PAS le nom scope
+      # `@eslint/js`, qui partait donc seul et cassait `npm install` en
+      # ERESOLVE (constate sur la PR #24). Ce groupe n'a pas d'`update-types` :
+      # les majeures y restent liees, ce qui est le seul moyen d'eviter une
+      # demi-montee incoherente.
+      eslint:
+        patterns:
+          - "eslint"
+          - "eslint-plugin-*"
+          - "@eslint/*"
       # Outillage de build et de test : le risque est une CI cassee, pas un
       # changement de comportement applicatif.
       tooling:
         patterns:
           - "vite"
           - "vitest"
-          - "eslint*"
           - "@vitejs/*"
           - "jsdom"
           - "@testing-library/*"
+          - "tailwindcss"
+          - "autoprefixer"
+          - "postcss"
         update-types:
           - minor
           - patch

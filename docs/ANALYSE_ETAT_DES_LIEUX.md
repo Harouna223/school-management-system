@@ -159,6 +159,12 @@ un simple changement de numéro de version.
 | Spring Boot | 3.5.16 → 4.1.2 | `HandlerMethodValidationException.getAllValidationResults()` supprimé ; `DaoAuthenticationProvider` n'a plus de constructeur sans argument (Spring Security 7) | Migration dédiée : réécrire `GlobalExceptionHandler` et `SecurityConfig`, springdoc 3.x |
 | MUI | 5.18 → 9.5 | `@mui/icons-material/MailOutline` n'existe plus : 3 suites de tests ne compilent même pas | Recenser les icônes et API retirées, migrer par paliers (5 → 7 → 9) |
 | eslint | 9 → 10 | `eslint-plugin-react@7.37.5` plafonne à `^9.7` : `npm install` échoue en `ERESOLVE` | Bloqué en amont, rien à faire côté projet avant une version compatible |
+| Tailwind CSS | 3.4 → 4.3 | Le plugin PostCSS a été déplacé : `It looks like you're trying to use tailwindcss directly as a PostCSS plugin` | Installer `@tailwindcss/postcss`, réécrire `postcss.config` et migrer la configuration CSS-first |
+
+**Couplage `eslint` / `@eslint/js`** : ces deux paquets doivent partager la même
+majeure (`@eslint/js` 10 exige `eslint` ^10). Le motif `eslint*` ne capturait
+pas le nom *scopé* `@eslint/js`, qui partait donc seul et cassait `npm install`
+(PR #24). Ils sont désormais dans un groupe commun qui inclut les majeures.
 
 Ces trois PR ont été fermées : Dependabot ne représente pas une version dont la
 PR a été fermée, donc elles ne reviendront pas avant la version suivante. C'est
