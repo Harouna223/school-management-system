@@ -138,11 +138,38 @@ contre le bourrage d'identifiants.
   pas Spring Framework 6.2). Vérifié : 1 006 tests unitaires et 66 tests
   d'intégration sur MySQL réel, aucun échec, aucune propriété de configuration
   obsolète. **Reste ouvert** : la branche 4.x est une migration majeure
-  (Spring Framework 7) qui demande sa propre étape, et aucun outil de veille
-  automatique (Dependabot / OWASP Dependency-Check) n'est branché dans la CI —
-  c'est ce qui a permis à 3.2.5 de vieillir sans alerte.
+  (Spring Framework 7) qui demande sa propre étape.
+- **#5 (veille automatique)** : corrigé. `.github/dependabot.yml` branche
+  Dependabot sur les 4 écosystèmes (maven, npm, docker, github-actions),
+  hebdomadaire. C'était la cause racine : sans veille, 3.5.16 vieillira
+  exactement comme 3.2.5 et personne ne le verra. Voir la section suivante
+  pour les majeures volontairement écartées.
 
 Non traités : **#1** (conteneurs root), **#7** (limites de ressources).
+
+### 4.1 Majeures en attente d'arbitrage (veille Dependabot)
+
+Dependabot ne regroupe que les mises à jour **mineures et patch** ; chaque
+majeure arrive donc en PR isolée. Les trois premières ont été vérifiées sur la
+CI réelle le 2026-11-01 : aucune n'est fusionnable en l'état, et aucune n'est
+un simple changement de numéro de version.
+
+| Dépendance | Saut | Ce qui casse, précisément | Ce qu'il faut faire |
+|---|---|---|---|
+| Spring Boot | 3.5.16 → 4.1.2 | `HandlerMethodValidationException.getAllValidationResults()` supprimé ; `DaoAuthenticationProvider` n'a plus de constructeur sans argument (Spring Security 7) | Migration dédiée : réécrire `GlobalExceptionHandler` et `SecurityConfig`, springdoc 3.x |
+| MUI | 5.18 → 9.5 | `@mui/icons-material/MailOutline` n'existe plus : 3 suites de tests ne compilent même pas | Recenser les icônes et API retirées, migrer par paliers (5 → 7 → 9) |
+| eslint | 9 → 10 | `eslint-plugin-react@7.37.5` plafonne à `^9.7` : `npm install` échoue en `ERESOLVE` | Bloqué en amont, rien à faire côté projet avant une version compatible |
+
+Ces trois PR ont été fermées : Dependabot ne représente pas une version dont la
+PR a été fermée, donc elles ne reviendront pas avant la version suivante. C'est
+ce tableau qui fait office de rappel.
+
+**Décision assumée** : `ignore: version-update:semver-major` n'est **pas**
+utilisé. La documentation GitHub ne dit pas clairement si `ignore` s'applique
+aussi aux mises à jour de sécurité ; si c'était le cas, une faille dans Spring
+Boot 3.5.x passerait inaperçue — exactement le problème que la veille doit
+résoudre. Fermer une PR de majeure donne le même résultat sans ce risque.
+
 
 ### P2 — dette à planifier
 

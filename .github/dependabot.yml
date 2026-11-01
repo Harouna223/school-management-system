@@ -7,9 +7,31 @@
 # vieillissement. Dependabot ouvre une pull request des qu'une version sort, et
 # la CI existante verifie automatiquement qu'elle ne casse rien.
 #
-# Les mises a jour sont REGROUPEES : une PR par dependance produirait un flot
-# que personne ne suit sur un projet maintenu a peu de monde, ce qui reviendrait
-# a ne pas avoir de veille du tout.
+# Regle de partage, tiree du premier passage reel du 2026-11-01 :
+#
+#   - MINEURES et PATCH : regroupees par domaine (`update-types` ci-dessous).
+#     Ce sont elles qui se fusionnent sans debat des que la CI est verte, et
+#     c'est ce flux-la qui manquait -- c'est son absence qui fait pourrir un
+#     projet, pas celle des majeures.
+#
+#   - MAJEURES : volontairement hors des groupes, donc une PR par majeure.
+#     Le premier passage a montre qu'une majeure n'est pas une pull request
+#     mais une migration :
+#       * Spring Boot 3.5.16 -> 4.1.2 : getAllValidationResults() supprime,
+#         DaoAuthenticationProvider n'a plus de constructeur sans argument ;
+#       * MUI 5.18 -> 9.5 : @mui/icons-material/MailOutline n'existe plus ;
+#       * eslint 9 -> 10 : eslint-plugin-react 7.37.5 plafonne a ^9.7.
+#     Regroupees, ces trois montees arrivaient melangees dans une PR
+#     illisible. Separees, chacune est un chantier identifiable qu'on peut
+#     fermer sans ambiguite : Dependabot ne represente pas une version dont la
+#     PR a ete fermee, donc il n'y a pas de bruit recurrent a filtrer.
+#
+#   NOTE : on n'utilise PAS `ignore: version-update:semver-major`. Le
+#   referencement GitHub ne dit pas clairement si `ignore` s'applique aussi aux
+#   mises a jour de SECURITE. Si c'etait le cas, une faille dans Spring Boot
+#   3.5.x passerait inapercue -- exactement le probleme que ce fichier existe
+#   pour resoudre. Fermer une PR de majeure obtient le meme resultat sans ce
+#   risque.
 # ============================================================
 version: 2
 updates:
@@ -21,7 +43,10 @@ updates:
       day: monday
       time: "05:00"
       timezone: Africa/Dakar
-    open-pull-requests-limit: 5
+    # Assez de place pour la PR groupee de routine ET pour les majeures en
+    # attente d'arbitrage : une majeure bloquee ne doit pas affamer les
+    # correctifs de securite.
+    open-pull-requests-limit: 8
     commit-message:
       prefix: "deps"
     labels:
@@ -37,6 +62,9 @@ updates:
         patterns:
           - "org.springframework*"
           - "org.springdoc*"
+        update-types:
+          - minor
+          - patch
       # Bibliotheques de test : meme nature de risque, verification identique.
       tests:
         patterns:
@@ -44,6 +72,9 @@ updates:
           - "org.mockito*"
           - "org.assertj*"
           - "org.testcontainers*"
+        update-types:
+          - minor
+          - patch
 
   # --- Frontend (npm) ---------------------------------------------------
   - package-ecosystem: npm
@@ -53,7 +84,7 @@ updates:
       day: monday
       time: "05:00"
       timezone: Africa/Dakar
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 8
     commit-message:
       prefix: "deps"
     labels:
@@ -65,12 +96,18 @@ updates:
         patterns:
           - "@mui/*"
           - "@emotion/*"
+        update-types:
+          - minor
+          - patch
       react:
         patterns:
           - "react"
           - "react-dom"
           - "react-router-dom"
           - "@types/react*"
+        update-types:
+          - minor
+          - patch
       # Outillage de build et de test : le risque est une CI cassee, pas un
       # changement de comportement applicatif.
       tooling:
@@ -81,8 +118,15 @@ updates:
           - "@vitejs/*"
           - "jsdom"
           - "@testing-library/*"
+        update-types:
+          - minor
+          - patch
 
   # --- Images Docker des Dockerfiles -----------------------------------
+  # Les images de base fixent la version d'execution (Java 21, Node 20) : une
+  # montee majeure change le moteur d'execution de l'application, elle ne se
+  # fusionne pas a l'aveugle. La CI construit desormais les images a chaque
+  # pull request (job `docker`), mais le choix de version reste manuel.
   - package-ecosystem: docker
     directory: "/docker"
     schedule:
@@ -90,7 +134,7 @@ updates:
       day: monday
       time: "05:00"
       timezone: Africa/Dakar
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 4
     commit-message:
       prefix: "deps"
     labels:
@@ -99,7 +143,9 @@ updates:
 
   # --- Actions utilisees par la CI -------------------------------------
   # Les actions GitHub sont du code execute avec les secrets du depot : les
-  # laisser vieillir est un risque de chaine d'approvisionnement.
+  # laisser vieillir est un risque de chaine d'approvisionnement. Ici les
+  # majeures sont acceptees telles quelles : une action cassee fait echouer la
+  # CI, qui est precisement ce qu'on veut.
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
@@ -107,7 +153,7 @@ updates:
       day: monday
       time: "05:00"
       timezone: Africa/Dakar
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 4
     commit-message:
       prefix: "ci"
     labels:
