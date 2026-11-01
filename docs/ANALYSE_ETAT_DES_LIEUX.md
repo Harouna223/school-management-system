@@ -133,9 +133,16 @@ contre le bourrage d'identifiants.
   violation, un script en ligne injecté est bloqué. `style-src 'unsafe-inline'`
   reste **nécessaire** (MUI/Emotion injecte ses styles à l'exécution).
   **Reste ouvert** : les jetons sont toujours en `localStorage`.
+- **#5 (Spring Boot)** : partiellement traité. Passage de **3.2.5 à 3.5.16**
+  (dernière 3.5.x maintenue), avec springdoc 2.5.0 → 2.8.17 (la 2.5 ne connaît
+  pas Spring Framework 6.2). Vérifié : 1 006 tests unitaires et 66 tests
+  d'intégration sur MySQL réel, aucun échec, aucune propriété de configuration
+  obsolète. **Reste ouvert** : la branche 4.x est une migration majeure
+  (Spring Framework 7) qui demande sa propre étape, et aucun outil de veille
+  automatique (Dependabot / OWASP Dependency-Check) n'est branché dans la CI —
+  c'est ce qui a permis à 3.2.5 de vieillir sans alerte.
 
-Non traités : **#1** (conteneurs root), **#5** (Spring Boot 3.2.5), **#7**
-(limites de ressources).
+Non traités : **#1** (conteneurs root), **#7** (limites de ressources).
 
 ### P2 — dette à planifier
 
