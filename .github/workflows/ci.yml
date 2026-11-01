@@ -43,7 +43,7 @@ jobs:
           cache: maven
 
       - name: Cache Maven packages
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.m2
           key: ${{ runner.os }}-maven-${{ hashFiles('backend-springboot/pom.xml') }}
@@ -115,7 +115,7 @@ jobs:
           cache-dependency-path: frontend-react/package-lock.json
 
       - name: Cache node_modules
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: frontend-react/node_modules
           key: ${{ runner.os }}-node-${{ hashFiles('frontend-react/package-lock.json') }}
