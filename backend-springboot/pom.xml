@@ -19,7 +19,7 @@
 
     <properties>
         <java.version>21</java.version>
-        <mapstruct.version>1.5.5.Final</mapstruct.version>
+        <mapstruct.version>1.6.3</mapstruct.version>
         <jjwt.version>0.13.0</jjwt.version>
         <!-- springdoc 2.5 ne connait pas Spring Framework 6.2 (fourni par Boot 3.5) :
              la documentation OpenAPI ne se generait plus. 2.8.x est la branche
