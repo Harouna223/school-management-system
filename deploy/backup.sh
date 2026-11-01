@@ -16,6 +16,11 @@
 #
 # Retention : RETENTION_DAYS jours (14 par defaut).
 # OFFSITE_DIR (facultatif) : copie des archives vers un disque distinct.
+#
+# Chaque archive est verifiee avant d'etre conservee : integrite de la
+# compression, presence effective de tables dans le dump, et concordance octet
+# par octet de la copie hors site. Une sauvegarde inutilisable fait echouer le
+# service au lieu de rester silencieusement en place.
 # ============================================================
 set -euo pipefail
 
@@ -71,8 +76,16 @@ docker compose -f "$COMPOSE_FILE" exec -T -e MYSQL_PWD="$DB_PASSWORD" mysql \
 
 [[ -s "$DB_TMP" ]] || die "dump vide : sauvegarde annulee"
 gzip -t "$DB_TMP" || die "archive SQL corrompue"
+
+# `gzip -t` ne prouve que l'integrite de la compression : un dump parfaitement
+# valide peut ne contenir AUCUNE table (mauvais nom de base, base vide, droits
+# insuffisants). Cette sauvegarde-la serait acceptee puis decouverte inutilisable
+# le jour de la restauration. On exige donc la presence effective de tables.
+NB_TABLES="$(gzip -dc "$DB_TMP" | grep -c '^CREATE TABLE' || true)"
+[[ "${NB_TABLES:-0}" -ge 1 ]] || die "dump sans aucune table : sauvegarde refusee"
+
 mv -f "$DB_TMP" "$DB_DIR/db-$STAMP.sql.gz"
-log "base sauvegardee : $(du -h "$DB_DIR/db-$STAMP.sql.gz" | cut -f1)"
+log "base sauvegardee : $(du -h "$DB_DIR/db-$STAMP.sql.gz" | cut -f1) ($NB_TABLES tables)"
 
 log "sauvegarde des fichiers pedagogiques"
 tar czf "$UP_TMP" -C "$DATA_DIR/uploads" .
@@ -96,6 +109,15 @@ if [[ -n "$OFFSITE_DIR" ]]; then
     log "copie hors site vers $OFFSITE_DIR"
     cp -f "$DB_DIR/db-$STAMP.sql.gz" "$OFFSITE_DIR/"
     cp -f "$UP_DIR/uploads-$STAMP.tar.gz" "$OFFSITE_DIR/"
+    # Une copie tronquee (disque externe plein, support debranche en cours de
+    # copie) ne doit jamais passer pour une sauvegarde valide : on compare
+    # octet par octet avec l'original.
+    verifier_copie() {
+      cmp -s "$1" "$OFFSITE_DIR/$2" || die "copie hors site alteree ou incomplete : $2"
+    }
+    verifier_copie "$DB_DIR/db-$STAMP.sql.gz" "db-$STAMP.sql.gz"
+    verifier_copie "$UP_DIR/uploads-$STAMP.tar.gz" "uploads-$STAMP.tar.gz"
+    log "copie hors site verifiee"
     find "$OFFSITE_DIR" -maxdepth 1 \( -name 'db-*.sql.gz' -o -name 'uploads-*.tar.gz' \) \
       -type f -mtime "+$RETENTION_DAYS" -delete
   else
@@ -103,6 +125,7 @@ if [[ -n "$OFFSITE_DIR" ]]; then
   fi
 else
   warn "OFFSITE_DIR non defini : la sauvegarde reste sur le disque principal."
+  warn "une panne de ce disque detruirait les donnees ET leurs sauvegardes."
 fi
 
 log "sauvegarde terminee"

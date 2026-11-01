@@ -96,9 +96,12 @@ pick_free_port() {
 # Variables attendues : ENV_FILE, DATA_DIR, SCHOOL_NAME, DOMAIN.
 generate_env_file() {
   local admin_password="${1:-}"
-  local old_umask db_password jwt_secret db_port cors_origins
+  local old_umask db_password db_app_password jwt_secret db_port cors_origins
   old_umask="$(umask)"
   db_password="$(openssl rand -base64 32 | tr -d '/+=' | cut -c1-28)"
+  # Mot de passe distinct de celui de root : le backend ne doit jamais pouvoir
+  # administrer le serveur MySQL, seulement sa propre base.
+  db_app_password="$(openssl rand -base64 32 | tr -d '/+=' | cut -c1-28)"
   jwt_secret="$(openssl rand -base64 48 | tr -d '\n')"
   [[ -n "$admin_password" ]] || admin_password="$(openssl rand -base64 24 | tr -d '/+=' | cut -c1-16)"
   db_port="$(pick_free_port 3307)"
@@ -114,6 +117,12 @@ generate_env_file() {
 DB_PASSWORD=$db_password
 DB_NAME=school_management
 DB_PORT=$db_port
+
+# Compte applicatif : droits limites a la base ci-dessus (le backend ne tourne
+# plus en root). Cree par l'image MySQL au premier demarrage, ou par update.sh
+# sur une installation existante.
+DB_APP_USER=sahel_app
+DB_APP_PASSWORD=$db_app_password
 
 # Application
 JWT_SECRET=$jwt_secret

@@ -13,6 +13,14 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root}
       MYSQL_DATABASE: ${DB_NAME:-school_management}
+      # Utilisateur applicatif, créé UNIQUEMENT au premier démarrage (volume
+      # vide) et doté des droits sur cette seule base. Le backend ne se connecte
+      # plus en root : une injection SQL ou une image compromise ne peut plus
+      # toucher les autres bases ni la table mysql.user.
+      # Sur une installation existante le volume est déjà initialisé, donc ces
+      # variables sont ignorées : c'est deploy/update.sh qui crée l'utilisateur.
+      MYSQL_USER: ${DB_APP_USER:-}
+      MYSQL_PASSWORD: ${DB_APP_PASSWORD:-}
       TZ: UTC
     command:
       - --character-set-server=utf8mb4
@@ -49,8 +57,11 @@ services:
       DB_HOST: mysql
       DB_PORT: 3306
       DB_NAME: ${DB_NAME:-school_management}
-      DB_USERNAME: root
-      DB_PASSWORD: ${DB_PASSWORD:-root}
+      # Repli sur root tant que DB_APP_USER n'est pas défini : les installations
+      # antérieures à l'introduction de l'utilisateur dédié continuent de démarrer
+      # sans intervention. deploy/update.sh bascule ensuite sur le compte applicatif.
+      DB_USERNAME: ${DB_APP_USER:-root}
+      DB_PASSWORD: ${DB_APP_PASSWORD:-${DB_PASSWORD:-root}}
       # ⚠️ Aucune valeur par défaut : le secret de signature des jetons n'est plus
       # stocké dans le dépôt. Il doit être défini dans docker/.env (non versionné).
       # Générer : openssl rand -base64 48
@@ -129,6 +140,10 @@ services:
       mysql:
         condition: service_healthy
     environment:
+      # Reste en root VOLONTAIREMENT : `mysqldump --routines` exige le privilège
+      # global SHOW_ROUTINE, que le compte applicatif ne doit pas recevoir. Ce
+      # conteneur n'expose aucun port et n'accepte aucune entrée utilisateur :
+      # il ne constitue pas une surface d'attaque, contrairement au backend.
       DB_PASSWORD: ${DB_PASSWORD:-root}
     volumes:
       - backup_data:/backups

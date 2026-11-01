@@ -98,7 +98,7 @@ sudo APP_DIR=/opt/sahel-edu DATA_DIR=/srv/sahel-edu ./deploy/install.sh
 | Docker | dépôt officiel : `docker-ce`, `buildx`, `compose-plugin` |
 | Répertoires | `/srv/sahel-edu/uploads`, `/srv/sahel-edu/backups/{db,uploads}` (mode 750, propriétaire root) |
 | Code | copie depuis le dépôt courant, ou `git clone` dans `/opt/sahel-edu` |
-| Secrets | `docker/.env` généré en **mode 600** : `DB_PASSWORD`, `JWT_SECRET` (48 octets aléatoires), `ADMIN_PASSWORD` |
+| Secrets | `docker/.env` généré en **mode 600** : `DB_PASSWORD` (root MySQL), `DB_APP_USER`/`DB_APP_PASSWORD` (compte applicatif), `JWT_SECRET` (48 octets aléatoires), `ADMIN_PASSWORD` |
 | Port MySQL | premier port libre à partir de 3307 (évite un MySQL local) |
 | systemd | installe et active `sahel-edu.service`, `sahel-edu-backup.timer` |
 | Pare-feu | UFW : 22, 80, 443 entrants ; le reste fermé |
@@ -210,6 +210,37 @@ sudo sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
 sudo systemctl restart ssh
 ```
 
+### Compte MySQL applicatif
+
+Le backend **ne se connecte pas en root**. Il utilise le compte `sahel_app`,
+dont les droits sont limités à la base `school_management` : une injection SQL
+ou une image compromise ne peut donc ni lire `mysql.user`, ni toucher une autre
+base hébergée sur le même serveur.
+
+Les identifiants sont générés par `install.sh` (`DB_APP_USER`, `DB_APP_PASSWORD`
+dans `docker/.env`) et le compte est créé automatiquement par l'image MySQL au
+premier démarrage.
+
+Sur une installation **déjà en service**, le volume MySQL est déjà initialisé :
+l'image ignore `MYSQL_USER`. C'est `deploy/update.sh` qui crée le compte — il le
+fait avant de redémarrer les conteneurs, de façon idempotente. Une mise à jour
+faite à la main (`git pull` puis `docker compose up`) sans passer par ce script
+laisserait donc le backend sans compte valide.
+
+Vérifier le compte effectif :
+
+```bash
+sudo docker compose -f /opt/sahel-edu/docker/docker-compose.yml \
+  exec -T -e MYSQL_PWD="$(sudo sed -n 's/^DB_PASSWORD=//p' /opt/sahel-edu/docker/.env)" mysql \
+  mysql -uroot -e "SELECT user, host FROM mysql.user WHERE user='sahel_app';
+                   SHOW GRANTS FOR 'sahel_app'@'%';"
+```
+
+La sauvegarde (`sahel-edu-backup`) reste volontairement en root : `mysqldump
+--routines` exige le privilège global `SHOW_ROUTINE`, que le compte applicatif
+ne doit pas recevoir. Ce conteneur n'expose aucun port et n'accepte aucune
+entrée utilisateur.
+
 ---
 
 ## 6. Sauvegarde et restauration
@@ -224,8 +255,11 @@ serveur était éteint) :
 | `/srv/sahel-edu/backups/db/db-AAAAMMJJ-HHMM.sql.gz` | dump complet (données, routines, triggers) |
 | `/srv/sahel-edu/backups/uploads/uploads-AAAAMMJJ-HHMM.tar.gz` | vidéos, PDF, photos |
 
-Les archives sont vérifiées (`gzip -t`, `tar tzf`) avant d'être conservées ;
-rétention **14 jours**.
+Les archives sont vérifiées avant d'être conservées : intégrité de la compression
+(`gzip -t`, `tar tzf`), présence effective de tables dans le dump, et — si
+`OFFSITE_DIR` est défini — comparaison octet par octet de la copie hors site avec
+l'original. Une sauvegarde inutilisable fait donc échouer le service, au lieu
+d'être découverte le jour de la restauration. Rétention **14 jours**.
 
 ```bash
 systemctl list-timers sahel-edu-backup.timer

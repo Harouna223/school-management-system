@@ -55,6 +55,52 @@ if [[ -z "$CURRENT_JWT_SECRET" || "$CURRENT_JWT_SECRET" == "$DEFAULT_JWT_SECRET"
   env_set JWT_SECRET "$(openssl rand -base64 48 | tr -d '\n')"
 fi
 
+# ------------------------------------------------------------------
+# Compte applicatif MySQL : le backend ne doit pas se connecter en root.
+#
+# Les installations anterieures utilisent root. Le volume mysql_data etant deja
+# initialise, la variable MYSQL_USER de docker-compose.yml est IGNOREE par
+# l'image : l'utilisateur doit donc etre cree explicitement ici, AVANT le
+# redemarrage. Sans cela, le backend relancerait avec un compte inexistant et
+# resterait en panne apres la mise a jour.
+# ------------------------------------------------------------------
+DB_APP_USER="$(env_get DB_APP_USER)"
+DB_APP_PASSWORD="$(env_get DB_APP_PASSWORD)"
+DB_NAME_VALUE="$(env_get DB_NAME school_management)"
+DB_ROOT_PASSWORD="$(env_get DB_PASSWORD)"
+
+if [[ -z "$DB_APP_USER" || -z "$DB_APP_PASSWORD" ]]; then
+  DB_APP_USER="${DB_APP_USER:-sahel_app}"
+  DB_APP_PASSWORD="$(openssl rand -base64 32 | tr -d '/+=' | cut -c1-28)"
+  log "compte applicatif MySQL absent du .env : creation de $DB_APP_USER"
+fi
+
+# Les valeurs sont injectees dans du SQL : un guillemet ou un antislash
+# permettrait de sortir de la chaine. Les mots de passe generes ici sont
+# alphanumeriques, la garde ne concerne donc que les .env edites a la main.
+case "$DB_APP_USER" in
+  *[\'\"\\]* ) die "DB_APP_USER contient un caractere interdit : $DB_APP_USER" ;;
+esac
+case "$DB_APP_PASSWORD" in
+  *[\'\"\\]* ) die "DB_APP_PASSWORD contient un guillemet ou un antislash : retirez-le." ;;
+esac
+
+log "creation ou actualisation du compte applicatif $DB_APP_USER"
+# Idempotent : rejoue sans risque a chaque mise a jour et realigne le mot de
+# passe sur celui du .env. Les droits sont limites a la base de l'application.
+if ! printf '%s\n' \
+      "CREATE USER IF NOT EXISTS '${DB_APP_USER}'@'%' IDENTIFIED BY '${DB_APP_PASSWORD}';" \
+      "ALTER USER '${DB_APP_USER}'@'%' IDENTIFIED BY '${DB_APP_PASSWORD}';" \
+      "GRANT ALL PRIVILEGES ON \`${DB_NAME_VALUE}\`.* TO '${DB_APP_USER}'@'%';" \
+      "FLUSH PRIVILEGES;" \
+    | compose exec -T -e MYSQL_PWD="$DB_ROOT_PASSWORD" mysql mysql -uroot >/dev/null; then
+  die "impossible de creer le compte applicatif : MySQL est-il demarre ? (docker compose ps)"
+fi
+
+env_set DB_APP_USER "$DB_APP_USER"
+env_set DB_APP_PASSWORD "$DB_APP_PASSWORD"
+log "compte applicatif enregistre dans $ENV_FILE"
+
 log "reconstruction des images (les migrations Flyway s'appliquent au demarrage)"
 compose build
 compose up -d --remove-orphans
