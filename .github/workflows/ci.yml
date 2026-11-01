@@ -156,10 +156,30 @@ jobs:
     # main, une montee d'image (node, eclipse-temurin, maven) passait la CI en
     # etant simplement *sautee*, donc validee sans avoir jamais ete construite.
     # Seule la publication reste reservee a main.
+    services:
+      # Base reelle pour la fumigation ci-dessous. Sans elle le backend refuse
+      # de demarrer, et Flyway ne peut pas appliquer les migrations : on ne
+      # verifierait que la construction de l'image, pas son demarrage.
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: school_management
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -uroot -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=15
     env:
       # Le contexte `secrets` n'est pas autorise dans un `if` (ni au niveau job, ni au niveau
       # etape) : on l'expose via `env`, qui lui est autorise dans un `if` d'etape.
       DOCKERHUB_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      # `secrets` EST autorise dans un `env` de job, d'ou cette variable
+      # intermediaire : elle sert a la fois a publier, a charger l'image dans le
+      # demon local, et a decider si la fumigation peut tourner.
+      PUBLISH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.DOCKER_USERNAME != '' }}
 
     steps:
       - name: Checkout code
@@ -173,7 +193,7 @@ jobs:
         # Publication uniquement depuis main, et seulement si les secrets existent.
         # Sur une pull request on ne se connecte pas : rien n'est pousse, et les
         # secrets ne sont de toute facon pas disponibles depuis un fork.
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && env.DOCKERHUB_USERNAME != '' }}
+        if: ${{ env.PUBLISH == 'true' }}
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
@@ -187,13 +207,20 @@ jobs:
       # un jeton en ecriture, or une PR Dependabot (ou issue d'un fork) recoit un
       # jeton en LECTURE SEULE. L'export echouerait et casserait le build -- donc
       # exactement les PR qu'on veut verifier. `cache-from` reste actif partout.
+      #
+      # `load` charge l'image dans le demon local quand elle n'est pas publiee :
+      # sans cela la fumigation n'aurait aucune image a demarrer. Le second tag
+      # `smoke-*` est fixe, donc independant de la presence des secrets.
       - name: Build backend Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: docker/Dockerfile.backend
-          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && env.DOCKERHUB_USERNAME != '' }}
-          tags: ${{ env.DOCKERHUB_USERNAME || 'local' }}/school-management-backend:latest
+          push: ${{ env.PUBLISH == 'true' }}
+          load: ${{ env.PUBLISH != 'true' }}
+          tags: |
+            ${{ env.DOCKERHUB_USERNAME || 'local' }}/school-management-backend:latest
+            smoke-backend:latest
           cache-from: type=gha
           cache-to: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'type=gha,mode=max' || '' }}
 
@@ -202,7 +229,74 @@ jobs:
         with:
           context: .
           file: docker/Dockerfile.frontend
-          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && env.DOCKERHUB_USERNAME != '' }}
-          tags: ${{ env.DOCKERHUB_USERNAME || 'local' }}/school-management-frontend:latest
+          push: ${{ env.PUBLISH == 'true' }}
+          load: ${{ env.PUBLISH != 'true' }}
+          tags: |
+            ${{ env.DOCKERHUB_USERNAME || 'local' }}/school-management-frontend:latest
+            smoke-frontend:latest
           cache-from: type=gha
           cache-to: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'type=gha,mode=max' || '' }}
+
+      # ----------------------------------------------------------------
+      # Fumigation : les images doivent DEMARRER, pas seulement se
+      # construire. Une montee d'image de base change le moteur d'execution
+      # (eclipse-temurin 21-jre -> 24-jre) et un build reussi ne dit rien de
+      # la compatibilite a l'execution : Hibernate, Flyway et le chargement
+      # des classes ne sont exerces qu'au demarrage.
+      # ----------------------------------------------------------------
+      - name: Fumigation – le backend demarre et repond
+        if: ${{ env.PUBLISH != 'true' }}
+        run: |
+          set -euo pipefail
+          docker run -d --name smoke-backend --network host \
+            -e DB_HOST=127.0.0.1 -e DB_PORT=3306 \
+            -e DB_NAME=school_management \
+            -e DB_USERNAME=root -e DB_PASSWORD=root \
+            -e JWT_SECRET="$(openssl rand -base64 48)" \
+            -e ADMIN_PASSWORD='Fumigation-Adm1n-2026' \
+            -e REQUIRE_SECURE_SECRETS=true \
+            -e SWAGGER_ENABLED=false \
+            -e UPLOAD_DIR=/app/uploads \
+            --tmpfs /app/uploads \
+            smoke-backend:latest
+
+          echo "Attente du demarrage (Flyway applique les migrations)..."
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8080/actuator/health/liveness >/tmp/health.json 2>/dev/null; then
+              echo "Reponse apres ${i} x 3s : $(cat /tmp/health.json)"
+              if grep -q '"status":"UP"' /tmp/health.json; then
+                echo "Backend demarre et sain."
+                exit 0
+              fi
+            fi
+            if [ "$(docker inspect -f '{{.State.Running}}' smoke-backend 2>/dev/null)" != "true" ]; then
+              echo "::error::Le conteneur s'est arrete avant de repondre."
+              docker logs smoke-backend || true
+              exit 1
+            fi
+            sleep 3
+          done
+
+          echo "::error::Le backend n'a pas repondu en 180 s."
+          docker logs --tail 120 smoke-backend || true
+          exit 1
+
+      - name: Fumigation – le frontend sert la page
+        if: ${{ env.PUBLISH != 'true' }}
+        run: |
+          set -euo pipefail
+          docker run -d --name smoke-frontend -p 8081:80 smoke-frontend:latest
+          for i in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:8081/ | grep -qi '<div id="root">'; then
+              echo "Nginx sert l'application (${i} x 3s)."
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "::error::Le frontend ne sert pas la page attendue."
+          docker logs smoke-frontend || true
+          exit 1
+
+      - name: Nettoyage des conteneurs de fumigation
+        if: ${{ always() && env.PUBLISH != 'true' }}
+        run: docker rm -f smoke-backend smoke-frontend 2>/dev/null || true
