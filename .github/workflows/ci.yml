@@ -212,7 +212,7 @@ jobs:
       # sans cela la fumigation n'aurait aucune image a demarrer. Le second tag
       # `smoke-*` est fixe, donc independant de la presence des secrets.
       - name: Build backend Docker image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: docker/Dockerfile.backend
@@ -225,7 +225,7 @@ jobs:
           cache-to: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'type=gha,mode=max' || '' }}
 
       - name: Build frontend Docker image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: docker/Dockerfile.frontend
