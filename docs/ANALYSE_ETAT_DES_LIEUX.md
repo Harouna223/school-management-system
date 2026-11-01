@@ -167,6 +167,17 @@ majeure (`@eslint/js` 10 exige `eslint` ^10). Le motif `eslint*` ne capturait
 pas le nom *scopé* `@eslint/js`, qui partait donc seul et cassait `npm install`
 (PR #24). Ils sont désormais dans un groupe commun qui inclut les majeures.
 
+**Règle générale** : un groupe garde les majeures quand ses membres ne peuvent
+pas monter séparément — `spring` (springdoc 2.x ne connaît pas Spring
+Framework 7), `mui` (`@mui/icons-material` 9 exige `@mui/material` 9) et
+`eslint`. Les groupes `tests`, `react` et `tooling` ne contiennent que des
+mineures et des patchs, car leurs membres sont indépendants.
+
+Cette règle a été écrite après l'avoir vue échouer : avec `minor, patch` sur
+`spring` et `mui`, Dependabot a ouvert quatre PR (#29/#30 et #33/#34) dont
+**aucune** ne compilait seule. Le regroupement des majeures n'est pas un confort
+de lecture, c'est une contrainte de compilation.
+
 Ces trois PR ont été fermées : Dependabot ne représente pas une version dont la
 PR a été fermée, donc elles ne reviendront pas avant la version suivante. C'est
 ce tableau qui fait office de rappel.
