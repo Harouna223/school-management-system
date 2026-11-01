@@ -4,7 +4,7 @@
 # ============================================================
 
 # ---- Étape 1 : build Vite ----
-FROM node:20-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
 COPY frontend-react/package*.json ./
 RUN npm install --no-audit --no-fund
