@@ -4,7 +4,7 @@
 # ============================================================
 
 # ---- Étape 1 : compilation ----
-FROM maven:3.9-eclipse-temurin-21 AS build
+FROM maven:3.9-eclipse-temurin-26 AS build
 WORKDIR /app
 COPY backend-springboot/pom.xml .
 # Le cache Maven (BuildKit) survit aux coupures reseau : relancer le build
