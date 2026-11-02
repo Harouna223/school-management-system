@@ -176,6 +176,93 @@ jobs:
           path: frontend-react/dist/
           retention-days: 7
 
+  exploitation:
+    name: Exploitation – Scripts & Compose
+    runs-on: ubuntu-latest
+    # Aucun `needs` : ce job ne compile rien et doit echouer en premier.
+    #
+    # Pourquoi il existe : jusqu'ici RIEN ne verifiait deploy/. install.sh,
+    # update.sh, backup.sh et install-offline.sh ne s'executent que sur le
+    # serveur de l'etablissement, jamais en CI. Une coquille y restait donc
+    # invisible jusqu'a l'installation reelle, chez le client, sans aucun
+    # moyen de la decouvrir avant.
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      # -x suit les `source` : sans cela les variables definies dans
+      # deploy/common.sh (APP_UID, BACKUP_ENV_FILE...) passeraient pour non
+      # definies et l'analyse serait aveugle precisement la ou elle sert.
+      # -S warning ecarte le bruit de style mais garde les vraies erreurs :
+      # expansion non protegee, variable non definie, commande mal citee.
+      - name: shellcheck – scripts de deploiement
+        run: |
+          set -euo pipefail
+          command -v shellcheck >/dev/null 2>&1 || {
+            sudo apt-get update -qq && sudo apt-get install -y shellcheck
+          }
+          shellcheck --version | head -2
+          mapfile -t scripts < <(git ls-files '*.sh')
+          echo "Analyse de ${#scripts[@]} scripts : ${scripts[*]}"
+          shellcheck -x -S warning "${scripts[@]}"
+
+      # Redondance assumee avec shellcheck : cette garde ne depend d'aucun
+      # paquet installe, donc elle reste utile si l'installation de shellcheck
+      # echoue sur une image de runner plus recente.
+      - name: Syntaxe bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r f; do bash -n "$f"; done < <(git ls-files '*.sh')
+          echo "Syntaxe bash OK."
+
+      # `docker compose config` n'a pas besoin du demon Docker : c'est une
+      # resolution cote client, ce job reste donc rapide et sans service.
+      #
+      # .env.example est copie en docker/.env pour reproduire EXACTEMENT
+      # l'invocation de production (deploy/common.sh lance
+      # `docker compose -f docker/docker-compose.yml`, sans --env-file : compose
+      # lit docker/.env). Sans ce fichier les variables seraient resolues a
+      # vide, et l'on validerait une configuration que personne n'utilise.
+      - name: docker compose config
+        run: |
+          set -euo pipefail
+          cd docker
+          cp .env.example .env
+          docker compose -f docker-compose.yml config --quiet
+          echo "docker compose config OK."
+
+      # L'etape precedente ne suffit pas : une variable referencee mais absente
+      # de .env.example est resolue a la chaine vide et compose sort avec le
+      # code 0. Le conteneur demarrerait alors avec une valeur vide, sans que
+      # rien ne le signale. Seules les variables SANS valeur par defaut sont
+      # exigees : `${VAR:-defaut}` a une valeur de repli assumee.
+      - name: Variables obligatoires documentees dans .env.example
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import pathlib, re, sys
+
+          compose = pathlib.Path("docker/docker-compose.yml").read_text(encoding="utf-8")
+          exemple = pathlib.Path("docker/.env.example").read_text(encoding="utf-8")
+          definies = {m.group(1) for m in re.finditer(r"^([A-Za-z_][A-Za-z0-9_]*)=", exemple, re.M)}
+
+          obligatoires, avec_defaut = set(), set()
+          for m in re.finditer(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(:?[-?][^}]*)?\}", compose):
+              nom, modificateur = m.group(1), m.group(2) or ""
+              # `${VAR:?message}` est obligatoire malgre le modificateur.
+              if not modificateur or modificateur.startswith(":?"):
+                  obligatoires.add(nom)
+              else:
+                  avec_defaut.add(nom)
+
+          manquantes = sorted(obligatoires - definies)
+          print(f"{len(obligatoires)} obligatoires, {len(avec_defaut)} avec valeur par defaut")
+          if manquantes:
+              print("::error::Absentes de docker/.env.example : " + ", ".join(manquantes))
+              sys.exit(1)
+          print("Toutes les variables obligatoires sont documentees.")
+          PY
+
   docker:
     name: Docker – Build images
     runs-on: ubuntu-latest
