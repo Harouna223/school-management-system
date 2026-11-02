@@ -389,16 +389,48 @@ zcat /srv/sahel-edu/backups/db/db-*.sql.gz | head -c 50 >/dev/null   # l'archive
 
 ```bash
 cd /opt/sahel-edu
-sudo ./deploy/update.sh
+sudo OFFSITE_DIR=/media/backup/sahel-edu ./deploy/update.sh
 ```
 
-Le script sauvegarde d'abord, puis `git pull --ff-only`, reconstruit les images,
-redémarre et vérifie la santé.
+Le script, dans cet ordre : sauvegarde complète, `git pull --ff-only`, migration
+des permissions et des unités systemd, reconstruction des images, redémarrage,
+vérification de santé.
 
+- **La pile est arrêtée pendant la reconstruction.** Comptez quelques minutes
+  d'indisponibilité. Si la construction échoue, le script relance l'ancienne
+  version au lieu de laisser le site à l'arrêt.
 - Les migrations Flyway s'appliquent **au démarrage** du backend.
 - Le volume `mysql_data` et `/srv/sahel-edu/uploads` ne sont jamais supprimés.
 - ⚠️ Ne jamais lancer `docker compose down -v` : `-v` supprime les volumes, donc
   la base de données.
+- La pile appartient à systemd. Pour redémarrer à la main, utiliser
+  `sudo systemctl restart sahel-edu.service`, **pas** `docker compose up -d`,
+  qui lancerait un second processus sur les mêmes conteneurs.
+
+### Première mise à jour depuis une version antérieure au durcissement
+
+Cette version fait tourner le backend en UID 10001 et exige une copie hors site.
+`update.sh` s'en charge, mais deux points méritent une vérification après coup.
+
+1. **Le propriétaire de `/srv/sahel-edu/uploads` change** (root → 10001), de
+   façon automatique :
+
+   ```bash
+   stat -c '%u:%g' /srv/sahel-edu/uploads   # attendu : 10001:10001
+   ```
+
+   Puis **téléversez réellement un fichier** dans « Cours et ressources » : un
+   `Permission denied` à cet endroit signifie que la migration n'a pas eu lieu,
+   et c'est le seul symptôme visible.
+
+2. **`OFFSITE_DIR` devient obligatoire.** En le passant en argument de
+   `update.sh`, il est écrit dans `/etc/sahel-edu/backup.env`. Sans lui,
+   `sahel-edu-backup` échoue — c'est voulu, mais `systemctl --failed` doit
+   rester vide :
+
+   ```bash
+   sudo systemctl start sahel-edu-backup && systemctl status sahel-edu-backup
+   ```
 
 ### Retour arrière
 
@@ -406,7 +438,8 @@ redémarre et vérifie la santé.
 cd /opt/sahel-edu
 sudo git log --oneline -5
 sudo git checkout <commit-precedent>
-sudo docker compose -f docker/docker-compose.yml build && sudo docker compose -f docker/docker-compose.yml up -d
+sudo docker compose -f docker/docker-compose.yml build
+sudo systemctl restart sahel-edu.service
 ```
 
 Si une migration a modifié le schéma, restaurer la sauvegarde correspondante.
