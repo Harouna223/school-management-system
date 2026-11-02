@@ -114,12 +114,23 @@ updates:
         patterns:
           - "@mui/*"
           - "@emotion/*"
-      react:
+      # react, react-dom et leurs types DOIVENT partager la meme majeure :
+      # `@types/react-dom` 19 exige `@types/react` 19, et react-dom 19 exige
+      # react 19. Le groupe precedent filtrait les majeures, si bien que
+      # react-dom et @types/react-dom sont partis seuls en 19 (#39) et ont
+      # echoue en ERESOLVE. Pas d'`update-types` ici.
+      react-core:
         patterns:
           - "react"
           - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+      # react-router est independant du cœur React : il fonctionne avec React 18
+      # comme avec React 19. Il reste donc en mineures/patch pour ne pas etre
+      # bloque par une migration React.
+      react-router:
+        patterns:
           - "react-router-dom"
-          - "@types/react*"
         update-types:
           - minor
           - patch
@@ -134,13 +145,20 @@ updates:
           - "eslint"
           - "eslint-plugin-*"
           - "@eslint/*"
-      # Outillage de build et de test : le risque est une CI cassee, pas un
-      # changement de comportement applicatif.
-      tooling:
+      # Chaine Vite : `@vitejs/plugin-react` declare `vite` en peer, et
+      # `vitest` aussi. Montees separement, elles ne s'installent pas -- #47
+      # (vite 8) est refuse par plugin-react 4.7, #45 (plugin-react 6) exige
+      # vite 8, #43 (vitest 5) fait echouer la resolution. Les majeures restent
+      # donc liees dans un groupe dedie.
+      vite:
         patterns:
           - "vite"
           - "vitest"
           - "@vitejs/*"
+      # Outillage independant : le risque est une CI cassee, pas un changement
+      # de comportement applicatif.
+      tooling:
+        patterns:
           - "jsdom"
           - "@testing-library/*"
           - "tailwindcss"
