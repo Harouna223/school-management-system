@@ -165,7 +165,38 @@ contre le bourrage d'identifiants.
   reconstruit plus les images) ; la correction de fond est de faire survivre
   `~/.m2/repository` entre les builds.
 
-Non traités : **#1** (conteneurs root), **#7** (limites de ressources).
+**État au 2026-11-02** — durcissement d'exploitation avant mise en production :
+
+- **#1 (conteneurs root)** : corrigé. `Dockerfile.backend` et
+  `Dockerfile.backend.jar` créent un compte `app` (UID/GID 10001) et passent
+  `USER app` ; le frontend utilise `nginxinc/nginx-unprivileged` et écoute sur
+  **8080** (un port privilégié est inaccessible sans root). Le volume des
+  fichiers pédagogiques appartient désormais à `10001:10001` — c'est
+  `install.sh` qui le crée ainsi et `update.sh` qui migre les installations
+  existantes, sans quoi les téléversements échoueraient alors que le conteneur
+  démarre normalement. Une garde dans la CI vérifie à l'exécution que les deux
+  conteneurs ne tournent pas en UID 0, et la fumigation frontend rejoue les
+  mêmes options que la production (`--read-only`, `--tmpfs`, `--cap-drop ALL`,
+  `no-new-privileges`) : `docker run` ne lit pas le fichier compose, sans quoi
+  ces réglages ne seraient validés nulle part.
+- **#7 (limites de ressources)** : corrigé. `mem_limit`, `cpus` et `pids_limit`
+  sur les quatre services ; `cap_drop: ALL` et `no-new-privileges` sur le
+  backend et le frontend ; `read_only` + `tmpfs` sur le frontend, qui ne sert
+  que des fichiers statiques. Le plafond du backend (2 Go) est cohérent avec
+  `-XX:MaxRAMPercentage=75`, soit ~1,5 Go de tas. **MySQL est volontairement
+  exempté** de `cap_drop` : son point d'entrée abandonne les privilèges root
+  via `CAP_SETUID`/`CAP_SETGID`, et retirer ces capacités casserait
+  l'initialisation d'un volume neuf.
+- **#4 (sauvegardes hors site)** : corrigé. `OFFSITE_DIR` est **obligatoire**
+  à l'installation (`ALLOW_NO_OFFSITE=1` pour l'assumer explicitement), écrit
+  dans `/etc/sahel-edu/backup.env` et lu par l'unité systemd. En son absence,
+  la sauvegarde **échoue** au lieu d'avertir : c'est ce qui la rendait
+  silencieusement inexistante. `install.sh` signale en plus le cas d'un
+  répertoire hors site situé sur le même disque que les données.
+
+**Reste ouvert, et assumé** : **#3** — les jetons restent en `localStorage`
+(passage à un cookie `HttpOnly` + `SameSite` à planifier). `style-src
+'unsafe-inline'` reste nécessaire pour MUI/Emotion.
 
 ### 4.1 Majeures : franchies, en attente, écartées
 
@@ -360,10 +391,17 @@ Le projet est **prêt fonctionnellement** et sa sécurité applicative est séri
 cloisonnement des données centralisé, secrets obligatoires, garde structurelle sur les
 autorisations, tests d'intégration non contournables.
 
-Ce qui manque n'est pas du code mais de l'**exploitation** : les conteneurs et la base
-tournent avec des privilèges excessifs, et la seule copie des données vit sur le même
-disque que les données. Ce sont les deux points qui, en cas d'incident réel dans un
-établissement, coûtent le plus cher.
+Depuis le 2026-11-02, l'**exploitation** ne fait plus exception : les conteneurs
+tournent sans privilèges root, les ressources sont plafonnées, et une sauvegarde qui
+ne quitte pas le disque des données fait désormais échouer le service au lieu de
+laisser croire qu'elle existe. Ce sont les trois points qui, lors d'un incident réel
+dans un établissement, coûtent le plus cher.
 
-Les P1 1, 2 et 4 se corrigent en moins d'une journée et changent réellement le
-profil de risque.
+Le seul P1 restant est **#3** (jetons en `localStorage`), qui demande un changement
+d'architecture côté authentification et non un réglage d'exploitation. Il ne bloque
+pas une mise en service.
+
+**Déployable en l'état.** La réserve à garder en tête n'est pas technique : la
+restauration d'une sauvegarde n'a jamais été exercée sur une base réelle. Le
+document de déploiement décrit la procédure (§6.4) ; la faire une fois, sur une base
+jetable, vaut mieux que n'importe quelle relecture.

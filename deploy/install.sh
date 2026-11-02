@@ -12,6 +12,8 @@
 # Variables reconnues :
 #   APP_DIR       /opt/sahel-edu      code de l'application
 #   DATA_DIR      /srv/sahel-edu      donnees persistantes (uploads, backups)
+#   OFFSITE_DIR   (obligatoire)       disque distinct recevant la copie hors site
+#   ALLOW_NO_OFFSITE  0               passer a 1 pour installer SANS copie hors site
 #   BRANCH        main
 #   REPO_URL      depot Git (utilise si APP_DIR n'existe pas encore)
 #   DOMAIN        nom de domaine public (facultatif : renseigne CORS_ORIGINS)
@@ -24,6 +26,8 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$HERE")"
 APP_DIR="${APP_DIR:-/opt/sahel-edu}"
 DATA_DIR="${DATA_DIR:-/srv/sahel-edu}"
+OFFSITE_DIR="${OFFSITE_DIR:-}"
+ALLOW_NO_OFFSITE="${ALLOW_NO_OFFSITE:-0}"
 BRANCH="${BRANCH:-main}"
 REPO_URL="${REPO_URL:-https://github.com/Harouna223/school-management-system.git}"
 SCHOOL_NAME="${SCHOOL_NAME:-Sahel Edu}"
@@ -31,6 +35,12 @@ DOMAIN="${DOMAIN:-}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-}"
 SERVICE_USER="${SERVICE_USER:-${SUDO_USER:-root}}"
 ENV_FILE="$APP_DIR/docker/.env"
+
+# UID/GID du backend non-root (voir docker/Dockerfile.backend : ARG APP_UID).
+# Le volume des fichiers pedagogiques doit appartenir a cet UID, sinon les
+# televersements echouent en « Permission denied ».
+APP_UID="${APP_UID:-10001}"
+APP_GID="${APP_GID:-10001}"
 
 # shellcheck source=common.sh
 . "$HERE/common.sh"
@@ -82,8 +92,55 @@ fi
 
 log "creation des repertoires persistants"
 mkdir -p "$DATA_DIR/uploads" "$DATA_DIR/backups/db" "$DATA_DIR/backups/uploads"
-chmod 750 "$DATA_DIR" "$DATA_DIR/uploads" "$DATA_DIR/backups"
-chown -R root:root "$DATA_DIR"
+chmod 750 "$DATA_DIR" "$DATA_DIR/backups"
+chown -R root:root "$DATA_DIR/backups"
+
+# Les fichiers pedagogiques appartiennent a l'UID du backend non-root, pas a
+# root : le conteneur ecrit dans ce volume en tant que 10001. Un volume reste
+# en root:root rendait le passage en non-root inoperant (uploads casses).
+mkdir -p "$DATA_DIR/uploads"
+chown -R "${APP_UID}:${APP_GID}" "$DATA_DIR/uploads"
+chmod 750 "$DATA_DIR/uploads"
+
+# ------------------------------------------------------------------
+# Copie hors site : OBLIGATOIRE.
+#
+# Une sauvegarde posee sur le meme disque que les donnees ne protege ni d'une
+# panne de ce disque, ni d'un ransomware, ni d'un vol de la machine. Le script
+# de sauvegarde eteignait cette alerte en simple avertissement, ce qui
+# revenait a installer une protection inexistante sans que personne ne le
+# remarque.
+#
+# ALLOW_NO_OFFSITE=1 permet d'assumer explicitement l'absence de copie hors
+# site (poste de developpement, evaluation) : le choix devient conscient et
+# laisse une trace dans la sortie de l'installation.
+# ------------------------------------------------------------------
+if [[ -z "$OFFSITE_DIR" ]]; then
+  if [[ "$ALLOW_NO_OFFSITE" == "1" ]]; then
+    warn "ALLOW_NO_OFFSITE=1 : installation SANS copie hors site."
+    warn "une panne du disque de $DATA_DIR detruirait les donnees ET leurs sauvegardes."
+  else
+    die "OFFSITE_DIR est obligatoire.
+  Indiquez un repertoire situe sur un DISQUE DIFFERENT de $DATA_DIR, par exemple
+  un disque USB monte en permanence :
+
+    sudo OFFSITE_DIR=/media/backup/sahel-edu ./deploy/install.sh
+
+  Pour installer malgre tout sans copie hors site (deconseille) :
+    sudo ALLOW_NO_OFFSITE=1 ./deploy/install.sh"
+  fi
+else
+  mkdir -p "$OFFSITE_DIR"
+  chmod 750 "$OFFSITE_DIR"
+  chown root:root "$OFFSITE_DIR"
+  log "copie hors site vers $OFFSITE_DIR"
+  # Un repertoire sur le meme disque n'apporte rien : on le signale sans
+  # bloquer, car seul l'administrateur connait le montage reel (LVM, bind...).
+  if [[ "$(stat -c %d "$OFFSITE_DIR")" == "$(stat -c %d "$DATA_DIR")" ]]; then
+    warn "$OFFSITE_DIR est sur le MEME disque que $DATA_DIR."
+    warn "la copie hors site ne protegerait pas d'une panne materielle."
+  fi
+fi
 
 # ------------------------------------------------------------------
 # 4. Code de l'application
@@ -127,6 +184,24 @@ install -m 0644 "$HERE/systemd/sahel-edu.service" /etc/systemd/system/sahel-edu.
 install -m 0644 "$HERE/systemd/sahel-edu-backup.service" /etc/systemd/system/sahel-edu-backup.service
 install -m 0644 "$HERE/systemd/sahel-edu-backup.timer" /etc/systemd/system/sahel-edu-backup.timer
 install -m 0755 "$HERE/backup.sh" /usr/local/sbin/sahel-edu-backup
+
+# Environnement de la sauvegarde, lu par l'unite via EnvironmentFile.
+#
+# Pourquoi un fichier separe plutot qu'une substitution dans l'unite : l'unite
+# est un fichier du depot, copie tel quel. Y ecrire des chemins a l'installation
+# la rendrait differente de celle du depot, et une mise a jour du depot
+# ecraserait silencieusement OFFSITE_DIR. Ici, relancer install.sh ou update.sh
+# ne fait que reecrire ce fichier d'environnement.
+install -m 0755 -d /etc/sahel-edu
+cat > /etc/sahel-edu/backup.env <<EOF
+# Genere par deploy/install.sh — ne pas editer a la main, relancer le script.
+APP_DIR=$APP_DIR
+DATA_DIR=$DATA_DIR
+OFFSITE_DIR=$OFFSITE_DIR
+RETENTION_DAYS=14
+EOF
+chmod 600 /etc/sahel-edu/backup.env
+
 systemctl daemon-reload
 
 log "demarrage de la pile"

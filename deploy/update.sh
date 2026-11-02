@@ -26,7 +26,10 @@ require_root
 
 log "sauvegarde prealable"
 if [[ -x /usr/local/sbin/sahel-edu-backup ]]; then
-  /usr/local/sbin/sahel-edu-backup
+  # ALLOW_NO_OFFSITE=1 : le disque hors site peut etre debranche, cela ne doit
+  # pas empecher une mise a jour. En revanche un dump qui echoue fait toujours
+  # echouer la commande (set -e), donc on ne remplace pas du code sans copie.
+  ALLOW_NO_OFFSITE=1 /usr/local/sbin/sahel-edu-backup
 else
   warn "script de sauvegarde absent : poursuite SANS sauvegarde prealable."
 fi
@@ -38,6 +41,58 @@ BEFORE="$(git -C "$APP_DIR" rev-parse --short HEAD)"
 git -C "$APP_DIR" pull --ff-only origin "$BRANCH"
 AFTER="$(git -C "$APP_DIR" rev-parse --short HEAD)"
 log "version : $BEFORE -> $AFTER"
+
+# ------------------------------------------------------------------
+# Migration : conteneurs non root + copie hors site obligatoire.
+#
+# Deux consequences de cette version cassent une installation existante si
+# elles ne sont pas appliquees ici :
+#
+#   1. le backend tourne desormais en UID 10001. Un volume uploads reste en
+#      root:root le laisserait dans l'impossibilite d'ecrire : les
+#      televersements echouent alors que le conteneur demarre normalement,
+#      donc sans aucune erreur visible au deploiement.
+#   2. le script de sauvegarde ne vit PAS dans le depot deploye, mais dans
+#      /usr/local/sbin : `git pull` ne le met jamais a jour. Sans cette
+#      reinstalation, une installation existante conserverait indefiniment
+#      l'ancienne version, celle qui se contentait d'avertir en l'absence de
+#      copie hors site — c'est-a-dire exactement le defaut qu'on corrige.
+# ------------------------------------------------------------------
+log "migration : proprietaire du volume des fichiers pedagogiques"
+if [[ -d "$DATA_DIR/uploads" ]]; then
+  chown -R "${APP_UID}:${APP_GID}" "$DATA_DIR/uploads"
+  chmod 750 "$DATA_DIR/uploads"
+  log "  $DATA_DIR/uploads -> ${APP_UID}:${APP_GID}"
+else
+  warn "$DATA_DIR/uploads introuvable : verification manuelle necessaire."
+fi
+
+log "migration : environnement de la sauvegarde"
+install -m 0755 -d /etc/sahel-edu
+if [[ -f "$BACKUP_ENV_FILE" ]]; then
+  log "  $BACKUP_ENV_FILE conserve (valeur existante respectee)"
+else
+  cat > "$BACKUP_ENV_FILE" <<EOF
+# Genere par deploy/update.sh — ne pas editer a la main, relancer le script.
+APP_DIR=$APP_DIR
+DATA_DIR=$DATA_DIR
+OFFSITE_DIR=${OFFSITE_DIR:-}
+RETENTION_DAYS=14
+EOF
+  chmod 600 "$BACKUP_ENV_FILE"
+  if [[ -z "${OFFSITE_DIR:-}" ]]; then
+    warn "OFFSITE_DIR n'est pas configure : la sauvegarde va ECHOUER."
+    warn "definissez-le dans $BACKUP_ENV_FILE, sur un disque distinct de $DATA_DIR,"
+    warn "puis : sudo systemctl start sahel-edu-backup"
+  fi
+fi
+
+log "reinstallation des unites systemd et du script de sauvegarde"
+install -m 0644 "$APP_DIR/deploy/systemd/sahel-edu.service" /etc/systemd/system/sahel-edu.service
+install -m 0644 "$APP_DIR/deploy/systemd/sahel-edu-backup.service" /etc/systemd/system/sahel-edu-backup.service
+install -m 0644 "$APP_DIR/deploy/systemd/sahel-edu-backup.timer" /etc/systemd/system/sahel-edu-backup.timer
+install -m 0755 "$APP_DIR/deploy/backup.sh" /usr/local/sbin/sahel-edu-backup
+systemctl daemon-reload
 
 # ------------------------------------------------------------------
 # Garde-fou JWT : depuis REQUIRE_SECURE_SECRETS=true, un .env encore muni du

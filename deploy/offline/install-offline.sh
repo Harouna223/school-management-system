@@ -15,6 +15,8 @@
 # Variables reconnues (meme contrat que deploy/install.sh) :
 #   APP_DIR       /opt/sahel-edu      code de l'application
 #   DATA_DIR      /srv/sahel-edu      donnees persistantes (uploads, backups)
+#   OFFSITE_DIR   (obligatoire)       disque distinct recevant la copie hors site
+#   ALLOW_NO_OFFSITE  0               passer a 1 pour installer SANS copie hors site
 #   DOMAIN        nom de domaine public (facultatif : renseigne CORS_ORIGINS)
 #   ADMIN_PASSWORD mot de passe admin initial (sinon genere)
 #   SERVICE_USER  utilisateur ajoute au groupe docker (defaut : sudo user)
@@ -25,6 +27,8 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$HERE/../.." && pwd)"
 APP_DIR="${APP_DIR:-/opt/sahel-edu}"
 DATA_DIR="${DATA_DIR:-/srv/sahel-edu}"
+OFFSITE_DIR="${OFFSITE_DIR:-}"
+ALLOW_NO_OFFSITE="${ALLOW_NO_OFFSITE:-0}"
 SCHOOL_NAME="${SCHOOL_NAME:-Sahel Edu}"
 DOMAIN="${DOMAIN:-}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-}"
@@ -112,8 +116,36 @@ fi
 
 log "creation des repertoires persistants"
 mkdir -p "$DATA_DIR/uploads" "$DATA_DIR/backups/db" "$DATA_DIR/backups/uploads"
-chmod 750 "$DATA_DIR" "$DATA_DIR/uploads" "$DATA_DIR/backups"
-chown -R root:root "$DATA_DIR"
+chmod 750 "$DATA_DIR" "$DATA_DIR/backups"
+chown -R root:root "$DATA_DIR/backups"
+
+# Meme exigence que deploy/install.sh : le backend tourne en UID 10001, donc
+# le volume des fichiers pedagogiques doit lui appartenir. Un volume en
+# root:root laisse l'application demarrer mais casse tous les televersements.
+chown -R "${APP_UID}:${APP_GID}" "$DATA_DIR/uploads"
+chmod 750 "$DATA_DIR/uploads"
+
+# Copie hors site obligatoire, comme dans deploy/install.sh : sans elle, la
+# sauvegarde nocturne echouera (et c'est voulu). Voir le commentaire detaille
+# dans deploy/install.sh pour la justification.
+if [[ -z "$OFFSITE_DIR" ]]; then
+  if [[ "$ALLOW_NO_OFFSITE" == "1" ]]; then
+    warn "ALLOW_NO_OFFSITE=1 : installation SANS copie hors site."
+  else
+    die "OFFSITE_DIR est obligatoire (disque distinct de $DATA_DIR).
+    sudo OFFSITE_DIR=/media/backup/sahel-edu $0
+  Pour installer malgre tout sans copie hors site (deconseille) :
+    sudo ALLOW_NO_OFFSITE=1 $0"
+  fi
+else
+  mkdir -p "$OFFSITE_DIR"
+  chmod 750 "$OFFSITE_DIR"
+  chown root:root "$OFFSITE_DIR"
+  log "copie hors site vers $OFFSITE_DIR"
+  if [[ "$(stat -c %d "$OFFSITE_DIR")" == "$(stat -c %d "$DATA_DIR")" ]]; then
+    warn "$OFFSITE_DIR est sur le MEME disque que $DATA_DIR : protection nulle."
+  fi
+fi
 
 # ------------------------------------------------------------------
 # 5. Code de l'application
@@ -168,6 +200,17 @@ chmod 0644 /etc/systemd/system/sahel-edu.service
 install -m 0644 "$HERE/../systemd/sahel-edu-backup.service" /etc/systemd/system/sahel-edu-backup.service
 install -m 0644 "$HERE/../systemd/sahel-edu-backup.timer" /etc/systemd/system/sahel-edu-backup.timer
 install -m 0755 "$HERE/../backup.sh" /usr/local/sbin/sahel-edu-backup
+
+# Environnement de la sauvegarde (voir deploy/install.sh pour le pourquoi).
+install -m 0755 -d /etc/sahel-edu
+cat > /etc/sahel-edu/backup.env <<EOF
+# Genere par deploy/offline/install-offline.sh — ne pas editer a la main.
+APP_DIR=$APP_DIR
+DATA_DIR=$DATA_DIR
+OFFSITE_DIR=$OFFSITE_DIR
+RETENTION_DAYS=14
+EOF
+chmod 600 /etc/sahel-edu/backup.env
 systemctl daemon-reload
 
 log "demarrage de la pile (aucune compilation, aucune connexion externe)"

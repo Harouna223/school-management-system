@@ -7,6 +7,10 @@ After=docker.service sahel-edu.service
 [Service]
 Type=oneshot
 ExecStart=/usr/local/sbin/sahel-edu-backup
+# Chemins et cible de la copie hors site, ecrits par deploy/install.sh (ou
+# deploy/update.sh). Le « - » rend le fichier facultatif : sans lui le service
+# refuserait de demarrer au lieu de signaler clairement OFFSITE_DIR manquant.
+EnvironmentFile=-/etc/sahel-edu/backup.env
 # Priorite basse : la sauvegarde ne doit pas concurrencer les utilisateurs.
 Nice=10
 IOSchedulingClass=best-effort

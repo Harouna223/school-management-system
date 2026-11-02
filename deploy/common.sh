@@ -9,6 +9,14 @@ DATA_DIR="${DATA_DIR:-/srv/sahel-edu}"
 ENV_FILE="${ENV_FILE:-$APP_DIR/docker/.env}"
 COMPOSE_FILE="$APP_DIR/docker/docker-compose.yml"
 
+# UID/GID du backend non-root. Doit rester aligne sur les ARG APP_UID/APP_GID
+# de docker/Dockerfile.backend : c'est le proprietaire attendu du volume des
+# fichiers pedagogiques. Une divergence se traduit par des televersements en
+# « Permission denied » alors que le conteneur demarre normalement.
+APP_UID="${APP_UID:-10001}"
+APP_GID="${APP_GID:-10001}"
+BACKUP_ENV_FILE="${BACKUP_ENV_FILE:-/etc/sahel-edu/backup.env}"
+
 log()  { printf '\033[1;34m[sahel-edu]\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[attention]\033[0m %s\n' "$*" >&2; }
 die()  { printf '\033[1;31m[erreur]\033[0m %s\n' "$*" >&2; exit 1; }

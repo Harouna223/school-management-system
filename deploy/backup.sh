@@ -15,7 +15,10 @@
 #   uploads/uploads-AAAAMMJJ-HHMM.tar.gz    videos, PDF et photos
 #
 # Retention : RETENTION_DAYS jours (14 par defaut).
-# OFFSITE_DIR (facultatif) : copie des archives vers un disque distinct.
+# OFFSITE_DIR (OBLIGATOIRE) : copie des archives vers un disque distinct.
+#   Lu depuis /etc/sahel-edu/backup.env (EnvironmentFile de l'unite systemd).
+#   Son absence fait ECHOUER le service : une sauvegarde qui ne quitte pas le
+#   disque des donnees ne protege d'aucune panne materielle.
 #
 # Chaque archive est verifiee avant d'etre conservee : integrite de la
 # compression, presence effective de tables dans le dump, et concordance octet
@@ -28,12 +31,32 @@ APP_DIR="${APP_DIR:-/opt/sahel-edu}"
 DATA_DIR="${DATA_DIR:-/srv/sahel-edu}"
 RETENTION_DAYS="${RETENTION_DAYS:-14}"
 OFFSITE_DIR="${OFFSITE_DIR:-}"
+# Derogation EXPLICITE : la copie hors site echoue en simple avertissement.
+# Utilisee par deploy/update.sh pour la sauvegarde prealable — une mise a jour
+# ne doit pas etre bloquee par un disque externe debranche — et jamais par le
+# service systemd, qui doit au contraire signaler la panne.
+ALLOW_NO_OFFSITE="${ALLOW_NO_OFFSITE:-0}"
 ENV_FILE="$APP_DIR/docker/.env"
 COMPOSE_FILE="$APP_DIR/docker/docker-compose.yml"
 
 log()  { printf '\033[1;34m[sahel-edu]\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[attention]\033[0m %s\n' "$*" >&2; }
 die()  { printf '\033[1;31m[erreur]\033[0m %s\n' "$*" >&2; exit 1; }
+
+# La copie hors site n'a pas pu etre faite. Par defaut c'est un ECHEC du
+# service : sans cela l'installation reste des annees sans sauvegarde
+# reellement detachee, et personne ne s'en apercoit avant la panne.
+hors_site_indisponible() {
+  if [[ "$ALLOW_NO_OFFSITE" == "1" ]]; then
+    warn "copie hors site NON effectuee : $1"
+    warn "ALLOW_NO_OFFSITE=1 : echec tolere (la sauvegarde locale est produite)."
+    return 0
+  fi
+  die "copie hors site impossible : $1
+  La sauvegarde locale a bien ete produite, mais elle reste sur le disque des
+  donnees. Renseignez OFFSITE_DIR dans /etc/sahel-edu/backup.env, puis :
+    sudo systemctl start sahel-edu-backup"
+}
 
 [[ "${EUID}" -eq 0 ]] || die "a executer avec sudo"
 [[ -f "$ENV_FILE" ]] || die "fichier .env introuvable : $ENV_FILE"
@@ -121,11 +144,12 @@ if [[ -n "$OFFSITE_DIR" ]]; then
     find "$OFFSITE_DIR" -maxdepth 1 \( -name 'db-*.sql.gz' -o -name 'uploads-*.tar.gz' \) \
       -type f -mtime "+$RETENTION_DAYS" -delete
   else
-    warn "copie hors site impossible : $OFFSITE_DIR non monte ?"
+    # Le support hors site est absent ou non monte : c'est exactement le cas
+    # qu'un simple avertissement laissait passer inapercu pendant des mois.
+    hors_site_indisponible "$OFFSITE_DIR inaccessible (disque non monte ?)"
   fi
 else
-  warn "OFFSITE_DIR non defini : la sauvegarde reste sur le disque principal."
-  warn "une panne de ce disque detruirait les donnees ET leurs sauvegardes."
+  hors_site_indisponible "OFFSITE_DIR non defini"
 fi
 
 log "sauvegarde terminee"

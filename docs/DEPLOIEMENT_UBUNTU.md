@@ -74,7 +74,8 @@ free -h
 sudo apt-get update && sudo apt-get install -y git
 sudo git clone https://github.com/Harouna223/school-management-system.git /opt/sahel-edu-install
 cd /opt/sahel-edu-install
-sudo ./deploy/install.sh
+# OFFSITE_DIR est OBLIGATOIRE : un disque distinct de celui des donnees.
+sudo OFFSITE_DIR=/media/backup/sahel-edu ./deploy/install.sh
 ```
 
 Le script est **idempotent** : le relancer met à jour le code et répare
@@ -96,9 +97,11 @@ sudo APP_DIR=/opt/sahel-edu DATA_DIR=/srv/sahel-edu ./deploy/install.sh
 |---|---|
 | Paquets | `curl`, `git`, `openssl`, `rsync`, `jq`, `ufw` |
 | Docker | dépôt officiel : `docker-ce`, `buildx`, `compose-plugin` |
-| Répertoires | `/srv/sahel-edu/uploads`, `/srv/sahel-edu/backups/{db,uploads}` (mode 750, propriétaire root) |
+| Répertoires | `/srv/sahel-edu/uploads` (propriétaire **10001:10001**, l'UID du backend non-root), `/srv/sahel-edu/backups/{db,uploads}` (root, 750) |
+| Hors site | crée `OFFSITE_DIR`, avertit s'il est sur le même disque que les données |
 | Code | copie depuis le dépôt courant, ou `git clone` dans `/opt/sahel-edu` |
 | Secrets | `docker/.env` généré en **mode 600** : `DB_PASSWORD` (root MySQL), `DB_APP_USER`/`DB_APP_PASSWORD` (compte applicatif), `JWT_SECRET` (48 octets aléatoires), `ADMIN_PASSWORD` |
+| Sauvegarde | `/etc/sahel-edu/backup.env` (mode 600) : chemins et `OFFSITE_DIR`, lu par l'unité systemd |
 | Port MySQL | premier port libre à partir de 3307 (évite un MySQL local) |
 | systemd | installe et active `sahel-edu.service`, `sahel-edu-backup.timer` |
 | Pare-feu | UFW : 22, 80, 443 entrants ; le reste fermé |
@@ -283,10 +286,10 @@ serveur était éteint) :
 | `/srv/sahel-edu/backups/uploads/uploads-AAAAMMJJ-HHMM.tar.gz` | vidéos, PDF, photos |
 
 Les archives sont vérifiées avant d'être conservées : intégrité de la compression
-(`gzip -t`, `tar tzf`), présence effective de tables dans le dump, et — si
-`OFFSITE_DIR` est défini — comparaison octet par octet de la copie hors site avec
-l'original. Une sauvegarde inutilisable fait donc échouer le service, au lieu
-d'être découverte le jour de la restauration. Rétention **14 jours**.
+(`gzip -t`, `tar tzf`), présence effective de tables dans le dump, et comparaison
+octet par octet de la copie hors site avec l'original. Une sauvegarde inutilisable
+fait donc échouer le service, au lieu d'être découverte le jour de la restauration.
+Rétention **14 jours**.
 
 ```bash
 systemctl list-timers sahel-edu-backup.timer
@@ -296,21 +299,41 @@ journalctl -u sahel-edu-backup -n 30
 
 ### Copie hors site (obligatoire)
 
-Une sauvegarde sur le même disque ne protège pas d'une panne de ce disque.
-Brancher un disque USB et définir `OFFSITE_DIR` dans l'unité :
+Une sauvegarde sur le même disque ne protège ni d'une panne de ce disque, ni d'un
+ransomware, ni d'un vol de la machine. `OFFSITE_DIR` est donc **exigé à
+l'installation** :
 
 ```bash
-sudo systemctl edit sahel-edu-backup.service
-# [Service]
-# Environment=OFFSITE_DIR=/media/backup/sahel-edu
-sudo systemctl daemon-reload
+sudo OFFSITE_DIR=/media/backup/sahel-edu ./deploy/install.sh
 ```
 
-Ou par `rsync` planifié vers un NAS :
+Le script crée le répertoire, le réserve à root, et **avertit si le disque cible
+est le même que celui des données** (`stat -c %d`) — un répertoire « hors site »
+posé sur le même disque n'apporte rien.
+
+La valeur est écrite dans `/etc/sahel-edu/backup.env` (mode 600), lu par l'unité
+systemd via `EnvironmentFile`. Pour la changer sur une installation existante,
+éditez ce fichier plutôt que l'unité — sinon la prochaine mise à jour l'écraserait :
+
+```bash
+sudo nano /etc/sahel-edu/backup.env
+sudo systemctl start sahel-edu-backup.service   # vérifier immédiatement
+```
+
+**En l'absence de `OFFSITE_DIR`, la sauvegarde échoue** au lieu de se contenter
+d'un avertissement : `systemctl --failed` le montre, et le problème ne peut plus
+passer inaperçu pendant des mois. Pour installer malgré tout sans copie hors site
+(déconseillé, mais explicite) : `sudo ALLOW_NO_OFFSITE=1 ./deploy/install.sh`.
+
+Ou par `rsync` planifié vers un NAS, si la copie est gérée hors de l'application :
 
 ```bash
 sudo rsync -av --delete /srv/sahel-edu/backups/ /mnt/nas/sahel-edu/
 ```
+
+Dans ce cas, `OFFSITE_DIR` doit tout de même être renseigné — sinon le service de
+sauvegarde reste en échec, ce qui est le comportement voulu : une copie gérée
+ailleurs doit être une décision écrite, pas un oubli.
 
 ### Restauration
 
@@ -439,14 +462,24 @@ Les fichiers restent dans `/srv/sahel-edu/uploads` et les sauvegardes dans
 
 1. `systemctl status sahel-edu.service` → `active (running)`
 2. `curl -s http://127.0.0.1:8080/actuator/health` → `{"status":"UP"}`
-3. Connexion `admin` avec le mot de passe affiché à l'installation
-4. **Changer le mot de passe admin** (Profil)
-5. Créer une classe, une matière, un élève de test
-6. Menu **Cours et ressources** : créer un cours PDF, le publier
-7. Se connecter avec l'élève de test : le cours apparaît, s'ouvre, se télécharge
-8. Vérifier qu'un élève d'une autre classe ne le voit pas
-9. `sudo systemctl start sahel-edu-backup.service` → archives présentes dans `/srv/sahel-edu/backups`
-10. `https://` → cadenas valide, HTTP redirigé
+3. **Conteneurs non root** — les deux doivent renvoyer un UID différent de 0 :
+   ```bash
+   docker compose -f docker/docker-compose.yml exec backend  id -u   # attendu : 10001
+   docker compose -f docker/docker-compose.yml exec frontend id -u   # attendu : 101
+   ```
+4. Connexion `admin` avec le mot de passe affiché à l'installation
+5. **Changer le mot de passe admin** (Profil)
+6. Créer une classe, une matière, un élève de test
+7. Menu **Cours et ressources** : créer un cours PDF, le publier.
+   C'est aussi le test des permissions du volume : un `Permission denied` ici
+   signifie que `$DATA_DIR/uploads` n'appartient pas à 10001.
+8. Se connecter avec l'élève de test : le cours apparaît, s'ouvre, se télécharge
+9. Vérifier qu'un élève d'une autre classe ne le voit pas
+10. `sudo systemctl start sahel-edu-backup.service` → archives dans
+    `/srv/sahel-edu/backups` **et** copie identique dans `OFFSITE_DIR`.
+    `systemctl status sahel-edu-backup` doit être en `success` : un `failed`
+    signifie que la copie hors site n'a pas eu lieu.
+11. `https://` → cadenas valide, HTTP redirigé
 
 La checklist fonctionnelle détaillée du module est en §7 de
 [COURS_VIDEO_PDF.md](COURS_VIDEO_PDF.md).

@@ -286,7 +286,10 @@ jobs:
             -e REQUIRE_SECURE_SECRETS=true \
             -e SWAGGER_ENABLED=false \
             -e UPLOAD_DIR=/app/uploads \
-            --tmpfs /app/uploads \
+            --tmpfs /app/uploads:rw,uid=10001,gid=10001,mode=0750 \
+            --cap-drop ALL \
+            --security-opt no-new-privileges:true \
+            --pids-limit 600 \
             smoke-backend:latest
 
           echo "Attente du demarrage (Flyway applique les migrations)..."
@@ -314,7 +317,19 @@ jobs:
         if: ${{ env.PUBLISH != 'true' }}
         run: |
           set -euo pipefail
-          docker run -d --name smoke-frontend -p 8081:80 smoke-frontend:latest
+          # Options de durcissement REPETEES a l'identique de
+          # docker/docker-compose.yml : ce n'est pas une redondance inutile.
+          # La CI lance `docker run`, elle ne lit jamais le fichier compose.
+          # Sans ces drapeaux, un `read_only` ou un `cap_drop` qui empeche
+          # nginx de demarrer passerait la CI au vert et ne casserait qu'en
+          # production, au moment du deploiement.
+          docker run -d --name smoke-frontend -p 8081:8080 \
+            --read-only \
+            --tmpfs /tmp \
+            --tmpfs /var/cache/nginx \
+            --cap-drop ALL \
+            --security-opt no-new-privileges:true \
+            smoke-frontend:latest
           for i in $(seq 1 20); do
             if curl -fsS http://127.0.0.1:8081/ | grep -qi '<div id="root">'; then
               echo "Nginx sert l'application (${i} x 3s)."
@@ -325,6 +340,27 @@ jobs:
           echo "::error::Le frontend ne sert pas la page attendue."
           docker logs smoke-frontend || true
           exit 1
+
+      # Garde de non-regression du durcissement : sans elle, un Dockerfile qui
+      # perdrait son USER repasserait au vert partout ailleurs. Le build, les
+      # tests et la fumigation precedent ne disent RIEN de l'identite du
+      # processus, or c'est precisement la mesure de securite.
+      - name: Fumigation – les conteneurs ne tournent pas en root
+        if: ${{ always() && env.PUBLISH != 'true' }}
+        run: |
+          set -euo pipefail
+          for c in smoke-backend smoke-frontend; do
+            if [ "$(docker inspect -f '{{.State.Running}}' "$c" 2>/dev/null)" != "true" ]; then
+              echo "::error::$c ne tourne pas : impossible de verifier l'UID."
+              exit 1
+            fi
+            uid="$(docker exec "$c" id -u)"
+            echo "$c tourne en UID $uid"
+            if [ "$uid" = "0" ]; then
+              echo "::error::$c tourne en root : le Dockerfile a perdu son USER."
+              exit 1
+            fi
+          done
 
       - name: Nettoyage des conteneurs de fumigation
         if: ${{ always() && env.PUBLISH != 'true' }}

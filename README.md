@@ -37,7 +37,13 @@ cp docker/.env.example docker/.env
 openssl rand -base64 48   # coller la valeur dans docker/.env, ligne JWT_SECRET=
 # renseigner aussi ADMIN_PASSWORD (au moins 8 caractères, lettres + chiffres)
 
-# 2. Construire et démarrer
+# 2. Répertoire des fichiers pédagogiques, propriétaire = UID du backend
+#    Le backend ne tourne PAS en root (UID 10001) : un répertoire root:root
+#    ferait échouer les téléversements alors que tout semblerait démarré.
+mkdir -p /srv/sahel-edu/uploads
+sudo chown -R 10001:10001 /srv/sahel-edu/uploads
+
+# 3. Construire et démarrer
 docker compose -f docker/docker-compose.yml up -d --build
 ```
 
