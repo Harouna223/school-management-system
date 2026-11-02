@@ -15,6 +15,19 @@ COPY backend-springboot/pom.xml .
 # GHA), donc chaque build retélécharge tout l'arbre de dependances. Depuis que
 # la CI construit les images a chaque pull request, Maven Central a repondu
 # "429 Too Many Requests" et fait echouer un build dont le code etait sain.
+#
+# ATTENTION, mesure du 2026-11-02 : ces proprietes `maven.wagon.http.*` ne
+# couvrent PAS le chemin qui echoue reellement. `dependency:go-offline` passe par
+# le resolver Aether, pas par le transport Wagon, et le 429 a encore fait tomber
+# `main` sur la resolution du parent POM (spring-boot-starter-parent:3.5.16) :
+#
+#   Could not transfer artifact ... status code: 429, reason phrase: Too Many Requests
+#
+# Le reessai n'a donc jamais eu lieu. La vraie correction est de faire survivre
+# `~/.m2/repository` d'un build a l'autre (cache GHA monte dans le build), pas
+# d'empiler des proprietes Wagon. En attendant, la frequence est reduite par
+# `paths-ignore` dans ci.yml : un commit de documentation ne reconstruit plus
+# les images.
 RUN --mount=type=cache,target=/root/.m2 \
     mvn -B \
         -Dmaven.wagon.http.retryHandler.count=5 \

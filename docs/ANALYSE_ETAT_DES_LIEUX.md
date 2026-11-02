@@ -155,6 +155,16 @@ contre le bourrage d'identifiants.
   donc la montée de JRE 24 est validée à l'exécution et pas seulement à la
   compilation.
 
+- **Fragilité du build Docker face à Maven Central** : le cache `--mount` de
+  `/root/.m2` n'est pas exporté vers le cache GitHub, donc chaque build
+  retélécharge tout l'arbre de dépendances. Maven Central a répondu
+  `429 Too Many Requests` sur la résolution du parent POM, faisant échouer un
+  commit exclusivement documentaire. Les propriétés `maven.wagon.http.*` ajoutées
+  pour cela **ne protègent pas** : `dependency:go-offline` passe par le resolver
+  Aether, pas par Wagon. Atténué par `paths-ignore` (la documentation ne
+  reconstruit plus les images) ; la correction de fond est de faire survivre
+  `~/.m2/repository` entre les builds.
+
 Non traités : **#1** (conteneurs root), **#7** (limites de ressources).
 
 ### 4.1 Majeures : franchies, en attente, écartées
@@ -193,6 +203,27 @@ code touché. Validée à l'exécution : `{"status":"UP"}` sur
 sur un MySQL 8.4 vierge. Le log de build confirme que l'image réellement
 résolue est `eclipse-temurin:25-jre` — pas un cache.
 
+**recharts 2.15 → 3.10** (PR #52). Vérifié avant fusion : les composants
+utilisés (`ResponsiveContainer`, `AreaChart`, `BarChart`, `PieChart`, `XAxis`,
+`YAxis`, `CartesianGrid`, `Tooltip`, `Legend`, `Cell`) existent tous en v3, et
+les props retirées en v3 (`activeIndex`, `activeShape`, `isAnimationActive`) ne
+sont utilisées nulle part. Build, 14 suites de tests et fumigation Docker au
+vert.
+
+La réserve qui existait — « `DashboardPage` n'a aucun test de rendu, donc le
+`<Pie label={(e) => …}>` n'est validé que par la compilation » — est levée :
+`src/test/pages/DashboardPage.render.test.jsx` rend la page avec une charge
+utile copiée du DTO `DashboardResponse` et vérifie que les trois graphiques
+montent réellement (`Area`, `Pie`, `Bar`), que la légende affiche les libellés
+produits par `DashboardService` (« Garçons » / « Filles »), et que le filtre de
+cycle envoie `COLLEGE` et non `Collège`. Ce dernier point est un garde de
+non-régression : les libellés accentués provoquaient un 400 côté Spring et
+laissaient les indicateurs vides sans aucun message.
+
+Le test a été vérifié par l'échec : en vidant la source de données du camembert,
+la légende tombe — il observe donc les données, il ne se contente pas de
+constater que la page se monte.
+
 #### Majeures encore en attente
 
 | Dépendance | Saut | Ce qui casse, précisément | Ce qu'il faut faire |
@@ -202,8 +233,18 @@ résolue est `eclipse-temurin:25-jre` — pas un cache.
 | eslint | 9 → 10 | `eslint-plugin-react@7.37.5` plafonne à `^9.7` : `npm install` échoue en `ERESOLVE` | Bloqué en amont, rien à faire côté projet avant une version compatible |
 | Tailwind CSS | 3.4 → 4.3 | Le plugin PostCSS a été déplacé : `It looks like you're trying to use tailwindcss directly as a PostCSS plugin` | Installer `@tailwindcss/postcss`, réécrire `postcss.config` et migrer la configuration CSS-first |
 | OpenPDF | 1.3.39 → 3.0.5 | Le paquet change de nom : `package com.lowagie.text.pdf does not exist` | Renommer les imports `com.lowagie.*` en `com.github.librepdf.openpdf.*` — 72 occurrences dans 7 fichiers, dont `ReportService` et `SchoolDocumentTheme` |
-| Chaîne Vite | vite 5.2 → 8, vitest 2.1 → 5, `@vitejs/plugin-react` 4.3 → 6.1 | Trois maillons qui ne peuvent pas monter séparément : vitest 5 exige vite 8, plugin-react 6 exige vite 7+. Et vitest 5 tire jsdom 30, qui exige Node `^22.22.2 \|\| ^24.15.0 \|\| >=26` alors que la CI est en **Node 20**. Monter jsdom seul est pire : jsdom 29 sous Node 26 casse `window.localStorage` (`TypeError: Cannot read properties of undefined (reading 'getItem')` dans `I18nProvider`) | Une seule étape, trois changements ensemble : Node 22+ en CI **et** jsdom 30 **et** la chaîne Vite. Referme au passage l'écart CI/production — `Dockerfile.frontend` compile déjà sur `node:26-alpine` |
-| recharts | 2.12 → 3.10 | Pas encore mesuré : la PR est en conflit avec `package-lock.json`, donc la CI n'a jamais tourné dessus | Rebaser, laisser la CI dire ce qui casse (l'API `XAxis`/`Tooltip` et les props de `Pie` ont bougé en 3.x), puis décider |
+| Chaîne Vite | vite 5.2 → 8, vitest 2.1 → 5, `@vitejs/plugin-react` 4.3 → 6.1 | **Pas** un problème de version de Node : `npm ci`, le lint et les 14 suites de tests passent sous Node 20 avec vitest 5.0.5. Les `EBADENGINE` (`vitest@5` exige `^22.12`, `jest-dom@7` exige `>=22`) ne sont que des avertissements. Le seul blocage est ailleurs : Vite 8 remplace Rollup par **Rolldown**, qui n'accepte `manualChunks` que sous forme de **fonction** — `vite.config.js` passait un objet (`Invalid type: Expected Function but received Object`, puis `TypeError: manualChunks is not a function`) | Converti en fonction dans la PR **#53**, qui porte le bump et le correctif ensemble : build vert, chunks `react`/`mui`/`charts`/`forms`/`http` préservés, fumigation Docker verte. Reste la décision de fusion, car c'est un changement de bundler de production |
+
+**Écart Node entre CI et production** : les tests tournent sous **Node 20**
+(`NODE_VERSION` dans `ci.yml`), mais l'image frontend compile sous
+**`node:26-alpine`** (`Dockerfile.frontend`). Une incompatibilité liée à la
+version de Node peut donc passer les tests et casser l'image — ou l'inverse.
+C'est exactement ce qui s'est produit en tentant Node 26 en CI : jsdom 29 y
+casse `window.localStorage` (`TypeError: Cannot read properties of undefined
+(reading 'getItem')` dans `I18nProvider`), alors que le build Docker en Node 26,
+lui, réussit. Les deux chemins doivent converger ; c'est le vrai contenu de la
+dette « chaîne Vite », pas la montée de version elle-même.
+
 
 **Couplage `eslint` / `@eslint/js`** : ces deux paquets doivent partager la même
 majeure (`@eslint/js` 10 exige `eslint` ^10). Le motif `eslint*` ne capturait
@@ -232,8 +273,11 @@ Traitement retenu :
   une par migration. Ce sont les points d'entrée du travail : la PR contient
   déjà le diff de dépendances, et la CI dit précisément ce qui casse. Rouge ici
   est une information, pas un défaut.
-- **Chaîne Vite et recharts 3** : rebasées pour obtenir un diagnostic CI, puis
-  laissées ouvertes pour la même raison — ce sont les points d'entrée.
+- **Chaîne Vite** : traitée dans la PR **#53** (bump + correctif `manualChunks`),
+  verte sur les trois jobs. Elle attend une décision explicite plutôt qu'une
+  fusion automatique : c'est le bundler de production qui change, et le test de
+  fumigation frontend ne prouve pas que l'application se monte dans un
+  navigateur. La PR Dependabot #51 a été fermée en la remplaçant.
 - **eslint 10, OpenPDF 3 et Tailwind 4** ont été fermées : aucune action n'est
   possible dans l'immédiat (blocage amont pour eslint, renommage mécanique
   pour OpenPDF, réécriture de configuration pour Tailwind). Dependabot ne
@@ -252,9 +296,10 @@ résoudre. Fermer une PR de majeure donne le même résultat sans ce risque.
 8. **God classes** : `ReportService` 1 224 lignes, `SchoolDocumentTheme` 752,
    `DocumentThemePage` 944, `StudentCardPage` 739, `TeacherPayrollPage` 696.
    Les services de 700+ lignes mélangent requêtage, mise en forme et rendu PDF.
-9. **Tests frontend très fins** : 1 694 lignes pour 23 616 (7 %), 14 fichiers pour
-   52 pages. La logique métier sensible côté client (délibérations, paie, barèmes,
-   calcul de moyennes) n'est pas couverte.
+9. **Tests frontend très fins** : 1 821 lignes pour 23 782 (7,7 %), 15 fichiers
+   pour 52 pages. `DashboardPage` est désormais couverte (rendu, graphiques,
+   filtre de cycle), mais la logique métier sensible côté client (délibérations,
+   paie, barèmes, calcul de moyennes) ne l'est toujours pas.
 10. **i18n à moitié migré** : `I18nProvider` + deux locales existent, mais seuls
     `Navbar`, `Sidebar`, `DataTable`, `LoginPage`, `Loader`, `EmptyState` et
     `ConfirmDialog` l'utilisent — **2 pages sur 52**. Le reste est en français en dur :
