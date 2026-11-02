@@ -208,10 +208,21 @@ utilisés (`ResponsiveContainer`, `AreaChart`, `BarChart`, `PieChart`, `XAxis`,
 `YAxis`, `CartesianGrid`, `Tooltip`, `Legend`, `Cell`) existent tous en v3, et
 les props retirées en v3 (`activeIndex`, `activeShape`, `isAnimationActive`) ne
 sont utilisées nulle part. Build, 14 suites de tests et fumigation Docker au
-vert. **Réserve** : `DashboardPage`, la page la plus chargée en graphiques,
-n'a pas de test de rendu — le `<Pie label={(e) => …}>` qu'elle contient n'est
-donc validé que par la compilation. À couvrir avec le point P2 sur les tests
-frontend.
+vert.
+
+La réserve qui existait — « `DashboardPage` n'a aucun test de rendu, donc le
+`<Pie label={(e) => …}>` n'est validé que par la compilation » — est levée :
+`src/test/pages/DashboardPage.render.test.jsx` rend la page avec une charge
+utile copiée du DTO `DashboardResponse` et vérifie que les trois graphiques
+montent réellement (`Area`, `Pie`, `Bar`), que la légende affiche les libellés
+produits par `DashboardService` (« Garçons » / « Filles »), et que le filtre de
+cycle envoie `COLLEGE` et non `Collège`. Ce dernier point est un garde de
+non-régression : les libellés accentués provoquaient un 400 côté Spring et
+laissaient les indicateurs vides sans aucun message.
+
+Le test a été vérifié par l'échec : en vidant la source de données du camembert,
+la légende tombe — il observe donc les données, il ne se contente pas de
+constater que la page se monte.
 
 #### Majeures encore en attente
 
@@ -285,9 +296,10 @@ résoudre. Fermer une PR de majeure donne le même résultat sans ce risque.
 8. **God classes** : `ReportService` 1 224 lignes, `SchoolDocumentTheme` 752,
    `DocumentThemePage` 944, `StudentCardPage` 739, `TeacherPayrollPage` 696.
    Les services de 700+ lignes mélangent requêtage, mise en forme et rendu PDF.
-9. **Tests frontend très fins** : 1 694 lignes pour 23 616 (7 %), 14 fichiers pour
-   52 pages. La logique métier sensible côté client (délibérations, paie, barèmes,
-   calcul de moyennes) n'est pas couverte.
+9. **Tests frontend très fins** : 1 821 lignes pour 23 782 (7,7 %), 15 fichiers
+   pour 52 pages. `DashboardPage` est désormais couverte (rendu, graphiques,
+   filtre de cycle), mais la logique métier sensible côté client (délibérations,
+   paie, barèmes, calcul de moyennes) ne l'est toujours pas.
 10. **i18n à moitié migré** : `I18nProvider` + deux locales existent, mais seuls
     `Navbar`, `Sidebar`, `DataTable`, `LoginPage`, `Loader`, `EmptyState` et
     `ConfirmDialog` l'utilisent — **2 pages sur 52**. Le reste est en français en dur :
