@@ -208,7 +208,7 @@ jobs:
         # Sur une pull request on ne se connecte pas : rien n'est pousse, et les
         # secrets ne sont de toute facon pas disponibles depuis un fork.
         if: ${{ env.PUBLISH == 'true' }}
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
