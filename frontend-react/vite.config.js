@@ -1,6 +1,25 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
+/**
+ * Regroupements de bundle, nom de chunk -> paquets racines.
+ *
+ * Déclaré hors de la configuration parce que Rolldown (moteur de build de
+ * Vite 8) n'accepte `manualChunks` que sous forme de FONCTION : la forme objet
+ * de Rollup, qui marchait jusqu'à Vite 5, casse le build avec
+ * « Invalid type: Expected Function but received Object ». Le contenu des
+ * groupes est volontairement identique à l'ancien objet, pour que la montée de
+ * moteur ne change pas aussi le découpage livré.
+ */
+const CHUNK_GROUPS = {
+  react: ['react', 'react-dom', 'react-router-dom'],
+  redux: ['@reduxjs/toolkit', 'react-redux'],
+  mui: ['@mui/material', '@mui/icons-material', '@emotion/react', '@emotion/styled'],
+  charts: ['recharts'],
+  forms: ['formik', 'yup'],
+  http: ['axios'],
+}
+
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
@@ -25,13 +44,17 @@ export default defineConfig({
     // lorsque la page qui les utilise est atteinte (lazy loading déjà en place).
     rollupOptions: {
       output: {
-        manualChunks: {
-          react: ['react', 'react-dom', 'react-router-dom'],
-          redux: ['@reduxjs/toolkit', 'react-redux'],
-          mui: ['@mui/material', '@mui/icons-material', '@emotion/react', '@emotion/styled'],
-          charts: ['recharts'],
-          forms: ['formik', 'yup'],
-          http: ['axios'],
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined
+          for (const [chunk, packages] of Object.entries(CHUNK_GROUPS)) {
+            for (const pkg of packages) {
+              // Le « / » final est indispensable : sans lui, `react` capterait
+              // `react-redux` et `react-router-dom`, qui doivent rester dans
+              // leurs propres chunks.
+              if (id.includes(`node_modules/${pkg}/`)) return chunk
+            }
+          }
+          return undefined
         },
       },
     },
