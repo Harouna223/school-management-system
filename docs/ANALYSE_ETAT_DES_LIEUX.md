@@ -193,6 +193,16 @@ code touché. Validée à l'exécution : `{"status":"UP"}` sur
 sur un MySQL 8.4 vierge. Le log de build confirme que l'image réellement
 résolue est `eclipse-temurin:25-jre` — pas un cache.
 
+**recharts 2.15 → 3.10** (PR #52). Vérifié avant fusion : les composants
+utilisés (`ResponsiveContainer`, `AreaChart`, `BarChart`, `PieChart`, `XAxis`,
+`YAxis`, `CartesianGrid`, `Tooltip`, `Legend`, `Cell`) existent tous en v3, et
+les props retirées en v3 (`activeIndex`, `activeShape`, `isAnimationActive`) ne
+sont utilisées nulle part. Build, 14 suites de tests et fumigation Docker au
+vert. **Réserve** : `DashboardPage`, la page la plus chargée en graphiques,
+n'a pas de test de rendu — le `<Pie label={(e) => …}>` qu'elle contient n'est
+donc validé que par la compilation. À couvrir avec le point P2 sur les tests
+frontend.
+
 #### Majeures encore en attente
 
 | Dépendance | Saut | Ce qui casse, précisément | Ce qu'il faut faire |
@@ -202,8 +212,18 @@ résolue est `eclipse-temurin:25-jre` — pas un cache.
 | eslint | 9 → 10 | `eslint-plugin-react@7.37.5` plafonne à `^9.7` : `npm install` échoue en `ERESOLVE` | Bloqué en amont, rien à faire côté projet avant une version compatible |
 | Tailwind CSS | 3.4 → 4.3 | Le plugin PostCSS a été déplacé : `It looks like you're trying to use tailwindcss directly as a PostCSS plugin` | Installer `@tailwindcss/postcss`, réécrire `postcss.config` et migrer la configuration CSS-first |
 | OpenPDF | 1.3.39 → 3.0.5 | Le paquet change de nom : `package com.lowagie.text.pdf does not exist` | Renommer les imports `com.lowagie.*` en `com.github.librepdf.openpdf.*` — 72 occurrences dans 7 fichiers, dont `ReportService` et `SchoolDocumentTheme` |
-| Chaîne Vite | vite 5.2 → 8, vitest 2.1 → 5, `@vitejs/plugin-react` 4.3 → 6.1 | Trois maillons qui ne peuvent pas monter séparément : vitest 5 exige vite 8, plugin-react 6 exige vite 7+. Et vitest 5 tire jsdom 30, qui exige Node `^22.22.2 \|\| ^24.15.0 \|\| >=26` alors que la CI est en **Node 20**. Monter jsdom seul est pire : jsdom 29 sous Node 26 casse `window.localStorage` (`TypeError: Cannot read properties of undefined (reading 'getItem')` dans `I18nProvider`) | Une seule étape, trois changements ensemble : Node 22+ en CI **et** jsdom 30 **et** la chaîne Vite. Referme au passage l'écart CI/production — `Dockerfile.frontend` compile déjà sur `node:26-alpine` |
-| recharts | 2.12 → 3.10 | Pas encore mesuré : la PR est en conflit avec `package-lock.json`, donc la CI n'a jamais tourné dessus | Rebaser, laisser la CI dire ce qui casse (l'API `XAxis`/`Tooltip` et les props de `Pie` ont bougé en 3.x), puis décider |
+| Chaîne Vite | vite 5.2 → 8, vitest 2.1 → 5, `@vitejs/plugin-react` 4.3 → 6.1 | **Pas** un problème de version de Node : `npm ci`, le lint et les 14 suites de tests passent sous Node 20 avec vitest 5.0.5. Les `EBADENGINE` (`vitest@5` exige `^22.12`, `jest-dom@7` exige `>=22`) ne sont que des avertissements. Le seul blocage est ailleurs : Vite 8 remplace Rollup par **Rolldown**, qui n'accepte `manualChunks` que sous forme de **fonction** — `vite.config.js` passait un objet (`Invalid type: Expected Function but received Object`, puis `TypeError: manualChunks is not a function`) | Converti en fonction dans la PR **#53**, qui porte le bump et le correctif ensemble : build vert, chunks `react`/`mui`/`charts`/`forms`/`http` préservés, fumigation Docker verte. Reste la décision de fusion, car c'est un changement de bundler de production |
+
+**Écart Node entre CI et production** : les tests tournent sous **Node 20**
+(`NODE_VERSION` dans `ci.yml`), mais l'image frontend compile sous
+**`node:26-alpine`** (`Dockerfile.frontend`). Une incompatibilité liée à la
+version de Node peut donc passer les tests et casser l'image — ou l'inverse.
+C'est exactement ce qui s'est produit en tentant Node 26 en CI : jsdom 29 y
+casse `window.localStorage` (`TypeError: Cannot read properties of undefined
+(reading 'getItem')` dans `I18nProvider`), alors que le build Docker en Node 26,
+lui, réussit. Les deux chemins doivent converger ; c'est le vrai contenu de la
+dette « chaîne Vite », pas la montée de version elle-même.
+
 
 **Couplage `eslint` / `@eslint/js`** : ces deux paquets doivent partager la même
 majeure (`@eslint/js` 10 exige `eslint` ^10). Le motif `eslint*` ne capturait
@@ -232,8 +252,11 @@ Traitement retenu :
   une par migration. Ce sont les points d'entrée du travail : la PR contient
   déjà le diff de dépendances, et la CI dit précisément ce qui casse. Rouge ici
   est une information, pas un défaut.
-- **Chaîne Vite et recharts 3** : rebasées pour obtenir un diagnostic CI, puis
-  laissées ouvertes pour la même raison — ce sont les points d'entrée.
+- **Chaîne Vite** : traitée dans la PR **#53** (bump + correctif `manualChunks`),
+  verte sur les trois jobs. Elle attend une décision explicite plutôt qu'une
+  fusion automatique : c'est le bundler de production qui change, et le test de
+  fumigation frontend ne prouve pas que l'application se monte dans un
+  navigateur. La PR Dependabot #51 a été fermée en la remplaçant.
 - **eslint 10, OpenPDF 3 et Tailwind 4** ont été fermées : aucune action n'est
   possible dans l'immédiat (blocage amont pour eslint, renommage mécanique
   pour OpenPDF, réécriture de configuration pour Tailwind). Dependabot ne
