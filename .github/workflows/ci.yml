@@ -7,6 +7,20 @@ on:
     branches: [main]
 
 env:
+  # Dockerfile.frontend construit avec node:26-alpine, mais la CI teste ici en
+  # Node 20 : ce n'est PAS aligne, et c'est assume pour l'instant.
+  #
+  # Passer la CI en Node 26 a ete tente (PR #48) et echoue : jsdom 29, utilise
+  # par l'environnement de test de vitest, ne fonctionne pas sous Node 26 --
+  # `window.localStorage` reste indefini et tous les tests qui le lisent
+  # tombent (`Cannot read properties of undefined (reading 'getItem')`).
+  # jsdom 30 corrige cela mais exige Node >= 22, et vitest 5 exige vite 8.
+  #
+  # Autrement dit : Node 26 en CI suppose la chaine vite 5 -> 8, vitest 2 -> 5,
+  # plugin-react 4 -> 6 et jsdom 29 -> 30. C'est une migration a part entiere,
+  # suivie dans docs/ANALYSE_ETAT_DES_LIEUX.md. En attendant, le build du
+  # frontend sous Node 26 reste verifie par le job `docker`, qui construit
+  # reellement l'image avec node:26-alpine.
   NODE_VERSION: 20
   JAVA_VERSION: 21
 
