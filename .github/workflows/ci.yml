@@ -3,8 +3,19 @@ name: Sahel Edu CI/CD Pipeline
 on:
   push:
     branches: [main, develop]
+    # Un commit qui ne touche que de la documentation n'a rien a faire dans un
+    # pipeline qui reconstruit deux images Docker : c'est ~3 minutes de calcul
+    # pour zero code verifie, et autant d'occasions de tomber sur le 429 de
+    # Maven Central (voir le job `docker`). Le 2026-11-02, un commit
+    # exclusivement documentaire a fait echouer `main` pour cette seule raison.
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
   pull_request:
     branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
 
 env:
   # Dockerfile.frontend construit avec node:26-alpine, mais la CI teste ici en
@@ -14,13 +25,17 @@ env:
   # par l'environnement de test de vitest, ne fonctionne pas sous Node 26 --
   # `window.localStorage` reste indefini et tous les tests qui le lisent
   # tombent (`Cannot read properties of undefined (reading 'getItem')`).
-  # jsdom 30 corrige cela mais exige Node >= 22, et vitest 5 exige vite 8.
   #
-  # Autrement dit : Node 26 en CI suppose la chaine vite 5 -> 8, vitest 2 -> 5,
-  # plugin-react 4 -> 6 et jsdom 29 -> 30. C'est une migration a part entiere,
-  # suivie dans docs/ANALYSE_ETAT_DES_LIEUX.md. En attendant, le build du
-  # frontend sous Node 26 reste verifie par le job `docker`, qui construit
-  # reellement l'image avec node:26-alpine.
+  # Attention, la mesure du 2026-11-02 corrige une intuition repandue : ce n'est
+  # PAS la montee de version qui bloque. Avec vite 8.3.5 / vitest 5.0.5, `npm ci`,
+  # le lint et les 14 suites de tests passent sous Node 20 ; les avertissements
+  # EBADENGINE (vitest 5 exige ^22.12) ne sont pas bloquants. Le seul vrai
+  # blocage etait `manualChunks`, que Rolldown (bundler de Vite 8) n'accepte que
+  # sous forme de fonction -- corrige dans la PR #53.
+  #
+  # Reste donc a aligner les deux chemins (CI en Node 20, image en Node 26), ce
+  # qui suppose de faire monter jsdom a la version 30 en meme temps. Suivi dans
+  # docs/ANALYSE_ETAT_DES_LIEUX.md.
   NODE_VERSION: 20
   JAVA_VERSION: 21
 

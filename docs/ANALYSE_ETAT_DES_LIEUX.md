@@ -155,6 +155,16 @@ contre le bourrage d'identifiants.
   donc la montée de JRE 24 est validée à l'exécution et pas seulement à la
   compilation.
 
+- **Fragilité du build Docker face à Maven Central** : le cache `--mount` de
+  `/root/.m2` n'est pas exporté vers le cache GitHub, donc chaque build
+  retélécharge tout l'arbre de dépendances. Maven Central a répondu
+  `429 Too Many Requests` sur la résolution du parent POM, faisant échouer un
+  commit exclusivement documentaire. Les propriétés `maven.wagon.http.*` ajoutées
+  pour cela **ne protègent pas** : `dependency:go-offline` passe par le resolver
+  Aether, pas par Wagon. Atténué par `paths-ignore` (la documentation ne
+  reconstruit plus les images) ; la correction de fond est de faire survivre
+  `~/.m2/repository` entre les builds.
+
 Non traités : **#1** (conteneurs root), **#7** (limites de ressources).
 
 ### 4.1 Majeures : franchies, en attente, écartées
