@@ -359,6 +359,18 @@ sudo systemctl start sahel-edu.service
 
 > Le dump est produit avec `--databases` : il contient `CREATE DATABASE` et
 > `USE`. L'étape 2 peut donc se limiter à `zcat ... | mysql -uroot`.
+>
+> **L'étape 3 doit impérativement tourner avec `sudo`.** Les archives sont
+> créées par root et enregistrent l'UID **10001** du backend ; `tar` lancé en
+> root le restaure, mais une extraction sans `sudo` (ou avec un outil qui ne
+> préserve pas les propriétaires) laisserait les fichiers appartenant à votre
+> compte. Le backend ne pourrait alors plus les remplacer ni les supprimer, et
+> l'échec n'apparaîtrait qu'au premier téléversement. En cas de doute, après
+> restauration :
+>
+> ```bash
+> sudo chown -R 10001:10001 /srv/sahel-edu/uploads
+> ```
 
 ### Test de restauration
 
