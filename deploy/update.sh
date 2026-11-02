@@ -68,7 +68,7 @@ else
 fi
 
 log "migration : environnement de la sauvegarde"
-install -m 0755 -d /etc/sahel-edu
+install -m 0755 -d "$(dirname "$BACKUP_ENV_FILE")"
 if [[ -f "$BACKUP_ENV_FILE" ]]; then
   log "  $BACKUP_ENV_FILE conserve (valeur existante respectee)"
 else
@@ -87,6 +87,22 @@ EOF
   fi
 fi
 
+# Le repertoire hors site n'etait cree que par install.sh. Une mise a jour qui
+# recoit OFFSITE_DIR doit le creer aussi : sinon la sauvegarde echouerait sur un
+# chemin inexistant, longtemps apres une mise a jour qui semblait reussie.
+# La valeur est relue depuis le fichier, qu'il vienne d'etre cree ou qu'il
+# existe deja : c'est la seule qui compte pour l'unite systemd.
+OFFSITE_EFFECTIF="$(sed -n 's/^OFFSITE_DIR=//p' "$BACKUP_ENV_FILE" | tail -n 1)"
+if [[ -n "$OFFSITE_EFFECTIF" ]]; then
+  mkdir -p "$OFFSITE_EFFECTIF"
+  chmod 750 "$OFFSITE_EFFECTIF"
+  chown root:root "$OFFSITE_EFFECTIF"
+  log "  copie hors site vers $OFFSITE_EFFECTIF"
+  if [[ "$(stat -c %d "$OFFSITE_EFFECTIF")" == "$(stat -c %d "$DATA_DIR")" ]]; then
+    warn "$OFFSITE_EFFECTIF est sur le MEME disque que $DATA_DIR : protection nulle."
+  fi
+fi
+
 log "reinstallation des unites systemd et du script de sauvegarde"
 install -m 0644 "$APP_DIR/deploy/systemd/sahel-edu.service" /etc/systemd/system/sahel-edu.service
 install -m 0644 "$APP_DIR/deploy/systemd/sahel-edu-backup.service" /etc/systemd/system/sahel-edu-backup.service
@@ -101,6 +117,23 @@ systemctl daemon-reload
 # laisserait la production en panne.
 # ------------------------------------------------------------------
 [[ -f "$ENV_FILE" ]] || die "docker/.env introuvable ($ENV_FILE) : lancer d'abord deploy/install.sh."
+
+# ------------------------------------------------------------------
+# Garde-fou : variables sans valeur par defaut dans le nouveau compose.
+#
+# Un .env genere par une version anterieure peut ignorer une variable que le
+# compose actuel reference sans defaut. Compose la resout alors a la chaine
+# vide et refuse de demarrer : la mise a jour couperait le service, sans que
+# la cause soit lisible dans les journaux.
+#
+# UPLOAD_HOST_DIR est la seule variable dans ce cas (le job CI
+# « Exploitation » verifie qu'il n'y en a pas d'autre). Si une variable de ce
+# genre est ajoutee plus tard, c'est ici qu'il faudra la traiter.
+# ------------------------------------------------------------------
+if [[ -z "$(env_get UPLOAD_HOST_DIR)" ]]; then
+  warn "UPLOAD_HOST_DIR absent de $ENV_FILE : ajout de $DATA_DIR/uploads"
+  env_set UPLOAD_HOST_DIR "$DATA_DIR/uploads"
+fi
 
 DEFAULT_JWT_SECRET="Y2hhbmdlLXRoaXMtc2VjcmV0LWtleS1pbi1wcm9kdWN0aW9uLXdpdGgtYTM3LWNyYXdhbGxlbg=="
 CURRENT_JWT_SECRET="$(env_get JWT_SECRET)"
@@ -156,9 +189,28 @@ env_set DB_APP_USER "$DB_APP_USER"
 env_set DB_APP_PASSWORD "$DB_APP_PASSWORD"
 log "compte applicatif enregistre dans $ENV_FILE"
 
+# La pile appartient a systemd : `sahel-edu.service` fait tourner un
+# `docker compose up` au premier plan. Lancer un second `compose up -d` ici
+# mettrait deux processus en concurrence sur les memes conteneurs, et le
+# service pouvait finir « dead » alors que les conteneurs tournaient — un
+# redemarrage ulterieur aurait alors tout arrete sans prevenir.
+# On arrete donc la pile, on reconstruit, puis on la relance par systemd,
+# exactement comme le fait install.sh.
+log "arret de la pile (les volumes sont conserves)"
+systemctl stop sahel-edu.service 2>/dev/null || true
+
 log "reconstruction des images (les migrations Flyway s'appliquent au demarrage)"
-compose build
-compose up -d --remove-orphans
+if ! compose build; then
+  # Une construction en echec laisse le serveur sans service : on relance
+  # l'ancienne version, qui reste utilisable, plutot que de laisser le site
+  # a l'arret en attendant quelqu'un.
+  warn "construction en echec : redemarrage de la version precedente."
+  systemctl start sahel-edu.service 2>/dev/null || true
+  die "mise a jour interrompue ; l'ancienne version a ete relancee."
+fi
+
+log "demarrage de la nouvelle version"
+systemctl start sahel-edu.service
 
 wait_healthy "http://127.0.0.1:$(env_get BACKEND_PORT 8080)/actuator/health" || true
 
