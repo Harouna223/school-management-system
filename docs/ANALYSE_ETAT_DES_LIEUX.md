@@ -157,12 +157,43 @@ contre le bourrage d'identifiants.
 
 Non traités : **#1** (conteneurs root), **#7** (limites de ressources).
 
-### 4.1 Majeures en attente d'arbitrage (veille Dependabot)
+### 4.1 Majeures : franchies, en attente, écartées
 
-Dependabot ne regroupe que les mises à jour **mineures et patch** ; chaque
-majeure arrive donc en PR isolée. Les trois premières ont été vérifiées sur la
-CI réelle le 2026-11-01 : aucune n'est fusionnable en l'état, et aucune n'est
-un simple changement de numéro de version.
+Chaque majeure est tranchée sur la CI réelle, jamais sur la réputation de la
+version. Deux ont été franchies le 2026-11-02 ; les autres ne sont pas de
+simples changements de numéro de version — chacune casse quelque chose de
+nommé, et c'est cette casse qui dicte le travail restant.
+
+#### Majeures franchies
+
+**React 18.3.1 → 19.3.1** (PR #50). Le saut paraissait risqué, il ne l'était
+pas, et c'est vérifiable point par point plutôt qu'espéré :
+
+- le point d'entrée utilisait déjà `createRoot` (`react-dom/client`) et non
+  `ReactDOM.render`, seule rupture réellement bloquante ;
+- aucune des API retirées n'est utilisée : `findDOMNode`,
+  `unmountComponentAtNode`, `propTypes`, `React.FC`, refs chaîne — **0
+  occurrence** sur les 112 fichiers de `src/` ;
+- les 4 `defaultProps` trouvés sont des surcharges de thème MUI
+  (`MuiButton`, `MuiTooltip`…) dans `src/styles/theme.js`, **pas** des
+  `defaultProps` de composant React : la suppression ne les concerne pas ;
+- MUI 5.18 déclare `react: ^17.0.0 || ^18.0.0 || ^19.0.0` en
+  `peerDependencies`. Le conflit redouté MUI 5 / React 19 n'existe pas dans
+  cette version — c'est le seul point qui pouvait faire échouer le runtime
+  sans échouer la compilation.
+
+Le job Docker a par ailleurs démarré l'image reconstruite. **Réserve
+assumée** : le test de fumigation frontend vérifie que nginx sert
+`index.html`, pas que l'application se monte dans un navigateur ; la preuve de
+rendu vient des 14 suites de tests jsdom, pas du smoke test.
+
+**`eclipse-temurin` 24-jre → 25-jre** (PR #49). Image de base seule, aucun
+code touché. Validée à l'exécution : `{"status":"UP"}` sur
+`/actuator/health/liveness` après 18 s, Flyway ayant appliqué les migrations
+sur un MySQL 8.4 vierge. Le log de build confirme que l'image réellement
+résolue est `eclipse-temurin:25-jre` — pas un cache.
+
+#### Majeures encore en attente
 
 | Dépendance | Saut | Ce qui casse, précisément | Ce qu'il faut faire |
 |---|---|---|---|
@@ -171,6 +202,8 @@ un simple changement de numéro de version.
 | eslint | 9 → 10 | `eslint-plugin-react@7.37.5` plafonne à `^9.7` : `npm install` échoue en `ERESOLVE` | Bloqué en amont, rien à faire côté projet avant une version compatible |
 | Tailwind CSS | 3.4 → 4.3 | Le plugin PostCSS a été déplacé : `It looks like you're trying to use tailwindcss directly as a PostCSS plugin` | Installer `@tailwindcss/postcss`, réécrire `postcss.config` et migrer la configuration CSS-first |
 | OpenPDF | 1.3.39 → 3.0.5 | Le paquet change de nom : `package com.lowagie.text.pdf does not exist` | Renommer les imports `com.lowagie.*` en `com.github.librepdf.openpdf.*` — 72 occurrences dans 7 fichiers, dont `ReportService` et `SchoolDocumentTheme` |
+| Chaîne Vite | vite 5.2 → 8, vitest 2.1 → 5, `@vitejs/plugin-react` 4.3 → 6.1 | Trois maillons qui ne peuvent pas monter séparément : vitest 5 exige vite 8, plugin-react 6 exige vite 7+. Et vitest 5 tire jsdom 30, qui exige Node `^22.22.2 \|\| ^24.15.0 \|\| >=26` alors que la CI est en **Node 20**. Monter jsdom seul est pire : jsdom 29 sous Node 26 casse `window.localStorage` (`TypeError: Cannot read properties of undefined (reading 'getItem')` dans `I18nProvider`) | Une seule étape, trois changements ensemble : Node 22+ en CI **et** jsdom 30 **et** la chaîne Vite. Referme au passage l'écart CI/production — `Dockerfile.frontend` compile déjà sur `node:26-alpine` |
+| recharts | 2.12 → 3.10 | Pas encore mesuré : la PR est en conflit avec `package-lock.json`, donc la CI n'a jamais tourné dessus | Rebaser, laisser la CI dire ce qui casse (l'API `XAxis`/`Tooltip` et les props de `Pie` ont bougé en 3.x), puis décider |
 
 **Couplage `eslint` / `@eslint/js`** : ces deux paquets doivent partager la même
 majeure (`@eslint/js` 10 exige `eslint` ^10). Le motif `eslint*` ne capturait
@@ -179,14 +212,19 @@ pas le nom *scopé* `@eslint/js`, qui partait donc seul et cassait `npm install`
 
 **Règle générale** : un groupe garde les majeures quand ses membres ne peuvent
 pas monter séparément — `spring` (springdoc 2.x ne connaît pas Spring
-Framework 7), `mui` (`@mui/icons-material` 9 exige `@mui/material` 9) et
-`eslint`. Les groupes `tests`, `react` et `tooling` ne contiennent que des
-mineures et des patchs, car leurs membres sont indépendants.
+Framework 7), `mui` (`@mui/icons-material` 9 exige `@mui/material` 9),
+`eslint` (`@eslint/js` suit `eslint`), `vite` (vitest 5 exige vite 8) et
+`react-core` (`react-dom` suit `react` : la PR #39 avait proposé `react-dom` 19
+sous `react` 18, ce qui ne peut pas fonctionner). Les groupes `tests`,
+`react-router` et `tooling` ne contiennent que des mineures et des patchs, car
+leurs membres sont indépendants.
 
-Cette règle a été écrite après l'avoir vue échouer : avec `minor, patch` sur
-`spring` et `mui`, Dependabot a ouvert quatre PR (#29/#30 et #33/#34) dont
-**aucune** ne compilait seule. Le regroupement des majeures n'est pas un confort
-de lecture, c'est une contrainte de compilation.
+Cette règle a été écrite après l'avoir vue échouer deux fois : avec
+`minor, patch` sur `spring` et `mui`, Dependabot a ouvert quatre PR
+(#29/#30 et #33/#34) dont **aucune** ne compilait seule ; puis `@eslint/js`
+s'est détaché sur la majeure 10 parce que le motif `eslint*` ne matche pas un
+nom scopé. Le regroupement des majeures n'est pas un confort de lecture, c'est
+une contrainte de compilation.
 
 Traitement retenu :
 
@@ -194,6 +232,8 @@ Traitement retenu :
   une par migration. Ce sont les points d'entrée du travail : la PR contient
   déjà le diff de dépendances, et la CI dit précisément ce qui casse. Rouge ici
   est une information, pas un défaut.
+- **Chaîne Vite et recharts 3** : rebasées pour obtenir un diagnostic CI, puis
+  laissées ouvertes pour la même raison — ce sont les points d'entrée.
 - **eslint 10, OpenPDF 3 et Tailwind 4** ont été fermées : aucune action n'est
   possible dans l'immédiat (blocage amont pour eslint, renommage mécanique
   pour OpenPDF, réécriture de configuration pour Tailwind). Dependabot ne
