@@ -48,6 +48,17 @@ APP_GID="${APP_GID:-10001}"
 require_root
 require_ubuntu
 
+# L'unite sahel-edu.service code en dur /opt/sahel-edu (WorkingDirectory et
+# chemin du compose). APP_DIR reste configurable pour le code et les donnees,
+# mais le service ne suivrait pas : mieux vaut le dire maintenant que laisser
+# `systemctl restart` echouer sur un "WorkingDirectory path does not exist"
+# apres plusieurs minutes de construction d'images.
+if [[ "$APP_DIR" != "/opt/sahel-edu" ]]; then
+  warn "APP_DIR=$APP_DIR : l'unite systemd pointe sur /opt/sahel-edu."
+  warn "le service ne demarrera pas tant que l'unite n'aura pas ete surchargee :"
+  warn "  sudo systemctl edit sahel-edu.service   (voir docs/DEPLOIEMENT_UBUNTU.md)"
+fi
+
 log "installation dans $APP_DIR (donnees : $DATA_DIR)"
 
 # ------------------------------------------------------------------
@@ -192,15 +203,15 @@ install -m 0755 "$HERE/backup.sh" /usr/local/sbin/sahel-edu-backup
 # la rendrait differente de celle du depot, et une mise a jour du depot
 # ecraserait silencieusement OFFSITE_DIR. Ici, relancer install.sh ou update.sh
 # ne fait que reecrire ce fichier d'environnement.
-install -m 0755 -d /etc/sahel-edu
-cat > /etc/sahel-edu/backup.env <<EOF
+install -m 0755 -d "$(dirname "$BACKUP_ENV_FILE")"
+cat > "$BACKUP_ENV_FILE" <<EOF
 # Genere par deploy/install.sh — ne pas editer a la main, relancer le script.
 APP_DIR=$APP_DIR
 DATA_DIR=$DATA_DIR
 OFFSITE_DIR=$OFFSITE_DIR
 RETENTION_DAYS=14
 EOF
-chmod 600 /etc/sahel-edu/backup.env
+chmod 600 "$BACKUP_ENV_FILE"
 
 systemctl daemon-reload
 

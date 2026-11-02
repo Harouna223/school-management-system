@@ -202,15 +202,15 @@ install -m 0644 "$HERE/../systemd/sahel-edu-backup.timer" /etc/systemd/system/sa
 install -m 0755 "$HERE/../backup.sh" /usr/local/sbin/sahel-edu-backup
 
 # Environnement de la sauvegarde (voir deploy/install.sh pour le pourquoi).
-install -m 0755 -d /etc/sahel-edu
-cat > /etc/sahel-edu/backup.env <<EOF
+install -m 0755 -d "$(dirname "$BACKUP_ENV_FILE")"
+cat > "$BACKUP_ENV_FILE" <<EOF
 # Genere par deploy/offline/install-offline.sh — ne pas editer a la main.
 APP_DIR=$APP_DIR
 DATA_DIR=$DATA_DIR
 OFFSITE_DIR=$OFFSITE_DIR
 RETENTION_DAYS=14
 EOF
-chmod 600 /etc/sahel-edu/backup.env
+chmod 600 "$BACKUP_ENV_FILE"
 systemctl daemon-reload
 
 log "demarrage de la pile (aucune compilation, aucune connexion externe)"
