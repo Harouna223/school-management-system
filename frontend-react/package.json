@@ -17,7 +17,7 @@
     "@fontsource-variable/inter": "^5.3.0",
     "@mui/icons-material": "^5.15.19",
     "@mui/material": "^5.15.19",
-    "@reduxjs/toolkit": "^2.13.0",
+    "@reduxjs/toolkit": "^2.14.0",
     "axios": "^1.21.0",
     "formik": "^2.4.6",
     "react": "^19.3.1",
