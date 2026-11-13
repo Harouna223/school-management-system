@@ -436,51 +436,99 @@ ailleurs doit être une décision écrite, pas un oubli.
 
 ### Restauration
 
-```bash
-# 1. Arrêter l'application
-sudo systemctl stop sahel-edu.service
-
-# 2. Restaurer la base (écrase la base actuelle !)
-sudo docker compose -f /opt/sahel-edu/docker/docker-compose.yml \
-  exec -T -e MYSQL_PWD="$(sudo sed -n 's/^DB_PASSWORD=//p' /opt/sahel-edu/docker/.env)" mysql \
-  mysql -uroot -e "DROP DATABASE IF EXISTS school_management; CREATE DATABASE school_management;"
-zcat /srv/sahel-edu/backups/db/db-AAAAMMJJ-HHMM.sql.gz | \
-  sudo docker compose -f /opt/sahel-edu/docker/docker-compose.yml \
-  exec -T -e MYSQL_PWD="$(sudo sed -n 's/^DB_PASSWORD=//p' /opt/sahel-edu/docker/.env)" mysql \
-  mysql -uroot
-
-# 3. Restaurer les fichiers
-sudo tar xzf /srv/sahel-edu/backups/uploads/uploads-AAAAMMJJ-HHMM.tar.gz -C /srv/sahel-edu/uploads
-
-# 4. Redémarrer
-sudo systemctl start sahel-edu.service
-```
-
-> Le dump est produit avec `--databases` : il contient `CREATE DATABASE` et
-> `USE`. L'étape 2 peut donc se limiter à `zcat ... | mysql -uroot`.
->
-> **L'étape 3 doit impérativement tourner avec `sudo`.** Les archives sont
-> créées par root et enregistrent l'UID **10001** du backend ; `tar` lancé en
-> root le restaure, mais une extraction sans `sudo` (ou avec un outil qui ne
-> préserve pas les propriétaires) laisserait les fichiers appartenant à votre
-> compte. Le backend ne pourrait alors plus les remplacer ni les supprimer, et
-> l'échec n'apparaîtrait qu'au premier téléversement. En cas de doute, après
-> restauration :
->
-> ```bash
-> sudo chown -R 10001:10001 /srv/sahel-edu/uploads
-> ```
-
-### Test de restauration
-
-À faire **au moins une fois** avant la mise en service :
+La restauration est un script, pas une suite de commandes à recopier : c'est une
+procédure qu'on exécute rarement, donc précisément celle qu'on risque de se
+tromper le jour où elle compte.
 
 ```bash
-# Sur une base jetable, pas sur la production
-sudo docker compose -f /opt/sahel-edu/docker/docker-compose.yml \
-  exec -T mysql mysql -uroot -e "CREATE DATABASE restauration_test;"
-zcat /srv/sahel-edu/backups/db/db-*.sql.gz | head -c 50 >/dev/null   # l'archive est lisible
+# Base seule (écrase la base actuelle)
+sudo ./deploy/restore.sh --db /srv/sahel-edu/backups/db/db-AAAAMMJJ-HHMM.sql.gz
+
+# Base + fichiers pédagogiques
+sudo ./deploy/restore.sh \
+  --db      /srv/sahel-edu/backups/db/db-AAAAMMJJ-HHMM.sql.gz \
+  --uploads /srv/sahel-edu/backups/uploads/uploads-AAAAMMJJ-HHMM.tar.gz
 ```
+
+Le script, dans l'ordre :
+
+1. vérifie l'archive (`gzip -t`, présence de tables, présence de `USE`) ;
+2. demande confirmation (taper `restaurer`), `--yes` pour un usage non interactif ;
+3. arrête la pile par systemd, ne relance que MySQL ;
+4. **prend une sauvegarde de sécurité de l'état actuel** dans
+   `/srv/sahel-edu/backups/db/avant-restauration-AAAAMMJJ-HHMMSS.sql.gz` ;
+5. supprime et recrée la base, puis importe l'archive ;
+6. contrôle que le nombre de tables restaurées égale celui de l'archive ;
+7. déplace les fichiers actuels dans `<UPLOAD_HOST_DIR>.avant-restauration-…`
+   avant d'extraire l'archive, et rétablit le propriétaire `10001:10001` ;
+8. redémarre la pile et attend que le backend réponde.
+
+| Situation | Ce que fait le script |
+| --- | --- |
+| Archive tronquée ou corrompue | Refuse avant toute écriture |
+| Archive valide mais sans aucune table | Refuse : un dump vide n'est pas une sauvegarde |
+| Archive sans instruction `USE` | Refuse : l'import n'aurait pas de base cible |
+| Restauration interrompue en cours de route | Le site est relancé automatiquement (piège `EXIT`) |
+| Nombre de tables incohérent après import | Échoue et indique où se trouve la sauvegarde de sécurité |
+| Backend qui ne redémarre pas | Échoue avec le renvoi vers `journalctl` |
+
+> **Une restauration est réversible.** L'état d'avant restauration est conservé
+> dans `avant-restauration-*.sql.gz`. Ce nom ne correspond volontairement pas au
+> motif `db-*.sql.gz` : la rétention de `backup.sh` ne purgera jamais la seule
+> copie de l'état d'avant restauration.
+>
+> **Le propriétaire des fichiers est rétabli.** Les archives enregistrent l'UID
+> **10001** du backend ; le script extrait en root puis force
+> `chown -R 10001:10001`. Sans cela le backend ne pourrait plus remplacer ni
+> supprimer les fichiers, et l'échec n'apparaîtrait qu'au premier téléversement.
+
+### Vérifier qu'une sauvegarde est réellement restaurable
+
+Une sauvegarde dont on n'a jamais essayé la restauration n'est pas une
+sauvegarde : c'est une archive dont on espère quelque chose. Le mode `--verify`
+restaure l'archive dans une base jetable et **compare le contenu** de chaque
+table avec la production, sans rien modifier :
+
+```bash
+sudo ./deploy/restore.sh --verify \
+  --db "$(ls -t /srv/sahel-edu/backups/db/db-*.sql.gz | head -1)"
+```
+
+```
+[sahel-edu] archive verifiee : db-20261113-0611.sql.gz (68K, 58 tables)
+[sahel-edu] exercice de restauration dans la base jetable verif_20261113061246
+[sahel-edu] exercice reussi : 58 tables comparees, contenu identique
+[sahel-edu] la sauvegarde db-20261113-0611.sql.gz est restaurable
+```
+
+La comparaison utilise `CHECKSUM TABLE` et non `COUNT(*)` : un décalage d'une
+ligne compensé par une autre passerait inaperçu avec de simples comptages. La
+base jetable est supprimée à la fin, y compris en cas d'échec.
+
+À exécuter **après chaque changement de version** et au moins une fois par
+trimestre — c'est le seul contrôle qui prouve que la chaîne
+`mysqldump → gzip → import` fonctionne sur vos données réelles.
+
+### Deux restaurations à ne pas confondre
+
+L'application propose aussi **Paramètres → Sauvegarde → Restaurer**, qui importe
+un fichier `.sql` depuis l'interface. Ce n'est pas la même chose :
+
+| | `deploy/restore.sh` | Restaurer (interface) |
+| --- | --- | --- |
+| Portée | Base **et** fichiers pédagogiques | Données uniquement |
+| Taille | Aucune limite | 100 Mo, 500 000 instructions |
+| Arrêt du service | Oui, contrôlé | Non, à chaud |
+| Usage | Sinistre, panne disque, migration de serveur | Correction ponctuelle de données |
+| Sauvegarde préalable | Automatique | Aucune |
+
+> ⚠️ **La restauration depuis l'interface ne peut pas être annulée en cas
+> d'échec.** Elle est déclarée `@Transactional` mais exécute du DDL
+> (`DROP TABLE`, `CREATE TABLE`), que MySQL valide implicitement : si l'import
+> s'interrompt au milieu, le schéma reste partiellement détruit et la
+> transaction ne peut rien annuler. Prenez systématiquement une sauvegarde
+> `backup.sh` juste avant, et préférez `restore.sh` dès qu'il s'agit de plus
+> qu'une correction de quelques lignes.
 
 ---
 
@@ -634,6 +682,13 @@ Les fichiers restent dans `/srv/sahel-edu/uploads` et les sauvegardes dans
     `systemctl status sahel-edu-backup` doit être en `success` : un `failed`
     signifie que la copie hors site n'a pas eu lieu.
 11. `https://` → cadenas valide, HTTP redirigé
+12. **La sauvegarde est restaurable** — le contrôle qui valide toute la chaîne,
+    à faire une fois avant la mise en service :
+    ```bash
+    sudo ./deploy/restore.sh --verify \
+      --db "$(ls -t /srv/sahel-edu/backups/db/db-*.sql.gz | head -1)"
+    ```
+    Attendu : `exercice reussi : N tables comparees, contenu identique`.
 
 La checklist fonctionnelle détaillée du module est en §7 de
 [COURS_VIDEO_PDF.md](COURS_VIDEO_PDF.md).
