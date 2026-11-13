@@ -177,7 +177,13 @@ const [history, setHistory] = useState({ bulletins: [], grades: [] })
       if (photo && saved.data.data.id) {
         try {
           await studentApi.uploadPhoto(saved.data.data.id, photo)
-        } catch {
+        } catch (photoError) {
+          // Le message affiché reste volontairement rassurant, mais l'erreur
+          // technique ne doit pas disparaître : sans cette trace, un échec de
+          // téléversement ne laissait aucune trace exploitable côté navigateur,
+          // et la cause (répertoire non inscriptible côté serveur) était
+          // introuvable sans rejouer l'appel à la main.
+          console.error('Échec du téléversement de la photo', photoError)
           toastError('Élève enregistré, mais la photo n\'a pas pu être envoyée. '
             + 'Vous pouvez la rajouter depuis la fiche de l\'élève.')
         }

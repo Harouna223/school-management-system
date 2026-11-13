@@ -82,7 +82,18 @@ export default function TeacherFormPage() {
         success(`Enseignant embauché : ${saved.data.data.employeeNo}`)
       }
       if (photo && saved.data.data.id) {
-        await teacherApi.uploadPhoto(saved.data.data.id, photo)
+        // Même raisonnement que pour l'élève : la photo est un envoi séparé,
+        // APRÈS l'enregistrement du dossier. Sans ce try/catch, un échec de
+        // téléversement remontait dans le catch principal et affichait une
+        // erreur alors que l'enseignant existait déjà — l'administrateur
+        // relançait la création et produisait un doublon.
+        try {
+          await teacherApi.uploadPhoto(saved.data.data.id, photo)
+        } catch (photoError) {
+          console.error('Échec du téléversement de la photo', photoError)
+          toastError('Enseignant enregistré, mais la photo n\'a pas pu être envoyée. '
+            + 'Vous pouvez la rajouter depuis sa fiche.')
+        }
       }
       // Mot de passe aléatoire généré par le serveur : affiché une seule fois ici.
       const created = saved.data.data
