@@ -107,7 +107,8 @@ d'administration des utilisateurs.
 ## Documentation
 
 - [Installation](docs/INSTALLATION.md) — prérequis et procédure détaillée
-- [Déploiement Ubuntu 24.04](docs/DEPLOIEMENT_UBUNTU.md) — Docker Compose, HTTPS, sauvegardes
+- [Déploiement Ubuntu 24.04](docs/DEPLOIEMENT_UBUNTU.md) — Docker Compose, HTTPS, sauvegardes, checklist de mise en production
+- [Runbook d'incidents](docs/RUNBOOK.md) — que faire quand le site, la sauvegarde ou le certificat ne répond plus
 - [Déploiement hors ligne](docs/DEPLOIEMENT_HORS_LIGNE.md) — serveur sans Internet, bundle autonome
 - [Architecture](docs/ARCHITECTURE.md) — structure du projet et fonctionnement interne
 - [API](docs/API.md) — liste des endpoints

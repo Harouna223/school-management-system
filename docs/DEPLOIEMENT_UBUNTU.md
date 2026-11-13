@@ -821,3 +821,117 @@ Les fichiers restent dans `/srv/sahel-edu/uploads` et les sauvegardes dans
 
 La checklist fonctionnelle détaillée du module est en §7 de
 [COURS_VIDEO_PDF.md](COURS_VIDEO_PDF.md).
+
+---
+
+## 12. Checklist de mise en production
+
+À dérouler dans l'ordre. Chaque ligne se vérifie par une commande, pas par une
+impression. **Ne pas ouvrir le service au public avant que les blocs F et G
+soient complets** : une école sans sauvegarde vérifiée n'est pas déployée, elle
+est en sursis.
+
+### A. Avant de toucher au serveur
+
+- [ ] Nom de domaine choisi, et **enregistrements A et AAAA** créés chez le
+      registrar (le VPS LWS a une IPv4 **et** une IPv6 : les deux, ou l'AAAA
+      retiré — un AAAA faux fait échouer Let's Encrypt par intermittence).
+- [ ] Accès SSH root au VPS confirmé : `ssh root@IP 'hostname; lsb_release -d'`
+      → Ubuntu 24.04.
+- [ ] Support de sauvegarde hors site disponible (disque externe, NAS, ou
+      stockage objet) et **distinct du disque du VPS**.
+- [ ] Mot de passe administrateur initial prévu (il sera généré et affiché une
+      seule fois).
+
+### B. Installation
+
+```bash
+git clone https://github.com/Harouna223/school-management-system.git /opt/sahel-edu
+cd /opt/sahel-edu
+sudo OFFSITE_DIR=/media/backup/sahel-edu ./deploy/install.sh
+```
+
+- [ ] Le script va au bout ; le **mot de passe admin est noté** (affiché une
+      seule fois, aussi présent dans `docker/.env` en 600).
+- [ ] `systemctl status sahel-edu` → `active (running)`.
+- [ ] `http://IP_DU_SERVEUR` répond, connexion `admin` possible.
+
+### C. Durcissement
+
+```bash
+sudo ./deploy/harden-server.sh          # horloge, swap, pare-feu, fail2ban, journaux
+sudo ./deploy/harden-server.sh --ssh    # SSH : cles uniquement
+```
+
+- [ ] **Avant** de lancer `--ssh` : la clé publique est dans
+      `/root/.ssh/authorized_keys` et testée dans un **second** terminal.
+- [ ] `sudo ufw status verbose` → `active`, ports 22/80/443 seulement.
+- [ ] `timedatectl` → `synchronized: yes`, fuseau `Africa/Bamako`.
+
+### D. HTTPS
+
+```bash
+sudo ./deploy/https.sh ecole.example.com admin@example.com
+```
+
+- [ ] `https://ecole.example.com` → cadenas valide.
+- [ ] `http://ecole.example.com` → **301** vers HTTPS.
+- [ ] `curl -sI https://ecole.example.com | grep -i strict-transport` → présent.
+- [ ] Un `Host` inconnu est rejeté (connexion fermée, pas de page par défaut).
+
+### E. Données et comptes
+
+- [ ] Classe, matière, élève de test créés.
+- [ ] Un PDF déposé dans **Cours et ressources** se télécharge (c'est le test
+      du volume `uploads` : un `Permission denied` signifie `10001:10001` absent).
+- [ ] Mot de passe admin changé depuis l'interface, puis `ADMIN_PASSWORD` vidé
+      dans le `.env` (voir §8).
+- [ ] `sudo ./deploy/secrets.sh audit` → `aucun probleme confirme`.
+
+### F. Sauvegarde — bloquant
+
+```bash
+sudo systemctl start sahel-edu-backup.service
+sudo systemctl status sahel-edu-backup        # doit etre en « success »
+sudo ./deploy/restore.sh --verify \
+  --db "$(ls -t /srv/sahel-edu/backups/db/db-*.sql.gz | head -1)"
+```
+
+- [ ] Archive présente dans `/srv/sahel-edu/backups/db` **et** dans `OFFSITE_DIR`.
+- [ ] `restore.sh --verify` → `exercice reussi : N tables comparees, contenu identique`.
+- [ ] Une copie du `.env` est conservée **hors du serveur** (gestionnaire de
+      mots de passe), pas dans le répertoire des sauvegardes.
+
+### G. Surveillance — bloquant
+
+```bash
+sudo /usr/local/sbin/sahel-edu-healthcheck
+sudo systemctl list-timers 'sahel-edu-*'
+```
+
+- [ ] `tous les controles sont au vert`.
+- [ ] Les deux minuteurs (`backup`, `check`) sont listés et armés.
+- [ ] `ALERT_WEBHOOK` configuré si quelqu'un doit être prévenu (voir §8).
+
+### H. Ouverture
+
+- [ ] Le compte `admin` n'a plus le mot de passe initial.
+- [ ] Les comptes enseignants sont créés avec les bons rôles.
+- [ ] `sudo reboot` effectué **une fois** : après redémarrage,
+      `systemctl --failed` est vide et le site répond — c'est le seul test qui
+      prouve que la pile remonte seule.
+
+### I. Ce qui n'est pas prouvé par cette checklist
+
+Trois choses ne peuvent pas être vérifiées avant le premier vrai déploiement,
+et doivent être surveillées le jour J :
+
+1. `install.sh` n'a jamais tourné sur un Ubuntu nu — il a été relu et ses
+   composants testés séparément, pas exécuté de bout en bout sur un VPS.
+2. `https.sh` n'a jamais obtenu de certificat Let's Encrypt réel (les quotas
+   interdisent les essais répétés) : le premier passage est le vrai test.
+3. Le comportement sous charge réelle (plusieurs vidéos simultanées) n'a pas été
+   mesuré.
+
+En cas d'échec à l'une de ces étapes, `journalctl -u sahel-edu -n 100` et
+`docs/RUNBOOK.md` donnent la marche à suivre.
