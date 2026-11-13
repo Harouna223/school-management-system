@@ -1,0 +1,19 @@
+[Unit]
+Description=Sahel Edu - controle de sante (conteneurs, disque, sauvegardes, certificat)
+Documentation=file:///opt/sahel-edu/docs/DEPLOIEMENT_UBUNTU.md
+Requires=docker.service
+After=docker.service sahel-edu.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/sahel-edu-healthcheck --quiet
+# Facultatif : ALERT_WEBHOOK y est lu. Le « - » rend le fichier optionnel, sans
+# quoi la surveillance echouerait au demarrage tant que l'envoi d'alertes n'est
+# pas configure — c'est-a-dire exactement au moment ou l'on en a besoin.
+EnvironmentFile=-/etc/sahel-edu/monitor.env
+# Priorite basse : ce controle ne doit jamais ralentir l'application.
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+# Un controle bloque (curl sans reponse, disque sature) ne doit pas s'empiler.
+TimeoutStartSec=180

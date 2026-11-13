@@ -121,12 +121,20 @@ if [[ -n "$OFFSITE_EFFECTIF" ]]; then
   fi
 fi
 
-log "reinstallation des unites systemd et du script de sauvegarde"
+log "reinstallation des unites systemd et des scripts d'exploitation"
 install -m 0644 "$APP_DIR/deploy/systemd/sahel-edu.service" /etc/systemd/system/sahel-edu.service
 install -m 0644 "$APP_DIR/deploy/systemd/sahel-edu-backup.service" /etc/systemd/system/sahel-edu-backup.service
 install -m 0644 "$APP_DIR/deploy/systemd/sahel-edu-backup.timer" /etc/systemd/system/sahel-edu-backup.timer
+install -m 0644 "$APP_DIR/deploy/systemd/sahel-edu-check.service" /etc/systemd/system/sahel-edu-check.service
+install -m 0644 "$APP_DIR/deploy/systemd/sahel-edu-check.timer" /etc/systemd/system/sahel-edu-check.timer
 install -m 0755 "$APP_DIR/deploy/backup.sh" /usr/local/sbin/sahel-edu-backup
+install -m 0755 "$APP_DIR/deploy/healthcheck.sh" /usr/local/sbin/sahel-edu-healthcheck
 systemctl daemon-reload
+# Le minuteur de controle n'existait pas dans les versions precedentes : sans
+# cet enable, une installation mise a jour resterait sans surveillance alors
+# que ses unites sont bien presentes sur le disque.
+systemctl enable --now sahel-edu-check.timer >/dev/null 2>&1 \
+  || warn "timer de controle de sante non active"
 
 # ------------------------------------------------------------------
 # Garde-fou JWT : depuis REQUIRE_SECURE_SECRETS=true, un .env encore muni du

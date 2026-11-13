@@ -217,7 +217,10 @@ log "installation des unites systemd"
 install -m 0644 "$HERE/systemd/sahel-edu.service" /etc/systemd/system/sahel-edu.service
 install -m 0644 "$HERE/systemd/sahel-edu-backup.service" /etc/systemd/system/sahel-edu-backup.service
 install -m 0644 "$HERE/systemd/sahel-edu-backup.timer" /etc/systemd/system/sahel-edu-backup.timer
+install -m 0644 "$HERE/systemd/sahel-edu-check.service" /etc/systemd/system/sahel-edu-check.service
+install -m 0644 "$HERE/systemd/sahel-edu-check.timer" /etc/systemd/system/sahel-edu-check.timer
 install -m 0755 "$HERE/backup.sh" /usr/local/sbin/sahel-edu-backup
+install -m 0755 "$HERE/healthcheck.sh" /usr/local/sbin/sahel-edu-healthcheck
 
 # Environnement de la sauvegarde, lu par l'unite via EnvironmentFile.
 #
@@ -245,6 +248,7 @@ systemctl restart sahel-edu.service
 BACKEND_PORT_VALUE="$(env_get BACKEND_PORT 8080)"
 wait_healthy "http://127.0.0.1:${BACKEND_PORT_VALUE}/actuator/health" || true
 systemctl enable --now sahel-edu-backup.timer >/dev/null 2>&1 || warn "timer de sauvegarde non active"
+systemctl enable --now sahel-edu-check.timer >/dev/null 2>&1 || warn "timer de controle de sante non active"
 
 # ------------------------------------------------------------------
 # 7. Recapitulatif
@@ -258,6 +262,7 @@ printf '  URL locale    : http://%s\n' "${IP:-<ip-du-serveur>}"
 printf '  etat          : systemctl status sahel-edu\n'
 printf '  journaux      : journalctl -u sahel-edu -f\n'
 printf '  sauvegardes   : systemctl list-timers sahel-edu-backup.timer\n'
+printf '  surveillance  : sudo ./deploy/healthcheck.sh  (automatique toutes les 15 min)\n'
 if [[ "$GENERATED" -eq 1 ]]; then
   printf '\n'
   warn "MOT DE PASSE ADMINISTRATEUR INITIAL : $ADMIN_PASSWORD"

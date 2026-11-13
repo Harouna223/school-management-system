@@ -1,0 +1,17 @@
+[Unit]
+Description=Sahel Edu - controle de sante toutes les 15 minutes
+
+[Timer]
+# Premier passage 5 minutes apres le demarrage : le backend a besoin d'une
+# minute environ pour appliquer ses migrations, et un controle lance trop tot
+# signalerait une anomalie qui n'existe pas.
+OnBootSec=5min
+# Puis toutes les 15 minutes. Ce delai est le bon compromis : assez court pour
+# reperer un disque qui se remplit ou un certificat qui approche, assez long
+# pour ne pas remplir les journaux.
+OnUnitActiveSec=15min
+RandomizedDelaySec=60
+Unit=sahel-edu-check.service
+
+[Install]
+WantedBy=timers.target

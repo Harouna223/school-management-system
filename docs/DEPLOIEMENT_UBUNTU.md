@@ -103,7 +103,7 @@ sudo APP_DIR=/opt/sahel-edu DATA_DIR=/srv/sahel-edu ./deploy/install.sh
 | Secrets | `docker/.env` généré en **mode 600** : `DB_PASSWORD` (root MySQL), `DB_APP_USER`/`DB_APP_PASSWORD` (compte applicatif), `JWT_SECRET` (48 octets aléatoires), `ADMIN_PASSWORD` |
 | Sauvegarde | `/etc/sahel-edu/backup.env` (mode 600) : chemins et `OFFSITE_DIR`, lu par l'unité systemd |
 | Port MySQL | premier port libre à partir de 3307 (évite un MySQL local) |
-| systemd | installe et active `sahel-edu.service`, `sahel-edu-backup.timer` |
+| systemd | installe et active `sahel-edu.service`, `sahel-edu-backup.timer`, `sahel-edu-check.timer` |
 | Durcissement | appelle `deploy/harden-server.sh` (horloge, swap, pare-feu, fail2ban, journaux) — voir §5 |
 | Pare-feu | UFW : port SSH réellement écouté, 80, 443 entrants ; le reste fermé |
 | Vérification | attend `actuator/health` = `UP` (≈ 90 s au premier démarrage : migrations Flyway) |
@@ -627,6 +627,52 @@ du -sh /srv/sahel-edu/uploads/courses
 find /srv/sahel-edu/uploads/courses -type f -size +300M -printf '%s %p\n' | sort -nr | head
 ```
 
+### Surveillance automatique
+
+`sahel-edu-check.timer` exécute un contrôle toutes les 15 minutes (et 5 minutes
+après le démarrage). Il n'est pas décoratif : il transforme un état silencieux
+en **unité systemd en échec**, visible d'un `systemctl --failed`.
+
+```bash
+sudo /usr/local/sbin/sahel-edu-healthcheck     # rapport complet
+sudo systemctl --failed                        # ce qui ne va pas, en une ligne
+journalctl -u sahel-edu-check -n 50            # historique des contrôles
+```
+
+| Contrôle | Pourquoi il compte |
+| --- | --- |
+| Service systemd actif | un `systemctl stop` oublié ne se voit pas depuis l'interface |
+| Conteneurs `running` / `healthy` | un conteneur en boucle de redémarrage répond par intermittence |
+| `actuator/health` = `UP` | le processus peut tourner alors que la base est injoignable |
+| Frontend HTTP 200 | nginx peut être vivant et ne rien servir |
+| Site public HTTPS 200 | seul contrôle couvrant DNS, TLS, nginx hôte, proxy et conteneur |
+| Certificat > 14 jours | certbot renouvelle à 30 jours ; à 14, il a déjà échoué |
+| Espace disque > 15 % | les vidéos de cours remplissent vite un petit VPS |
+| Sauvegarde < 48 h | une sauvegarde arrêtée laisse ses anciennes archives en place |
+| Copie hors site < 48 h | protège de la panne du disque, pas seulement de l'erreur |
+| MySQL répond | `mysqladmin ping` sort en 0 même sur « Access denied » : il prouve la vivacité |
+| Aucune unité en échec | agrège tout le reste, y compris ce que ce script ne teste pas |
+
+Les seuils sont surchargeables par variable d'environnement
+(`SEUIL_DISQUE_PCT`, `AGE_SAUVEGARDE_MAX_H`, `SEUIL_CERT_JOURS`) — utile pour un
+serveur dont le disque est volontairement rempli.
+
+**Alerte sortante (facultative).** Par défaut le seul signal est
+`systemctl --failed`, que personne ne consulte sur un serveur d'école. Créez
+`/etc/sahel-edu/monitor.env` (mode 600) pour recevoir les anomalies ailleurs :
+
+```bash
+sudo install -m 600 /dev/null /etc/sahel-edu/monitor.env
+sudo tee /etc/sahel-edu/monitor.env >/dev/null <<'EOF'
+# Charge utile JSON {"text": "..."} : compatible Slack, Mattermost, Teams.
+ALERT_WEBHOOK=https://hooks.slack.com/services/XXX/YYY/ZZZ
+EOF
+sudo systemctl restart sahel-edu-check.timer
+```
+
+Le fichier est optionnel (`EnvironmentFile=-`) : sans lui, la surveillance
+fonctionne à l'identique, simplement sans envoi.
+
 ### Secrets et fichier `.env`
 
 Tous les secrets de l'installation vivent dans **un seul fichier**,
@@ -770,6 +816,8 @@ Les fichiers restent dans `/srv/sahel-edu/uploads` et les sauvegardes dans
     Attendu : `exercice reussi : N tables comparees, contenu identique`.
 13. `sudo ./deploy/secrets.sh audit` → `aucun probleme confirme`. Puis vider
     `ADMIN_PASSWORD` dans le `.env` et recharger la pile (voir §8).
+14. `sudo /usr/local/sbin/sahel-edu-healthcheck` → `tous les controles sont au
+    vert`. C'est le même contrôle que celui qui tournera toutes les 15 minutes.
 
 La checklist fonctionnelle détaillée du module est en §7 de
 [COURS_VIDEO_PDF.md](COURS_VIDEO_PDF.md).
