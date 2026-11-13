@@ -29,6 +29,8 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Gestion globale et centralisée des erreurs API.
@@ -36,6 +38,9 @@ import java.util.Map;
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
+
+    /** Repère la colonne citée par MySQL dans le message d'erreur d'origine. */
+    private static final Pattern COLUMN_IN_MESSAGE = Pattern.compile("column '([^']+)'");
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleNotFound(ResourceNotFoundException ex,
@@ -140,6 +145,14 @@ public class GlobalExceptionHandler {
      *
      * <p>Le libellé d'origine est conservé pour les cas non répertoriés : mieux
      * vaut un message générique qu'une erreur masquée.</p>
+     *
+     * <p>Le repli final ne doit rester qu'un filet de sécurité. Il annonçait
+     * « la ressource existe déjà ou est référencée » alors que la cause
+     * réelle était souvent toute autre — une valeur trop longue pour sa
+     * colonne, ou des caractères non pris en charge. L'utilisateur cherchait
+     * donc un doublon inexistant, et le vrai champ fautif n'était jamais
+     * nommé. Les deux cas les plus fréquents sur MySQL sont désormais
+     * reconnus, avec le nom de la colonne en cause.</p>
      */
     private String describeConstraint(DataIntegrityViolationException ex) {
         String detail = ex.getMostSpecificCause().getMessage();
@@ -166,10 +179,39 @@ public class GlobalExceptionHandler {
             return "Référence introuvable : la classe, le parent ou l'année sélectionnée "
                     + "n'existe plus. Rechargez la page et réessayez.";
         }
+        if (normalized.contains("data too long") || normalized.contains("data truncation")) {
+            return "Une valeur saisie est trop longue pour le champ" + namedColumn(detail)
+                    + " : raccourcissez-la avant d'enregistrer.";
+        }
+        if (normalized.contains("incorrect string value")) {
+            return "Le champ" + namedColumn(detail) + " contient des caractères non pris en charge "
+                    + "(emoji, symboles) : retirez-les et réessayez.";
+        }
+        if (normalized.contains("out of range") || normalized.contains("incorrect integer value")) {
+            return "Une valeur numérique du champ" + namedColumn(detail)
+                    + " est hors limites : vérifiez le montant ou la quantité saisie.";
+        }
         if (normalized.contains("uk_")) {
             return "Cette donnée existe déjà : un enregistrement identique est présent.";
         }
         return "Donnée en conflit : la ressource existe déjà ou est référencée";
+    }
+
+    /**
+     * Nom de colonne cité par MySQL (« Data too long for column 'first_name' »),
+     * rendu sous la forme {@code « first_name »}, ou chaîne vide si le message
+     * n'en cite aucun.
+     *
+     * <p>C'est le nom technique de la colonne, pas le libellé du formulaire :
+     * il reste assez parlant pour retrouver le champ, et il correspond à ce
+     * que l'exploitant voit dans le journal d'erreurs.</p>
+     */
+    private String namedColumn(String detail) {
+        if (detail == null) {
+            return "";
+        }
+        Matcher matcher = COLUMN_IN_MESSAGE.matcher(detail);
+        return matcher.find() ? " « " + matcher.group(1) + " »" : "";
     }
 
     @ExceptionHandler(NoResourceFoundException.class)

@@ -136,6 +136,39 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    @DisplayName("une valeur trop longue nomme le champ fautif au lieu de faire croire à un doublon")
+    void truncatedValueNamesTheColumn() throws Exception {
+        mockMvc.perform(post("/api/students")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .param("cause", "Data too long for column 'first_name' at row 1"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message", containsString("trop longue")))
+                .andExpect(jsonPath("$.message", containsString("first_name")));
+    }
+
+    @Test
+    @DisplayName("des caractères non pris en charge sont expliqués, sans parler de doublon")
+    void unsupportedCharactersAreExplained() throws Exception {
+        mockMvc.perform(post("/api/students")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .param("cause", "Incorrect string value: '\\xF0\\x9F\\x98\\x80' for column 'last_name' at row 1"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message", containsString("caractères non pris en charge")))
+                .andExpect(jsonPath("$.message", containsString("last_name")));
+    }
+
+    @Test
+    @DisplayName("un nombre hors limites est signalé comme tel")
+    void outOfRangeNumberIsExplained() throws Exception {
+        mockMvc.perform(post("/api/students")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .param("cause", "Out of range value for column 'amount' at row 1"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message", containsString("hors limites")))
+                .andExpect(jsonPath("$.message", containsString("amount")));
+    }
+
+    @Test
     @DisplayName("une contrainte inconnue conserve le message générique")
     void unknownConstraintKeepsGenericMessage() throws Exception {
         mockMvc.perform(post("/api/students")
