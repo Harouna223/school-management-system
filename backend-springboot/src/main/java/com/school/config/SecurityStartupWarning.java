@@ -27,7 +27,7 @@ public class SecurityStartupWarning implements CommandLineRunner {
     private final boolean requireSecureSecrets;
 
     public SecurityStartupWarning(@Value("${app.jwt.secret}") String jwtSecret,
-                                  @Value("${app.security.require-secure-secrets:false}") boolean requireSecureSecrets) {
+                                  @Value("${app.security.require-secure-secrets:true}") boolean requireSecureSecrets) {
         this.jwtSecret = jwtSecret;
         this.requireSecureSecrets = requireSecureSecrets;
     }

@@ -24,6 +24,19 @@ BRANCH="${BRANCH:-main}"
 require_root
 [[ -d "$APP_DIR/.git" ]] || die "$APP_DIR n'est pas un depot Git (installation par copie ?)."
 
+# Le .env contient DB_PASSWORD, JWT_SECRET et ADMIN_PASSWORD. Un fichier cree a
+# la main (ou copie depuis un poste de travail) reste en 644 : tous les comptes
+# du serveur peuvent alors lire les secrets. Aucun autre script ne corrige cette
+# permission, donc elle survivrait indefiniment a chaque mise a jour.
+if [[ -f "$ENV_FILE" ]]; then
+  ETAT_ENV="$(stat -c '%a %U:%G' "$ENV_FILE")"
+  if [[ "$ETAT_ENV" != "600 root:root" ]]; then
+    warn "permissions de $ENV_FILE : $ETAT_ENV -> 600 root:root"
+    chown root:root "$ENV_FILE"
+    chmod 600 "$ENV_FILE"
+  fi
+fi
+
 log "sauvegarde prealable"
 if [[ -x /usr/local/sbin/sahel-edu-backup ]]; then
   # ALLOW_NO_OFFSITE=1 : le disque hors site peut etre debranche, cela ne doit

@@ -627,6 +627,85 @@ du -sh /srv/sahel-edu/uploads/courses
 find /srv/sahel-edu/uploads/courses -type f -size +300M -printf '%s %p\n' | sort -nr | head
 ```
 
+### Secrets et fichier `.env`
+
+Tous les secrets de l'installation vivent dans **un seul fichier**,
+`/opt/sahel-edu/docker/.env`, en mode `600 root:root`. Il n'est jamais versionné
+(`.gitignore`) et `install.sh` ne le remplace jamais s'il existe déjà : une
+réinstallation ne régénère donc pas les secrets d'une base existante.
+
+| Clé | Rôle | Si elle fuit |
+| --- | --- | --- |
+| `JWT_SECRET` | signature des jetons | jetons forgeables → usurpation de n'importe quel compte |
+| `DB_PASSWORD` | compte `root` MySQL | accès à toutes les bases du serveur |
+| `DB_APP_PASSWORD` | compte applicatif | accès aux données de l'école, sans le schéma système |
+| `ADMIN_PASSWORD` | création initiale du compte admin | **aucun effet après le premier démarrage** |
+| `MAIL_PASSWORD`, `WA_*`, `SMS_*` | envois sortants | messages envoyés au nom de l'école |
+
+#### Auditer
+
+```bash
+sudo ./deploy/secrets.sh audit
+```
+
+Contrôle les permissions des fichiers, la dérive par rapport à
+`docker/.env.example`, la faiblesse ou l'absence de chaque secret, et ce qui
+reste visible par `docker inspect`. Le code de sortie vaut 1 dès qu'un problème
+est confirmé — utilisable dans une tâche planifiée.
+
+```bash
+sudo ./deploy/secrets.sh perms    # remet .env et backup.env en 600 root:root
+```
+
+#### Ce que `docker inspect` expose
+
+Les variables du `.env` sont passées aux conteneurs : `docker inspect
+school-backend` les affiche en clair. Le groupe `docker` équivaut à root sur
+l'hôte, ce n'est donc pas une élévation de privilèges — mais **ne collez jamais
+cette sortie dans un ticket ou une conversation**, et sachez qu'elle figure
+aussi dans toute sauvegarde de `/var/lib/docker`.
+
+Le mot de passe MySQL ne passe jamais en argument de commande (`MYSQL_PWD`),
+il n'apparaît donc pas dans `ps`.
+
+#### Renouveler
+
+```bash
+sudo ./deploy/secrets.sh rotate-jwt       # invalide toutes les sessions
+sudo ./deploy/secrets.sh rotate-db-app    # mot de passe du compte applicatif
+```
+
+Les deux écrivent la nouvelle valeur dans le `.env`, rechargent la pile par
+systemd (le backend est recréé, MySQL ne bouge pas) et attendent
+`actuator/health`. Si le backend ne revient pas, la rotation est **annulée
+automatiquement** : l'ancienne valeur est réécrite et la pile relancée.
+
+`ADMIN_PASSWORD` ne se renouvelle pas par script : le mot de passe
+administrateur se change dans l'application (Profil). La valeur du `.env` ne
+sert qu'à créer le compte au tout premier démarrage.
+
+> **Videz `ADMIN_PASSWORD` après la mise en service.** Une fois le compte admin
+> créé, cette valeur n'a plus aucun effet — `initializeAdmin` sort immédiatement
+> si le compte existe — mais elle reste exposée par `docker inspect` et dans
+> toute copie du fichier. L'audit la signale comme inutile.
+>
+> ```bash
+> sudo sed -i 's/^ADMIN_PASSWORD=.*/ADMIN_PASSWORD=/' /opt/sahel-edu/docker/.env
+> sudo systemctl reload sahel-edu.service
+> ```
+
+#### Conserver une copie du `.env`
+
+Le dump de la base **ne contient ni les comptes MySQL ni leurs droits**
+(`mysqldump --databases` n'exporte que la base applicative). Après une
+restauration sur un serveur neuf, c'est donc `install.sh` ou `update.sh` qui
+recrée le compte applicatif.
+
+Gardez une copie du `.env` **hors du serveur** (gestionnaire de mots de passe),
+et **pas** dans `/srv/sahel-edu/backups` : ce répertoire est recopié en clair
+vers `OFFSITE_DIR`, ce qui mettrait tous les secrets au même endroit que la base
+qu'ils protègent.
+
 ---
 
 ## 9. Dépannage
@@ -689,6 +768,8 @@ Les fichiers restent dans `/srv/sahel-edu/uploads` et les sauvegardes dans
       --db "$(ls -t /srv/sahel-edu/backups/db/db-*.sql.gz | head -1)"
     ```
     Attendu : `exercice reussi : N tables comparees, contenu identique`.
+13. `sudo ./deploy/secrets.sh audit` → `aucun probleme confirme`. Puis vider
+    `ADMIN_PASSWORD` dans le `.env` et recharger la pile (voir §8).
 
 La checklist fonctionnelle détaillée du module est en §7 de
 [COURS_VIDEO_PDF.md](COURS_VIDEO_PDF.md).
