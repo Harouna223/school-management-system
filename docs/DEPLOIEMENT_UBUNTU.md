@@ -104,7 +104,8 @@ sudo APP_DIR=/opt/sahel-edu DATA_DIR=/srv/sahel-edu ./deploy/install.sh
 | Sauvegarde | `/etc/sahel-edu/backup.env` (mode 600) : chemins et `OFFSITE_DIR`, lu par l'unité systemd |
 | Port MySQL | premier port libre à partir de 3307 (évite un MySQL local) |
 | systemd | installe et active `sahel-edu.service`, `sahel-edu-backup.timer` |
-| Pare-feu | UFW : 22, 80, 443 entrants ; le reste fermé |
+| Durcissement | appelle `deploy/harden-server.sh` (horloge, swap, pare-feu, fail2ban, journaux) — voir §5 |
+| Pare-feu | UFW : port SSH réellement écouté, 80, 443 entrants ; le reste fermé |
 | Vérification | attend `actuator/health` = `UP` (≈ 90 s au premier démarrage : migrations Flyway) |
 
 À la fin, le script affiche **le mot de passe administrateur généré**. Notez-le :
@@ -188,14 +189,26 @@ sudo chmod 600 /etc/netplan/01-sahel-edu.yaml && sudo netplan apply
 
 ### Pare-feu
 
-`install.sh` applique déjà :
+Le pare-feu est configuré par `deploy/harden-server.sh`, appelé par
+`install.sh`. Il est volontairement **dans un seul endroit** : deux scripts
+appliquant une politique réseau finissent toujours par diverger.
 
 ```bash
-ufw allow 22/tcp
-ufw allow 80/tcp
-ufw allow 443/tcp
-ufw enable
+sudo ./deploy/harden-server.sh     # idempotent, relançable à tout moment
+sudo ufw status verbose
 ```
+
+Politique appliquée :
+
+| Règle | Détail |
+|---|---|
+| `deny incoming` / `allow outgoing` | politique par défaut |
+| SSH | port lu dans la configuration **effective** de sshd (`sshd -T`), pas supposé à 22 |
+| 80, 443 | HTTP/HTTPS publics (validation ACME puis TLS) |
+| MySQL, backend | jamais ouverts : publiés sur `127.0.0.1` par le compose |
+
+> Le port SSH est détecté et non codé en dur : un serveur déjà déplacé sur un
+> autre port aurait été rendu injoignable par une règle `22/tcp` seule.
 
 Pour restreindre SSH au réseau de l'école (recommandé) :
 
@@ -208,10 +221,69 @@ sudo ufw status numbered
 ### Accès SSH durci
 
 ```bash
-sudo sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
-sudo sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
-sudo systemctl restart ssh
+# 1. depuis VOTRE poste, installer la clé publique
+ssh-copy-id root@IP_DU_SERVEUR
+
+# 2. vérifier que la connexion par clé fonctionne (nouveau terminal)
+ssh root@IP_DU_SERVEUR
+
+# 3. seulement ensuite, fermer les mots de passe
+sudo ./deploy/harden-server.sh --ssh
 ```
+
+Le script refuse de s'exécuter s'il ne trouve **aucune** clé publique : sans
+clé, `PasswordAuthentication no` équivaut à se couper définitivement l'accès.
+Il valide aussi le fichier avec `sshd -t` **avant** de recharger sshd, et le
+retire si la syntaxe est invalide.
+
+Ce qui est appliqué (`/etc/ssh/sshd_config.d/99-sahel-edu.conf`) :
+
+```
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitRootLogin prohibit-password     # root par clé uniquement
+MaxAuthTries 4
+X11Forwarding no
+```
+
+> ⚠️ **Ne pas mettre `PermitRootLogin no`** sur un VPS LWS dont l'accès se fait
+> en `root` : c'est la seule voie d'entrée, et elle serait fermée sans recours
+> autre que la console de secours du fournisseur. `prohibit-password` interdit
+> déjà le mot de passe de root, ce qui est l'objectif réel.
+
+Si un jour un utilisateur `sudo` non-root devient la voie d'accès principale,
+`PermitRootLogin no` devient légitime — mais après avoir vérifié la connexion.
+
+### Durcissement du système — détail et vérifications
+
+`deploy/harden-server.sh` est **idempotent** : relancé, il ne réécrit que ce
+qui diverge et n'affiche `deja conforme` que lorsque rien n'a bougé. Il ne
+redémarre jamais la machine et ne touche pas à SSH sans `--ssh`.
+
+| # | Mesure | Pourquoi | Vérification | Attendu |
+|---|---|---|---|---|
+| 1 | Fuseau `Africa/Bamako` + NTP | une horloge qui dérive invalide les JWT et le TLS | `timedatectl` | `Time zone: Africa/Bamako`, `NTP service: active` |
+| 2 | `/swapfile` 2 Go, `swappiness=10` | sans swap, un pic mémoire fait tuer un conteneur par l'OOM killer | `free -h` puis `swapon --show` | `Swap:` non nul, `/swapfile` listé |
+| 3 | `99-sahel-edu.conf` (sysctl) | anti-usurpation, anti-SYN-flood, noyau non lisible | `sysctl vm.swappiness kernel.dmesg_restrict` | `10`, `1` |
+| 4 | `unattended-upgrades` | correctifs de sécurité sans intervention | `systemctl status unattended-upgrades` | `active (running)` |
+| 5 | `fail2ban` (prison `sshd`) | UFW ferme le port, pas les 10 000 tentatives dessus | `fail2ban-client status sshd` | `Currently banned:` (0 ou plus) |
+| 6 | journald plafonné à 500 Mo | un disque plein fait tomber MySQL | `journalctl --disk-usage` | `<= 500M` |
+| 7 | rotation des journaux Docker (10 Mo × 3) | par défaut Docker ne supprime **jamais** ses journaux | `docker inspect -f '{{.HostConfig.LogConfig}}' school-backend` | `json-file map[max-file:3 max-size:10m]` |
+| 8 | UFW | politique réseau unique | `ufw status verbose` | `Status: active`, `deny (incoming)` |
+
+Une seule commande pour tout revérifier :
+
+```bash
+sudo ./deploy/harden-server.sh
+```
+
+S'il ne reste rien à faire, la sortie se termine par
+`serveur deja conforme : aucune modification necessaire`.
+
+> **`live-restore` et redémarrages** : le fichier `/etc/docker/daemon.json` est
+> fusionné avec l'existant (jamais écrasé : un miroir de registre configuré par
+> le fournisseur serait perdu). Docker n'est redémarré que si ce fichier vient
+> réellement de changer — un redémarrage arrête tous les conteneurs.
 
 ### Compte MySQL applicatif
 
@@ -430,6 +502,16 @@ Cette version fait tourner le backend en UID 10001 et exige une copie hors site.
 
    ```bash
    sudo systemctl start sahel-edu-backup && systemctl status sahel-edu-backup
+   ```
+
+3. **La documentation interactive de l'API est refermée.** Un `docker/.env`
+   antérieur ne contient pas `SWAGGER_ENABLED` ; le compose la résolvait donc à
+   `true`. `update.sh` ajoute `SWAGGER_ENABLED=false` **uniquement si la clé est
+   absente** — une installation qui l'a volontairement laissée à `true` n'est
+   pas fermée à son insu :
+
+   ```bash
+   grep '^SWAGGER_ENABLED' /opt/sahel-edu/docker/.env   # attendu : SWAGGER_ENABLED=false
    ```
 
 ### Retour arrière

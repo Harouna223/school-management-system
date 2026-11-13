@@ -91,6 +91,29 @@ systemctl enable --now docker >/dev/null 2>&1 || die "impossible de demarrer doc
 docker compose version >/dev/null 2>&1 || die "plugin 'docker compose' introuvable"
 
 # ------------------------------------------------------------------
+# 2b. Durcissement du systeme
+#
+# Place ICI et non a la fin, pour deux raisons d'ordre :
+#   - UFW doit etre actif AVANT que Docker ne cree ses regles, sinon les
+#     conteneurs deja lances peuvent publier des ports hors de la politique
+#     du pare-feu ;
+#   - la rotation des journaux Docker doit etre en place avant que les
+#     conteneurs ne commencent a ecrire, sinon les premiers Go de journaux
+#     echappent au plafond.
+#
+# Le durcissement SSH n'est PAS applique ici : il exige une cle deja
+# installee et une verification depuis un autre terminal. Voir le
+# recapitulatif final.
+# ------------------------------------------------------------------
+[[ -f "$HERE/harden-server.sh" ]] || die "deploy/harden-server.sh introuvable"
+log "durcissement du systeme (horloge, swap, pare-feu, fail2ban, journaux)"
+# `bash` explicite et non execution directe : le bit executable n'est pas
+# preserve par tous les systemes de fichiers (ni par un depot clone depuis
+# Windows), et un `install.sh` qui echoue sur un « Permission denied » apres
+# plusieurs minutes n'aiderait personne.
+bash "$HERE/harden-server.sh"
+
+# ------------------------------------------------------------------
 # 3. Utilisateur et repertoires persistants
 # ------------------------------------------------------------------
 if [[ "$SERVICE_USER" != "root" ]] && id "$SERVICE_USER" >/dev/null 2>&1; then
@@ -224,22 +247,7 @@ wait_healthy "http://127.0.0.1:${BACKEND_PORT_VALUE}/actuator/health" || true
 systemctl enable --now sahel-edu-backup.timer >/dev/null 2>&1 || warn "timer de sauvegarde non active"
 
 # ------------------------------------------------------------------
-# 7. Pare-feu
-# ------------------------------------------------------------------
-if command -v ufw >/dev/null 2>&1; then
-  if ! ufw status 2>/dev/null | grep -q "Status: active"; then
-    warn "activation de UFW : les connexions SSH EN COURS sont conservees,"
-    warn "mais le port 22 doit rester ouvert pour toute nouvelle connexion."
-  fi
-  log "configuration du pare-feu (22, 80, 443 entrant ; reste ferme)"
-  ufw allow 22/tcp   >/dev/null 2>&1 || true
-  ufw allow 80/tcp   >/dev/null 2>&1 || true
-  ufw allow 443/tcp  >/dev/null 2>&1 || true
-  ufw --force enable >/dev/null 2>&1 || true
-fi
-
-# ------------------------------------------------------------------
-# 8. Recapitulatif
+# 7. Recapitulatif
 # ------------------------------------------------------------------
 IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
 printf '\n'
@@ -258,3 +266,5 @@ if [[ "$GENERATED" -eq 1 ]]; then
 fi
 printf '\n'
 printf 'Pour activer HTTPS : sudo ./deploy/https.sh ecole.example.com admin@example.com\n'
+printf 'Pour fermer SSH aux mots de passe (apres avoir installe votre cle) :\n'
+printf '  sudo ./deploy/harden-server.sh --ssh\n'

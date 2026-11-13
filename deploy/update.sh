@@ -140,6 +140,15 @@ if [[ -z "$(env_get UPLOAD_HOST_DIR)" ]]; then
   env_set UPLOAD_HOST_DIR "$DATA_DIR/uploads"
 fi
 
+# Documentation interactive : les .env anterieurs ne la connaissaient pas, et
+# le compose la resout a true par defaut. On l'ajoute UNIQUEMENT si la cle est
+# absente : une installation qui l'a volontairement laissee a true (recette,
+# demonstration) ne doit pas etre fermee a son insu par une mise a jour.
+if ! grep -qE '^[[:space:]]*SWAGGER_ENABLED=' "$ENV_FILE"; then
+  warn "SWAGGER_ENABLED absent de $ENV_FILE : ajout de la valeur de production (false)"
+  env_set SWAGGER_ENABLED false
+fi
+
 DEFAULT_JWT_SECRET="Y2hhbmdlLXRoaXMtc2VjcmV0LWtleS1pbi1wcm9kdWN0aW9uLXdpdGgtYTM3LWNyYXdhbGxlbg=="
 CURRENT_JWT_SECRET="$(env_get JWT_SECRET)"
 if [[ -z "$CURRENT_JWT_SECRET" || "$CURRENT_JWT_SECRET" == "$DEFAULT_JWT_SECRET" || "${#CURRENT_JWT_SECRET}" -lt 44 ]]; then

@@ -139,6 +139,14 @@ ADMIN_PASSWORD=$admin_password
 SCHOOL_NAME=$SCHOOL_NAME
 CORS_ORIGINS=$cors_origins
 
+# Documentation interactive : fermee en production.
+#
+# Elle n'est pas joignable a travers le frontend, qui ne proxifie que /api et
+# /uploads, mais le port du backend est publie sur la boucle locale : la
+# fermer evite qu'un futur changement de topologie (backend expose, regle de
+# proxy ajoutee) ne rende /v3/api-docs public sans que personne ne le decide.
+SWAGGER_ENABLED=false
+
 # Frontend : 0.0.0.0:80 en HTTP direct sur le LAN.
 # deploy/https.sh bascule sur 127.0.0.1:8081 derriere un nginx hote.
 FRONTEND_BIND=0.0.0.0
