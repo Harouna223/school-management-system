@@ -7,11 +7,53 @@
 #
 # Les parametres SSL sont ecrits explicitement : le fichier
 # /etc/letsencrypt/options-ssl-nginx.conf n'existe pas avec `certbot certonly`.
+#
+# Deux jetons sont substitues par deploy/https.sh : le nom de domaine et le
+# resolver DNS. Ne pas ecrire ces jetons ailleurs dans le fichier, sinon la
+# substitution les remplacerait aussi dans les commentaires.
 # ============================================================
+
+# Resolver utilise pour la validation OCSP (stapling). Il est lu sur le
+# systeme par https.sh et non code en dur : supposer 1.1.1.1 joignable est
+# faux sur un VPS dont le DNS sortant est filtre, et faux aussi quand
+# systemd-resolved ecoute seul sur 127.0.0.53.
+resolver __RESOLVER__ valid=300s ipv6=off;
+resolver_timeout 5s;
 
 upstream sahel_edu_frontend {
     server 127.0.0.1:8081;
     keepalive 32;
+}
+
+# --- Repli : tout nom d'hote inconnu -----------------------------------
+#
+# Sans ce bloc, nginx repond avec le PREMIER serveur declare pour le port :
+# l'application repondait donc a n'importe quel domaine pointant vers l'IP du
+# serveur, et un balayage d'Internet la trouvait aussi facilement que par son
+# vrai nom. 444 ferme la connexion sans rien renvoyer.
+#
+# Consequence assumee : http://IP_DU_SERVEUR ne repond plus apres cette etape.
+# C'est voulu - le frontend n'ecoute de toute facon plus que sur 127.0.0.1,
+# donc l'IP n'aurait deja plus rien servi.
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+    return 444;
+}
+
+server {
+    listen 443 ssl default_server;
+    listen [::]:443 ssl default_server;
+    server_name _;
+
+    # Obligatoire : nginx refuse un serveur TLS sans certificat. Celui du vrai
+    # domaine est repris ici, la poignee de main est de toute facon suivie
+    # d'une fermeture immediate.
+    ssl_certificate     /etc/letsencrypt/live/__DOMAIN__/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/__DOMAIN__/privkey.pem;
+
+    return 444;
 }
 
 # Redirection HTTP -> HTTPS, en conservant la validation ACME.
@@ -31,9 +73,17 @@ server {
 }
 
 server {
+    # « http2 » en parametre de listen, et non la directive « http2 on; » :
+    # celle-ci n'existe qu'a partir de nginx 1.25.1, alors qu'Ubuntu 24.04
+    # fournit nginx 1.24. La forme ci-dessous y est valide et non depreciee.
+    # Ne pas la « moderniser » sans verifier la version reellement installee.
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
     server_name __DOMAIN__;
+
+    # N'affiche pas la version de nginx dans les en-tetes et les pages
+    # d'erreur : c'est une information gratuite pour un attaquant.
+    server_tokens off;
 
     access_log /var/log/nginx/sahel-edu.access.log;
     error_log  /var/log/nginx/sahel-edu.error.log warn;
@@ -47,7 +97,26 @@ server {
     ssl_session_cache shared:SSL:10m;
     ssl_session_tickets off;
 
+    # OCSP stapling : le serveur joint la preuve de validite du certificat.
+    # Sans cela, chaque navigateur interroge lui-meme l'autorite de
+    # certification, ce qui revele a un tiers les sites consultes et ajoute
+    # une dependance externe a chaque premiere connexion.
+    ssl_stapling on;
+    ssl_stapling_verify on;
+    ssl_trusted_certificate /etc/letsencrypt/live/__DOMAIN__/chain.pem;
+
+    # HSTS. « includeSubDomains » couvre aussi *.DOMAIN : si un sous-domaine
+    # est un jour servi en HTTP seul, les navigateurs refuseront de s'y
+    # connecter sans recours pendant la duree de validite. Ne pas ajouter
+    # « preload » : l'inscription dans les listes des navigateurs est
+    # irreversible a court terme.
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    # Ces deux en-tetes sont AUSSI emis par le nginx du conteneur. Le
+    # doublon est volontaire : `add_header` ne remplace pas l'en-tete de
+    # l'amont, il s'y ajoute, et ces lignes sont la seule protection des
+    # reponses generees par l'HOTE lui-meme (502, 504, 444), qui ne passent
+    # pas par le conteneur. Des valeurs identiques repetees sont conformes.
     add_header X-Content-Type-Options "nosniff" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 

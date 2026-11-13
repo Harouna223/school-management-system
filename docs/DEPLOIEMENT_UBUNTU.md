@@ -137,15 +137,25 @@ sudo ./deploy/https.sh ecole.example.com admin@example.com
 
 Le script :
 
-1. vérifie que le domaine résout vers l'IP publique du serveur (sinon il
-   s'arrête avec un diagnostic ; `--force` pour passer outre) ;
+1. vérifie que le domaine résout vers **une** des adresses du serveur, en IPv4
+   **et** en IPv6 (sinon il s'arrête en affichant les deux listes ; `--force`
+   pour passer outre) ;
 2. installe `nginx` + `certbot` ;
-3. configure nginx en **HTTP seul** pour la validation ACME ;
-4. obtient le certificat (`certbot certonly --webroot`) ;
-5. bascule nginx en **HTTPS complet** (HSTS, TLS 1.2/1.3, redirection 80→443) ;
+3. configure nginx en **HTTP seul** pour la validation ACME — **uniquement si
+   aucun certificat n'existe encore** (voir l'encadré ci-dessous) ;
+4. obtient le certificat (`certbot certonly --webroot --keep-until-expiring`) ;
+5. bascule nginx en **HTTPS complet** : HSTS, TLS 1.2/1.3, OCSP stapling,
+   redirection 80→443, repli `444` pour tout nom d'hôte inconnu ;
 6. déplace le conteneur frontend sur `127.0.0.1:8081` (plus accessible en direct) ;
 7. installe un *deploy hook* qui recharge nginx à chaque renouvellement ;
 8. active `certbot.timer` (renouvellement automatique).
+
+> **Le script est rejouable.** Relancer `https.sh` sur une installation déjà en
+> HTTPS ne la dégrade pas : la phase « HTTP seul » est ignorée dès qu'un
+> certificat existe. C'était le principal défaut de la version précédente —
+> une relance réécrivait le site en clair, et si `certbot` échouait ensuite
+> (DNS modifié, quota ACME atteint) la production restait servie en HTTP, donc
+> **inaccessible** pour tout navigateur ayant déjà reçu le HSTS.
 
 Vérifications :
 
@@ -155,6 +165,21 @@ certbot renew --dry-run
 curl -I https://ecole.example.com          # 200 + Strict-Transport-Security
 ```
 
+Le script les exécute déjà en fin de course et affiche :
+
+| Contrôle | Attendu |
+|---|---|
+| redirection HTTP | `HTTP 301` |
+| page d'accueil | `HTTP 200` |
+| en-tête HSTS | `max-age=31536000; includeSubDomains` |
+| écoute du frontend | `127.0.0.1:8081` uniquement |
+| jours restants du certificat | affiché, alerte sous 14 jours |
+
+> **`http://IP_DU_SERVEUR` cesse de répondre** après cette étape. C'est voulu :
+> le frontend n'écoute plus que sur la boucle locale, et le repli `444` ferme
+> les connexions dont le `Host` n'est pas le domaine configuré. Sans ce repli,
+> nginx répondait à **n'importe quel** domaine pointant vers l'IP du serveur.
+
 ### 4.3 Cas particuliers
 
 | Situation | Solution |
@@ -162,6 +187,8 @@ curl -I https://ecole.example.com          # 200 + Strict-Transport-Security
 | **CGNAT** (aucune redirection entrante possible) | Tunnel sortant (WireGuard/Tailscale) vers une passerelle publique, ou IP publique dédiée chez le fournisseur. Ne jamais exposer MySQL/backend. |
 | **Pas de domaine** | Rester en HTTP sur le LAN (installation par défaut) ou créer un certificat auto-signé pour le LAN : `openssl req -x509` puis adapter manuellement la conf nginx. |
 | **Proxy/CDN devant** | `sudo ./deploy/https.sh domaine email --force`, et laisser le CDN gérer le certificat. |
+| **VPS IPv4 + IPv6 (LWS)** | Géré : le script compare le domaine à l'IPv4 **et** à l'IPv6 du serveur. L'enregistrement `AAAA` est facultatif ; s'il existe et pointe ailleurs, le diagnostic l'affiche. |
+| **Le site répond sur un domaine qui n'est pas le vôtre** | Impossible depuis cette version : un bloc `default_server` renvoie `444` pour tout `Host` inconnu. |
 
 ---
 
