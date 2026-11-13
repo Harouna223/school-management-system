@@ -23,6 +23,3 @@ services:
   frontend:
     image: ${FRONTEND_IMAGE:-sahel-edu-frontend:local}
     pull_policy: never
-
-  db-backup:
-    pull_policy: never

@@ -36,21 +36,35 @@ Le schéma de base de données est créé automatiquement par Flyway au premier 
 
 ### Sauvegarde automatique
 
-Le service `db-backup` effectue un dump MySQL quotidien dans le volume `backup_data`
-(conservation : 14 jours) :
+Il n'y a **pas** de conteneur de sauvegarde : il n'y a qu'un seul mécanisme, et
+c'est celui du déploiement serveur.
+
+| Contexte | Sauvegarde |
+|---|---|
+| Serveur Ubuntu (`deploy/install.sh`) | `sahel-edu-backup.timer` → `/usr/local/sbin/sahel-edu-backup` |
+| Poste de développement (`docker compose`) | **aucune** — ce n'est pas une donnée à conserver |
+
+Le script produit un dump vérifié (compression testée, présence de tables
+exigée) et le copie **hors du disque des données** vers `OFFSITE_DIR`, avec
+comparaison octet par octet. Voir `docs/DEPLOIEMENT_UBUNTU.md` §6.
+
+Pour sauvegarder et restaurer à la main sur un poste de développement :
 
 ```bash
-# Restaurer une sauvegarde dans le conteneur MySQL
+# Dump
 docker compose -f docker/docker-compose.yml exec -T mysql \
-  mysql -uroot -p"$(grep DB_PASSWORD docker/.env | cut -d= -f2)" school_management < backup-XXXX.sql
+  mysqldump -uroot -p"$(grep '^DB_PASSWORD=' docker/.env | cut -d= -f2)" \
+  --single-transaction --routines --triggers school_management > sauvegarde.sql
 
-# Restaurer depuis le volume des sauvegardes
-docker compose -f docker/docker-compose.yml run --rm db-backup \
-  sh -c 'cat /backups/backup-XXXX.sql | mysql -h mysql -uroot -p"$DB_PASSWORD" school_management'
+# Restauration (écrase la base actuelle !)
+docker compose -f docker/docker-compose.yml exec -T mysql \
+  mysql -uroot -p"$(grep '^DB_PASSWORD=' docker/.env | cut -d= -f2)" school_management < sauvegarde.sql
 ```
 
-> Astuce : récupérez le fichier `.sql` depuis le volume avec :
-> `docker run --rm -v school-management_backup_data:/backups -v $PWD:/out alpine sh -c "cp /backups/backup-*.sql /out/"`
+> Un conteneur `db-backup` a existé jusqu'ici. Il écrivait dans un volume Docker,
+> donc **sur le même disque** que les données, sans vérifier ses archives et en
+> ignorant ses propres échecs. Il a été retiré : deux mécanismes de sauvegarde
+> dont un seul est fiable donnent une fausse assurance.
 
 ## 3. Installation en développement
 

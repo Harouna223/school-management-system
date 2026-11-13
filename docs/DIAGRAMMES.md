@@ -14,7 +14,7 @@ flowchart LR
   F[Frontend React.js + Vite\nMUI + Tailwind + Redux Toolkit]
   B[Backend Spring Boot :8080\nSecurity JWT - API REST]
   M[(MySQL 8.4\nschool_management)]
-  BK[db-backup\nmysqldump quotidien\nrétention 14 j]
+  BK[sahel-edu-backup.timer\nservi par l'hote\ncopie hors site]
   W[WhatsApp Cloud API / Twilio]
   S[SMTP - Envoi d'e-mails]
   T[Twilio SMS]
@@ -117,10 +117,18 @@ sequenceDiagram
 
 ## 5. Sauvegarde automatique
 
+La sauvegarde ne tourne pas dans un conteneur : elle est déclenchée par
+`sahel-edu-backup.timer`, côté hôte.
+
 ```mermaid
 flowchart TD
-  BK[Conteneur db-backup] -->|chaque 24 h| D[mysqldump --single-transaction\n--routines --triggers]
-  D --> F1[backup-AAAAMMJJ-HHMM.sql]
-  F1 --> V[Volume docker backup_data]
-  V --> R[find -mtime +14 -delete\nrétention 14 jours]
+  T[sahel-edu-backup.timer] -->|chaque nuit| S[deploy/backup.sh]
+  S --> D[mysqldump --single-transaction\n--routines --triggers]
+  D --> G[gzip -9 + verification\ncompression et presence de tables]
+  G --> L["/srv/sahel-edu/backups/db\ndb-AAAAMMJJ-HHMM.sql.gz"]
+  S --> U["tar czf des fichiers pedagogiques\n/srv/sahel-edu/backups/uploads"]
+  L --> O[OFFSITE_DIR\ncp + comparaison octet par octet]
+  U --> O
+  O --> R[find -mtime +14 -delete\nretention 14 jours, des deux cotes]
+  S -.->|OFFSITE_DIR absent| E[ECHEC du service\nsystemctl --failed]
 ```

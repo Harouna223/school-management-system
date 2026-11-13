@@ -113,7 +113,7 @@ docker compose -f docker/docker-compose.yml up -d --build
 
 ```bash
 docker compose -f docker/docker-compose.yml ps
-# 4 services attendus : mysql (healthy), backend (healthy), frontend (healthy), db-backup
+# 3 services attendus : mysql (healthy), backend (healthy), frontend (healthy)
 ```
 
 Attendre que `school-backend` devienne `healthy` (1 à 2 min au premier démarrage).
@@ -235,41 +235,43 @@ mots de passe — jamais dans le code ni dans les logs.
 
 ## ÉTAPE 7 — Sauvegardes et restauration
 
-### Sauvegarde automatique (déjà en place)
+### Sauvegarde automatique
 
-Le service `db-backup` effectue un `mysqldump` quotidien dans le volume
-`backup_data` (rétention : 14 jours).
+> **Cette installation par `docker compose` ne fournit AUCUNE sauvegarde
+> automatique.** Le conteneur `db-backup` a été retiré : il écrivait dans un
+> volume Docker (même disque que les données), sans vérifier ses archives et en
+> ignorant ses propres échecs.
+>
+> Pour une sauvegarde réelle, déployez avec `deploy/install.sh` : il installe
+> `sahel-edu-backup.timer`, qui produit un dump vérifié et le copie **hors du
+> disque des données** (`OFFSITE_DIR` obligatoire). Voir
+> `docs/DEPLOIEMENT_UBUNTU.md` §6.
 
 ### Sauvegarder aussi les fichiers uploadés (photos, reçus, documents)
 
 ```bash
-# Planifier (cron) un tar du volume des uploads
+# Planifier (cron) un tar du repertoire des uploads
 sudo mkdir -p /var/backups/sms
 sudo crontab -e
-# Ajouter :
-0 2 * * * docker run --rm -v school-management_uploads_data:/uploads -v /var/backups/sms:/out alpine sh -c "tar czf /out/uploads-$(date +\%F).tgz -C /uploads . && find /out -name 'uploads-*.tgz' -mtime +30 -delete"
+# Ajouter (adapter le chemin a UPLOAD_HOST_DIR de docker/.env) :
+0 2 * * * tar czf /var/backups/sms/uploads-$(date +\%F).tgz -C /srv/sahel-edu/uploads . && find /var/backups/sms -name 'uploads-*.tgz' -mtime +30 -delete
 ```
 
 ### Sauvegarde complète (base + uploads) sur un serveur distant (optionnel)
 
 ```bash
-# Extraire le dump quotidien vers la machine hôte
-docker run --rm -v school-management_backup_data:/backups -v /var/backups/sms:/out \
-  alpine sh -c "cp /backups/backup-*.sql /out/"
-# Puis rsync vers un autre site/disque :
-rsync -av /var/backups/sms/ user@autre-serveur:/backups/sms/
+# Dump a la demande, verifie, puis rsync vers un autre site/disque
+sudo /usr/local/sbin/sahel-edu-backup
+rsync -av /srv/sahel-edu/backups/ user@autre-serveur:/backups/sms/
 ```
 
 ### Restaurer une sauvegarde SQL
 
 ```bash
-# Depuis la machine hôte
-docker compose -f docker/docker-compose.yml exec -T mysql \
-  mysql -uroot -p"$DB_PASSWORD" school_management < /var/backups/sms/backup-XXXX.sql
-
-# Depuis le volume des sauvegardes
-docker compose -f docker/docker-compose.yml run --rm db-backup \
-  sh -c 'cat /backups/backup-XXXX.sql | mysql -h mysql -uroot -p"$DB_PASSWORD" school_management'
+# Les archives sont compressees : db-AAAAMMJJ-HHMM.sql.gz
+gunzip -c /srv/sahel-edu/backups/db/db-XXXX.sql.gz \
+  | docker compose -f docker/docker-compose.yml exec -T mysql \
+    mysql -uroot -p"$DB_PASSWORD" school_management
 ```
 
 > **Tester régulièrement la restauration** sur un serveur de test.
@@ -325,10 +327,10 @@ docker compose -f docker/docker-compose.yml ps
 - [ ] HTTPS actif (certificat valide) et renouvellement automatique
 - [ ] Pare-feu : seuls 22, 80, 443 ouverts
 - [ ] Ports 8080 et 3306/3307 non exposés publiquement
-- [ ] `docker compose ps` → les 4 services sont `healthy`
+- [ ] `docker compose ps` → les 3 services sont `healthy`
 - [ ] Connexion `admin` + changement du mot de passe initial
 - [ ] Création d'un établissement réel : paramètres, année scolaire, classes, matières
-- [ ] Sauvegarde quotidienne opérationnelle (vérifier un dump récent dans `backup_data`)
+- [ ] Sauvegarde quotidienne opérationnelle (`systemctl list-timers sahel-edu-backup.timer`)
 - [ ] Restauration testée sur un serveur de test
 - [ ] Sauvegarde des uploads planifiée (cron)
 - [ ] Documentation remise au client : URL, identifiants, procédure de mise à jour

@@ -39,10 +39,25 @@ services:
       # neuve impossible.
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${DB_PASSWORD:-root}"]
+      # `mysqladmin ping` sort en 0 dès que le serveur RÉPOND, même si
+      # l'authentification échoue : « Access denied » prouve justement que le
+      # serveur tourne. Le mot de passe root était donc inutile ici — et il
+      # finissait en clair dans `docker inspect`, donc dans la configuration du
+      # healthcheck. Vérifié sur mysql 8.4 : sans -p, la commande sort en 0.
+      #
+      # 127.0.0.1 et non « localhost » : pendant l'initialisation du volume,
+      # l'entrypoint démarre un serveur temporaire en --skip-networking, qui
+      # n'écoute que sur la socket. Un ping par socket répondait donc « sain »
+      # alors que le vrai serveur n'était pas encore là, et le backend pouvait
+      # démarrer sur une base indisponible en TCP.
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]
       interval: 10s
       timeout: 5s
       retries: 10
+    # InnoDB doit vider ses journaux à l'arrêt : 10 s (valeur par défaut de
+    # Docker) suffisent mal sur une base de plusieurs Go, et un SIGKILL laisse
+    # une récupération au démarrage suivant.
+    stop_grace_period: 60s
     # ---- Limites ----
     # Volontairement SANS cap_drop ni no-new-privileges : l'entree de l'image
     # MySQL demarre en root puis abandonne ses privileges vers l'utilisateur
@@ -56,6 +71,14 @@ services:
     mem_limit: 1g
     cpus: "1.5"
     pids_limit: 400
+    # no-new-privileges, contrairement à cap_drop, est sans danger ici : il
+    # empêche un execve d'ACQUÉRIR des privilèges (binaire setuid, capacité de
+    # fichier), alors que l'entrypoint ne fait que les RÉDUIRE (gosu passe de
+    # root à mysql). Vérifié sur mysql 8.4 : volume initialisé complètement,
+    # requête servie, et /var/lib/mysql appartient bien à mysql:mysql — la
+    # réduction de privilèges a donc bien eu lieu.
+    security_opt:
+      - no-new-privileges:true
 
   backend:
     build:
@@ -145,6 +168,9 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
+    # Spring Boot ferme son pool de connexions et termine les requetes en cours
+    # à l'arrêt. 10 s (défaut Docker) coupent parfois une transaction en cours.
+    stop_grace_period: 30s
 
   frontend:
     build:
@@ -185,47 +211,42 @@ services:
       retries: 3
       start_period: 10s
 
-  # Sauvegarde automatique de la base (dump quotidien, rétention 14 jours)
-  db-backup:
-    image: mysql:8.4
-    container_name: school-db-backup
-    restart: unless-stopped
-    depends_on:
-      mysql:
-        condition: service_healthy
-    # ---- Limites ----
-    # mysqldump + tar : la memoire depend du volume des fichiers pedagogiques,
-    # mais reste tres inferieure a celle du backend. Plafonner evite qu'un
-    # archivage de plusieurs gigaoctets asphyxie la base pendant la nuit.
-    mem_limit: 512m
-    cpus: "0.5"
-    pids_limit: 200
-    security_opt:
-      - no-new-privileges:true
-    environment:
-      # Reste en root VOLONTAIREMENT : `mysqldump --routines` exige le privilège
-      # global SHOW_ROUTINE, que le compte applicatif ne doit pas recevoir. Ce
-      # conteneur n'expose aucun port et n'accepte aucune entrée utilisateur :
-      # il ne constitue pas une surface d'attaque, contrairement au backend.
-      DB_PASSWORD: ${DB_PASSWORD:-root}
-    volumes:
-      - backup_data:/backups
-      # Vidéos et PDF : archivés avec la base dans les mêmes sauvegardes.
-      - ${UPLOAD_HOST_DIR:-/srv/sahel-edu/uploads}:/uploads:ro
-    command:
-      - /bin/sh
-      - -c
-      - |
-        while true; do
-          mysqldump -h mysql -uroot -p"$$DB_PASSWORD" --single-transaction --routines --triggers school_management > /backups/backup-$$(date +%Y%m%d-%H%M).sql && echo "[backup] sauvegarde effectuée : backup-$$(date +%Y%m%d-%H%M).sql" || echo "[backup] ECHEC de la sauvegarde"
-          tar czf /backups/uploads-$$(date +%Y%m%d-%H%M).tar.gz -C /uploads . && echo "[backup] fichiers pédagogiques archivés" || echo "[backup] ECHEC de l'archivage des fichiers"
-          find /backups \( -name 'backup-*.sql' -o -name 'uploads-*.tar.gz' \) -mtime +14 -delete
-          sleep 86400
-        done
+  # ------------------------------------------------------------------
+  # Il n'y a PAS de conteneur de sauvegarde, et c'est volontaire.
+  #
+  # Un service `db-backup` existait ici : boucle de 24 h, mysqldump + tar vers
+  # le volume `backup_data`. Il a ete retire pour quatre raisons, toutes
+  # verifiables dans son ancien code :
+  #
+  #   1. il ecrivait dans un volume Docker, donc SUR LE MEME DISQUE que les
+  #      donnees : il ne protegeait ni d'une panne du disque, ni d'un
+  #      ransomware, ni d'un vol de la machine ;
+  #   2. il ne verifiait rien : ni l'integrite de l'archive, ni la presence de
+  #      tables dans le dump. Une sauvegarde vide etait indiscernable d'une
+  #      bonne ;
+  #   3. il avalait ses erreurs (`|| echo ECHEC` renvoie 0). Un dump qui
+  #      echouait chaque nuit depuis six mois ne produisait aucune alerte :
+  #      `docker ps` affichait un conteneur « Up », et le probleme n'apparaissait
+  #      qu'au moment de la restauration ;
+  #   4. il codait en dur `school_management` au lieu de ${DB_NAME} : renommer
+  #      la base suffisait a rendre la sauvegarde silencieusement inutile.
+  #
+  # La sauvegarde vit desormais a un seul endroit : deploy/backup.sh, installe
+  # dans /usr/local/sbin/sahel-edu-backup et declenche par
+  # sahel-edu-backup.timer. Il verifie la compression, exige la presence de
+  # tables, compare octet par octet la copie hors site et ECHOUE si OFFSITE_DIR
+  # est absent. Deux mecanismes de sauvegarde dont un seul est fiable, c'est
+  # pire qu'un seul : le second donne une fausse assurance.
+  # ------------------------------------------------------------------
 
 volumes:
   mysql_data:
   # Conservé pour ne pas perdre les fichiers des installations antérieures :
   # le backend n'écrit plus dans ce volume mais dans ${UPLOAD_HOST_DIR}.
   uploads_data:
-  backup_data:
+  # `backup_data` n'est plus déclaré : plus aucun service ne l'utilise. Le
+  # volume existant n'est PAS supprimé (compose ne supprime jamais un volume
+  # nommé), il reste consultable avec :
+  #   docker run --rm -v school-management_backup_data:/b alpine ls -l /b
+  # Il contient les anciennes sauvegardes locales du conteneur db-backup ;
+  # vérifiez qu'elles sont bien reprises ailleurs avant de le retirer.

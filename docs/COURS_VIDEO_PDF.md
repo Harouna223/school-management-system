@@ -225,12 +225,19 @@ docker compose -f docker/docker-compose.yml exec mysql \
 
 ### Sauvegarde automatique
 
-Le service `db-backup` produit chaque jour, dans le volume `backup_data` :
+Assurée par `sahel-edu-backup.timer` (hôte), et non par un conteneur. Chaque
+nuit, `deploy/backup.sh` produit dans `/srv/sahel-edu/backups` :
 
-- `backup-AAAAMMJJ-HHMM.sql` — dump MySQL complet ;
-- `uploads-AAAAMMJJ-HHMM.tar.gz` — vidéos et PDF.
+- `db/db-AAAAMMJJ-HHMM.sql.gz` — dump MySQL complet ;
+- `uploads/uploads-AAAAMMJJ-HHMM.tar.gz` — vidéos et PDF.
 
-Rétention : 14 jours.
+Rétention : 14 jours, appliquée aussi dans `OFFSITE_DIR`, où les deux archives
+sont copiées et comparées octet par octet.
+
+```bash
+systemctl list-timers sahel-edu-backup.timer
+sudo systemctl start sahel-edu-backup     # déclencher à la demande
+```
 
 ### Sauvegarde manuelle (recommandée avant toute mise à jour importante)
 
@@ -353,5 +360,5 @@ Journaux utiles :
 ```bash
 docker compose -f docker/docker-compose.yml logs -f backend
 docker compose -f docker/docker-compose.yml logs -f frontend
-docker compose -f docker/docker-compose.yml logs -f db-backup
+journalctl -u sahel-edu-backup -n 50      # sauvegarde (service systemd)
 ```

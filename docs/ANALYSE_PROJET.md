@@ -312,7 +312,7 @@ filtrage sur les élèves rattachés à son compte, comme le fait déjà `Access
 | 9 | **Jeton d'un utilisateur supprimé → 500 au lieu de 401** — `loadUserByUsername` lève `UsernameNotFoundException`, non capturée par `JwtExceptionFilter` (qui ne traite que `ExpiredJwtException`/`JwtException`/`IllegalArgumentException`) | `JwtAuthenticationFilter.java:46`, `JwtExceptionFilter.java:30-34` | capturer et renvoyer 401 |
 | 10 | **Token de rafraîchissement sans recontrôle du compte** — `AuthService.java:143-168` ne vérifie ni `isEnabled()` ni `isAccountNonLocked()`. **Non exploitable** : `JwtAuthenticationFilter.java:49-51` recontrôle ces deux états à *chaque* requête, donc les jetons émis sont inutilisables | idem | ajouter le contrôle (défense en profondeur) |
 | 11 | **Identifiants en clair dans les journaux d'audit** — `getRemoteAddr()` derrière nginx renvoie l'IP du proxy, pas du client | `AuditService.java:28` | lire `X-Forwarded-For` |
-| 12 | **`db-backup` code en dur la base `school_management`** au lieu de `${DB_NAME}` : la sauvegarde quotidienne échoue si le nom change | `docker-compose.yml:106` | utiliser `${DB_NAME}` |
+| 12 | ~~**`db-backup` code en dur la base `school_management`** au lieu de `${DB_NAME}`~~ — **résolu** : le service a été retiré (sauvegarde déplacée vers `deploy/backup.sh`, qui lit `DB_NAME` dans `.env`) | `docker-compose.yml` | — |
 | 13 | **Modules sans couverture d'autorisation** — `/api/my/**` et `/api/parents/**` ne sont couverts par **aucune règle explicite** : ils tombent sur `anyRequest().authenticated()`. La protection repose **entièrement** sur le service (elle existe : `ParentService.java:172`, `MySpaceService`) | `SecurityConfig.java:140` | ajouter des règles de route explicites (défense en profondeur) |
 | 14 | **`@PreAuthorize` utilisé 2 fois sur 302 endpoints** malgré `@EnableMethodSecurity` : toute l'autorisation repose sur le filtrage d'URL. Un nouveau contrôleur sur un chemin non listé est ouvert à tout compte authentifié | `TeacherPayrollController.java:247,256` | annoter les services sensibles |
 
@@ -551,8 +551,8 @@ Les signaler évite de « corriger » du code déjà sain.
 ### P1 — robustesse
 9. Borner la pagination (`@Max`), renvoyer **403** et non 400 sur refus d'accès.
 10. Rendre `/uploads/**` authentifié.
-11. Corriger la restauration (DDL hors transaction, connexion dédiée) et utiliser `${DB_NAME}` dans
-    le service `db-backup`.
+11. Corriger la restauration (DDL hors transaction, connexion dédiée). Le second point
+    (`${DB_NAME}` dans `db-backup`) est devenu sans objet : le service a été retiré.
 12. `@Valid` + DTO sur les 27 corps de requête ; protection contre l'injection de formules Excel.
 13. Traiter les N+1 (`@EntityGraph`) et passer `User.roles`/`Role.permissions` en LAZY.
 14. Retirer le `<Loader />` global bloquant (`DashboardLayout.jsx:50`) au profit des états locaux.

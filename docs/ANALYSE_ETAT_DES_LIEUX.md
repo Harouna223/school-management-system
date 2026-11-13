@@ -81,9 +81,11 @@ d'intégration est ignoré** (`Skipped > 0` ou `Tests run: 0`). C'est exactement
 garde-fou qui empêche une migration Flyway cassée de passer inaperçue.
 
 ### 3.6 Exploitation
-- `docker-compose` : healthchecks MySQL et backend (liveness), `depends_on:
-  condition: service_healthy`, sidecar `db-backup` (dump quotidien + archive des
-  uploads, rétention 14 jours).
+- `docker-compose` : healthchecks MySQL (ping sans mot de passe) et backend
+  (liveness), `depends_on: condition: service_healthy`, `stop_grace_period` sur
+  MySQL et le backend. Trois services — le sidecar `db-backup` a été **retiré**
+  (volume Docker, donc même disque que les données ; archives non vérifiées ;
+  échecs silencieux) au profit de `sahel-edu-backup.timer` côté hôte.
 - MySQL et backend **publiés sur 127.0.0.1 uniquement** — jamais exposés au LAN.
 - nginx : CSP, `X-Frame-Options`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`,
   `resolver 127.0.0.11` (corrige les 502 après redéploiement du backend),
@@ -180,13 +182,15 @@ contre le bourrage d'identifiants.
   `no-new-privileges`) : `docker run` ne lit pas le fichier compose, sans quoi
   ces réglages ne seraient validés nulle part.
 - **#7 (limites de ressources)** : corrigé. `mem_limit`, `cpus` et `pids_limit`
-  sur les quatre services ; `cap_drop: ALL` et `no-new-privileges` sur le
+  sur les trois services ; `cap_drop: ALL` et `no-new-privileges` sur le
   backend et le frontend ; `read_only` + `tmpfs` sur le frontend, qui ne sert
   que des fichiers statiques. Le plafond du backend (2 Go) est cohérent avec
   `-XX:MaxRAMPercentage=75`, soit ~1,5 Go de tas. **MySQL est volontairement
   exempté** de `cap_drop` : son point d'entrée abandonne les privilèges root
   via `CAP_SETUID`/`CAP_SETGID`, et retirer ces capacités casserait
-  l'initialisation d'un volume neuf.
+  l'initialisation d'un volume neuf. Il reçoit en revanche
+  `no-new-privileges:true`, qui n'empêche que l'ACQUISITION de privilèges et
+  laisse intacte cette réduction — vérifié sur mysql 8.4.
 - **#4 (sauvegardes hors site)** : corrigé. `OFFSITE_DIR` est **obligatoire**
   à l'installation (`ALLOW_NO_OFFSITE=1` pour l'assumer explicitement), écrit
   dans `/etc/sahel-edu/backup.env` et lu par l'unité systemd. En son absence,

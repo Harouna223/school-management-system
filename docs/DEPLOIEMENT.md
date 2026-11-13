@@ -202,9 +202,11 @@ docker compose -f docker/docker-compose.yml logs -f backend
 
 Les conteneurs se lancent dans cet ordre :
 1. `mysql` — base de données, initialisée avec le schéma
-2. `backend` — API Spring Boot, attend que MySQL soit prêt
+2. `backend` — API Spring Boot, attend que MySQL soit **sain** (`service_healthy`)
 3. `frontend` — Nginx servant le frontend React
-4. `db-backup` — sauvegarde automatique quotidienne
+
+> Il n'y a pas de quatrième conteneur. La sauvegarde est assurée par
+> `sahel-edu-backup.timer` côté hôte (voir §9).
 
 ---
 
@@ -227,18 +229,20 @@ Les conteneurs se lancent dans cet ordre :
 
 ### 9. Sauvegarde et restauration
 
-**Sauvegarde automatique** : le conteneur `db-backup` effectue un dump SQL quotidien à 00:00, conservé 14 jours. Les fichiers sont dans le volume `backup_data` :
-```bash
-docker exec school-db-backup ls -la /backups
-```
+> **Cette voie (docker compose seul) ne fournit AUCUNE sauvegarde automatique.**
+> C'était le rôle d'un conteneur `db-backup`, retiré : il écrivait dans un
+> volume Docker, donc sur le même disque que les données, ne vérifiait pas ses
+> archives et ignorait ses propres échecs. Pour une sauvegarde réelle, utilisez
+> `deploy/install.sh`, qui installe `sahel-edu-backup.timer` (dump vérifié,
+> copie hors site obligatoire). Voir `docs/DEPLOIEMENT_UBUNTU.md` §6.
 
 **Sauvegarde manuelle** : depuis l'interface → Paramètres → Sauvegarde → Télécharger.
 
 **Restauration** : Paramètres → Sauvegarde → Restaurer (fichier `.sql` généré par l'application uniquement).
 
-**Sauvegarde complète (recommandé)** : en plus du dump SQL, sauvegardez le volume `uploads_data` (photos, logo) :
+**Sauvegarde complète (recommandé)** : en plus du dump SQL, sauvegardez le répertoire des fichiers pédagogiques (`UPLOAD_HOST_DIR`, par défaut `/srv/sahel-edu/uploads`) :
 ```bash
-docker run --rm -v uploads_data:/data -v /backup:/backup alpine tar czf /backup/uploads-$(date +%Y%m%d).tar.gz -C /data .
+sudo tar czf /backup/uploads-$(date +%Y%m%d).tar.gz -C /srv/sahel-edu/uploads .
 ```
 
 ---
@@ -380,9 +384,6 @@ services:
     container_name: sms-ndjamena-frontend
     ports:
       - "81:80"       # changer le port frontend externe
-
-  db-backup:
-    container_name: sms-ndjamena-db-backup
 ```
 
 #### Configuration du reverse proxy
@@ -501,8 +502,6 @@ services:
     container_name: sms-$ECOLE-frontend
     ports:
       - "$PORT_FRONT:80"
-  db-backup:
-    container_name: sms-$ECOLE-db-backup
 EOF
 
 echo "→ Lancement de l'instance..."
