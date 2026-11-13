@@ -59,12 +59,17 @@ log "version : $BEFORE -> $AFTER"
 #      copie hors site — c'est-a-dire exactement le defaut qu'on corrige.
 # ------------------------------------------------------------------
 log "migration : proprietaire du volume des fichiers pedagogiques"
-if [[ -d "$DATA_DIR/uploads" ]]; then
-  chown -R "${APP_UID}:${APP_GID}" "$DATA_DIR/uploads"
-  chmod 750 "$DATA_DIR/uploads"
-  log "  $DATA_DIR/uploads -> ${APP_UID}:${APP_GID}"
+# C'est UPLOAD_HOST_DIR qui est monte dans le conteneur, pas forcement
+# $DATA_DIR/uploads. Chown-er le mauvais repertoire laissait les
+# televersements casses apres une mise a jour qui semblait pourtant reussie.
+UPLOAD_DIR_REELLE="$(env_get UPLOAD_HOST_DIR "$DATA_DIR/uploads")"
+if [[ -d "$UPLOAD_DIR_REELLE" ]]; then
+  chown -R "${APP_UID}:${APP_GID}" "$UPLOAD_DIR_REELLE"
+  chmod 750 "$UPLOAD_DIR_REELLE"
+  log "  $UPLOAD_DIR_REELLE -> ${APP_UID}:${APP_GID}"
 else
-  warn "$DATA_DIR/uploads introuvable : verification manuelle necessaire."
+  warn "$UPLOAD_DIR_REELLE introuvable : verification manuelle necessaire."
+  warn "  (valeur lue dans UPLOAD_HOST_DIR de $ENV_FILE)"
 fi
 
 log "migration : environnement de la sauvegarde"

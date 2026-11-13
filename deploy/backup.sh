@@ -111,7 +111,15 @@ mv -f "$DB_TMP" "$DB_DIR/db-$STAMP.sql.gz"
 log "base sauvegardee : $(du -h "$DB_DIR/db-$STAMP.sql.gz" | cut -f1) ($NB_TABLES tables)"
 
 log "sauvegarde des fichiers pedagogiques"
-tar czf "$UP_TMP" -C "$DATA_DIR/uploads" .
+# Le repertoire monte par le compose est UPLOAD_HOST_DIR, qui n'est pas
+# forcement $DATA_DIR/uploads : un administrateur peut le deplacer sur un
+# disque plus grand. Archiver $DATA_DIR/uploads en dur produisait alors une
+# sauvegarde annoncee « reussie » mais vide de tout fichier pedagogique — la
+# panne n'apparaissait qu'au moment de la restauration, quand il est trop tard.
+UP_SRC="$(env_get UPLOAD_HOST_DIR "$DATA_DIR/uploads")"
+[[ -d "$UP_SRC" ]] || die "repertoire des fichiers pedagogiques introuvable : $UP_SRC
+  Verifiez UPLOAD_HOST_DIR dans $ENV_FILE."
+tar czf "$UP_TMP" -C "$UP_SRC" .
 tar tzf "$UP_TMP" >/dev/null || die "archive des fichiers corrompue"
 mv -f "$UP_TMP" "$UP_DIR/uploads-$STAMP.tar.gz"
 log "fichiers sauvegardes : $(du -h "$UP_DIR/uploads-$STAMP.tar.gz" | cut -f1)"
