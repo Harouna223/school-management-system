@@ -114,13 +114,22 @@ describe('DashboardPage – graphiques Recharts', () => {
 
     // Recharts ne rend son SVG qu'une fois le conteneur mesuré : c'est le
     // polyfill de src/test/setup.js qui fournit une taille sous jsdom.
+    //
+    // Les trois assertions de type de graphique sont DANS le waitFor, et non
+    // après : `.recharts-responsive-container` est présent dès le premier
+    // rendu, alors que le SVG n'arrive qu'au cycle suivant (mesure puis
+    // rendu). Les vérifier juste après l'attente des conteneurs laissait une
+    // course : le test passait la plupart du temps et échouait parfois sur
+    // `expected null not to be null` (CI #218), sans qu'aucun code applicatif
+    // n'ait changé. La condition attendue est la même ; seul le moment de la
+    // vérifier change, et un graphique qui ne se rendrait jamais échoue
+    // toujours, au bout du délai.
     await waitFor(() => {
       expect(container.querySelectorAll('.recharts-responsive-container')).toHaveLength(3)
+      expect(container.querySelector('.recharts-area')).not.toBeNull()
+      expect(container.querySelector('.recharts-pie')).not.toBeNull()
+      expect(container.querySelector('.recharts-bar')).not.toBeNull()
     })
-
-    expect(container.querySelector('.recharts-area')).not.toBeNull()
-    expect(container.querySelector('.recharts-pie')).not.toBeNull()
-    expect(container.querySelector('.recharts-bar')).not.toBeNull()
   })
 
   it('rend la légende du camembert avec les libellés du serveur', async () => {
